@@ -1,0 +1,19 @@
+[Unit]
+Description={{description}}
+After=network.target
+
+[Service]
+User={{user}}
+Group={{user}}
+WorkingDirectory={{application_dir}}
+{% for flag in flags -%}
+Environment="{{flag}}=True"
+{% endfor -%}
+{% for env_var in env_vars -%}
+Environment="{{env_var}}"
+{% endfor -%}
+
+ExecStart=/usr/bin/python3 {{application_path}}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,30 @@
+options:
+  feature-flags:
+    type: string
+    default: ''
+    description: |
+      Comma-delimited list of feature flags to be used. Each feature flag specified is set to 'True'. Example: 'DEBUG,FEATURE_FLAG_AUTH'. (non-conclusive) List of supported flags:
+        - DEBUG: run h_api in debug mode
+        - FEATURE_FLAG_AUTH: Turn on authentication on h_api
+  juju-admin-username:
+    type: string
+    default: 'admin'
+    description: |
+      This is the user the api will use to do everything. He will be owner off every controller and model.
+  juju-admin-password:
+    type: string
+    default: ''
+    description: |
+      MUST NOT BE LEFT BLANK
+  api-key:
+    type: string
+    default: ''
+    description: |
+      A 256 character string. To make POST or PUT api-calls, this key must be added to the call in the following format: {'api-key': <api-key>}
+      To make GET api-calls, the key must be added to the url in the following format: <url>?apikey=<api-key>
+      When no api-key is provided, or an incorrect length, one will be created. This can be found in the /opt/sojobo-api/api-key file.
+  port:
+    type: string
+    default: '5000'
+    description: |
+      The port on which the API will be listening.
