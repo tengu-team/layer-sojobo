@@ -26,12 +26,13 @@ from flask import Response, request, abort
 from pygments import highlight, lexers, formatters
 
 
-API_DIR = os.environ.get('SOJOBO_API_DIR')
+def api_dir():
+    return os.environ.get('SOJOBO_API_DIR')
 
 
 def write_yaml(path, content):
     with open(path, "w") as y_file:
-        y_file.write(yaml.dump(content))
+        yaml.dump(content, y_file, default_flow_style=True)
 
 
 def create_response(http_code, return_object):
@@ -74,7 +75,11 @@ def get_controllers(name):
 
 
 def check_api_key(api_key):
-    with open('{}/api-key'.format(API_DIR), 'r') as key:
+    with open('{}/api-key'.format(api_dir()), 'r') as key:
         apikey = key.readlines()
     if api_key != apikey:
         abort(403)
+
+
+def invalid_data():
+    return 400, 'The request does not have all the required data or not in the right format. See the readme for more info'

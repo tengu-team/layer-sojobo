@@ -95,7 +95,7 @@ def render_api_systemd_template():
     appconf = config()
     env_vars = [
         "JUJU_ADMIN_USER={}".format(appconf['juju-admin-username']),
-        "JUJU_ADMIN_PASSWORD={}".format(appconf['juju-admin-password']), # ToDo, change to something secure
+        "JUJU_ADMIN_PASSWORD={}".format(appconf['juju-admin-password']),
         "SOJOBO_API_DIR={}".format(API_DIR),
         "SOJOBO_API_PORT={}".format(PORT)
     ]

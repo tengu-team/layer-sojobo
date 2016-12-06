@@ -19,7 +19,9 @@ from distutils.util import strtobool
 import os
 import socket
 
-from api import controller, model, user, helpers
+from control_api import controller, model, user
+import helpers
+
 from flask import Flask, request, redirect
 #
 # Init feature flags and global variables
@@ -58,7 +60,7 @@ def apply_caching(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Headers'] = 'Authentication,Content-Type,Location,id-token'
     response.headers['Access-Control-Expose-Headers'] = 'Content-Type,Location'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE'
     response.headers['Accept'] = 'application/json'
     return response
 
@@ -86,7 +88,7 @@ def create_controller():
     return controller.create(request)
 
 
-@APP.route('controllers/delete', methods=['POST'])
+@APP.route('controllers/delete', methods=['DELETE'])
 def delete_controller():
     return controller.delete(request)
 ###############################################################################
@@ -97,7 +99,7 @@ def create_model():
     return model.create(request)
 
 
-@APP.route('/models/delete', method=['POST'])
+@APP.route('/models/delete', method=['DELETE'])
 def delete_model():
     return model.delete(request)
 
@@ -118,7 +120,7 @@ def create_user():
     return user.create(request)
 
 
-@APP.route('/users/delete/', methods=['POST'])
+@APP.route('/users/delete/', methods=['DELETE'])
 def delete_user():
     return user.delete(request)
 
@@ -145,4 +147,13 @@ def get_credentials():
 # START FLASK SERVER
 ###############################################################################
 if __name__ == '__main__':
+    # Enable monitoring and metering module if it's available to the user
+    # Not tested and naming must be agreed upon with Sebastien
+    try:
+        from monitoring_api import monitoring
+        APP.register_blueprint(monitoring, url_prefix='/monitoring')
+        from metering_api import metering
+        APP.register_blueprint(metering, url_prefix='/metering')
+    except ImportError:
+        pass
     APP.run(host='0.0.0.0', port=os.environ.get('SOJOBO_API_PORT'), debug=DEBUG, threaded=True)

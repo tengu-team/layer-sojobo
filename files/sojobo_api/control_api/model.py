@@ -2,8 +2,8 @@
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
-import helpers
-from .. import juju
+from .. import helpers
+import juju
 
 
 def create(request):

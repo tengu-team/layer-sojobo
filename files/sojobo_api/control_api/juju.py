@@ -13,15 +13,16 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103
+# pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902
 # !/usr/bin/env python3
 
-import os
 import json
-import yaml
-import tempfile
+import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
-from controllers import maas, aws
+import tempfile
+import yaml
+
+from juju_controllers import maas, aws
 
 from flask import abort
 
@@ -48,38 +49,56 @@ class JuJu_Token(object):
     def m_shared_name(self):
         return "{}/{}".format(USER, self.m_name)
 
+    def get_credentials(self):
+        return {'credentials': {self.c_name: {self.username: self.c_token.get_credentials()}}}
+
+    def get_cloud(self):
+        return {'clouds':{self.c_name: self.c_token.get_cloud()}}
+
 
 def authenticate(auth, controller, modelname=None):
     try:
         check_output(['juju', 'login', auth.username, '--controller', controller], input=auth.password + '\n',
-                 universal_newlines=True)
+                     universal_newlines=True)
     except CalledProcessError:
         abort(403)
     controllers_info = json.loads(check_output(['juju', 'controllers', '--format', 'json']))
-    with open("/home/ubuntu/.local/share/juju/clouds.yaml", 'r') as y_clouds:
-        clouds = yaml.load(y_clouds)
-    c_type = clouds['clouds'][controller]['type']
-    c_endpoint = clouds['clouds'][controller]['endpoint']
+    c_type, c_endpoint = get_controller_info(controller)
     c_access = controllers_info['controllers'][controller]['access']
-    if c_type == 'MAAS':
-        try:
-            c_token = maas.MAAS_Token(c_endpoint, auth)
-            maas.login(auth)
-            token = JuJu_Token(auth, controller, c_type, c_access, c_token)
-        except CalledProcessError:
-            abort(403)
-
+    if c_type == 'maas':
+        c_token = maas.Token(c_endpoint, auth)
+    elif c_type == 'aws':
+        c_token = aws.Token(c_endpoint, auth)
+    token = JuJu_Token(auth, controller, c_type, c_access, c_token)
     if modelname:
         models_info = json.loads(check_output(['juju', 'models', '--format', 'json']))
         token.set_model(modelname, models_info[0]['models']['users'][token.username]['access'])
     check_call(['juju', 'logout'])
     check_output(['juju', 'login', USER, '--controller', token.c_name], input=PASSWORD + '\n',
-             universal_newlines=True)
+                 universal_newlines=True)
     if token.m_name:
         check_call(['juju', 'switch', token.m_name])
     return token
 
 
+def create_controller(c_type, name, region, credentials):
+    if c_type == 'maas':
+        output = maas.create_controller(name, region, credentials)
+    elif c_type == 'aws':
+        output = aws.create_controller(name, region, credentials)
+    else:
+        output = 'Incorrect controller type. Supported options are: maas, aws'
+    return output
+
+
+def delete_controller(token):
+    if token.c_access == 'superuser':
+        return check_output(['juju', 'destroy-controller', '--destroy-all-models', token.c_name, '-y'])
+    else:
+        abort(403)
+#####################################################################################
+# To Check
+#####################################################################################
 def list_users():
     users = json.loads(check_output(['juju', 'list-users', '--format', 'json'],
                                     universal_newlines=True))
@@ -102,10 +121,7 @@ def create_user(username, password):
 
 
 def create_model(token, ssh_keys):
-    if CONTROLLER_TYPE == 'maas':
-        credentials = maas.get_credentials(CLOUD_NAME, token.username, token.api_key)
-    else:
-        credentials = aws.get_credentials(token)
+    credentials = token.get_credentials()
     tmp = tempfile.NamedTemporaryFile(mode="w+", delete=False)
     tmp.write(json.dumps(credentials))
     tmp.close()  # deletes the file
@@ -114,7 +130,7 @@ def create_model(token, ssh_keys):
         modelconfig = modelconfig + ['authorized-keys="{}"'.format(ssh_keys)]
     if len(modelconfig):
         modelconfig = ['--config'] + modelconfig
-    check_call(['juju', 'add-credential', '--replace', CLOUD_NAME, '-f', tmp.name])
+    check_call(['juju', 'add-credential', '--replace', token.c_name, '-f', tmp.name])
     check_call(['juju', 'add-model', token.modelname, '--credential', token.username] + modelconfig)
     check_call(['juju', 'grant', token.username, 'admin', token.modelname])
 
@@ -159,17 +175,7 @@ def model_exists(token):
     return exists
 
 
-def get_credentials(token):
-    if CONTROLLER_TYPE == "maas":
-        credentials = maas.get_credentials(CLOUD_NAME, token.username, token.api_key)
-    else:
-        credentials = aws.get_credentials(token.username)
-    return credentials
-
-
-def get_clouds():
-    if CONTROLLER_TYPE == "maas":
-        clouds = maas.get_clouds(CLOUD_NAME)
-    else:
-        clouds = aws.get_clouds(CLOUD_NAME)
-    return clouds
+def get_controller_info(controller):
+    with open("/home/ubuntu/.local/share/juju/clouds.yaml", 'r') as y_clouds:
+        clouds = yaml.load(y_clouds)
+    return clouds['clouds'][controller]['type'], clouds['clouds'][controller]['endpoint']
