@@ -15,7 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902
 # !/usr/bin/env python3
-
+import base64
+import hashlib
 import json
 import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
@@ -61,7 +62,7 @@ def authenticate(auth, controller, modelname=None):
         check_output(['juju', 'login', auth.username, '--controller', controller], input=auth.password + '\n',
                      universal_newlines=True)
     except CalledProcessError:
-        abort(403)
+        abort(403, {'message': 'This controller does not exist or you do not have permission to see it!'})
     controllers_info = json.loads(check_output(['juju', 'controllers', '--format', 'json']))
     c_type, c_endpoint = get_controller_info(controller)
     c_access = controllers_info['controllers'][controller]['access']
@@ -72,12 +73,13 @@ def authenticate(auth, controller, modelname=None):
     token = JuJu_Token(auth, controller, c_type, c_access, c_token)
     if modelname:
         models_info = json.loads(check_output(['juju', 'models', '--format', 'json']))
-        token.set_model(modelname, models_info[0]['models']['users'][token.username]['access'])
+        if '{}/{}'.format(USER, modelname) in models_info.values():
+            token.set_model(modelname, models_info[0]['models']['users'][token.username]['access'])
+        else:
+            abort(403, {'message': 'This model does not exist or you do not have permission to see it!'})
     check_call(['juju', 'logout'])
     check_output(['juju', 'login', USER, '--controller', token.c_name], input=PASSWORD + '\n',
                  universal_newlines=True)
-    if token.m_name:
-        check_call(['juju', 'switch', token.m_name])
     return token
 
 
@@ -92,10 +94,54 @@ def create_controller(c_type, name, region, credentials):
 
 
 def delete_controller(token):
-    if token.c_access == 'superuser':
-        return check_output(['juju', 'destroy-controller', '--destroy-all-models', token.c_name, '-y'])
+    return check_output(['juju', 'destroy-controller', '--destroy-all-models', token.c_name, '-y'])
+
+
+def model_exists(token):
+    data = json.loads(check_output(['juju', 'list-models', '--format', 'json']))
+    if token.m_name in data.values():
+        exists = True
     else:
-        abort(403)
+        exists = False
+    return exists
+
+
+def get_gui_url(token):
+    return check_output(['juju', 'gui', '--no-browser', '--model', token.m_name],
+                        universal_newlines=True, stderr=STDOUT).rstrip()
+
+
+def create_model(token, ssh_key=None):
+    credentials = token.get_credentials()
+    tmp = tempfile.NamedTemporaryFile(mode="w+", delete=False)
+    tmp.write(json.dumps(credentials))
+    tmp.close()  # deletes the file
+    check_call(['juju', 'add-credential', '--replace', token.c_name, '-f', tmp.name])
+    check_call(['juju', 'add-model', token.m_name, '--credential', token.username])
+    check_call(['juju', 'grant', token.username, 'admin', token.m_name])
+    if ssh_key is not None:
+        add_ssh_key(token, ssh_key)
+
+
+def delete_model(token):
+    check_call(['juju', 'destroy-model', '-y', token.m_name])
+
+
+def add_ssh_key(token, ssh_key):
+    check_call(['juju', 'add-ssh-key', '-m', '{}:{}'.format(token.c_name, token.m_name), '"{}"'.format(ssh_key)])
+
+
+def remove_ssh_key(token, ssh_key):
+    key = base64.b64decode(bytes(ssh_key.strip().split()[1].encode('ascii')))
+    fp_plain = hashlib.md5(key).hexdigest()
+    fingerprint = ':'.join(a+b for a,b in zip(fp_plain[::2], fp_plain[1::2]))
+    check_call(['juju', 'remove-ssh-key', '-m', '{}:{}'.format(token.c_name, token.n_name), fingerprint])
+
+
+def model_status(token):
+    general = check_output(['juju', 'show-model', '-m', '{}:{}'.format(token.c_name, token.m_name), '--format', 'json'])
+    detail = check_output(['juju', 'status', '-m', '{}:{}'.format(token.c_name, token.m_name), '--format', 'json'])
+    return json.loads({'general': general, 'detail': detail})
 #####################################################################################
 # To Check
 #####################################################################################
@@ -120,33 +166,6 @@ def create_user(username, password):
         print(output)
 
 
-def create_model(token, ssh_keys):
-    credentials = token.get_credentials()
-    tmp = tempfile.NamedTemporaryFile(mode="w+", delete=False)
-    tmp.write(json.dumps(credentials))
-    tmp.close()  # deletes the file
-    modelconfig = []
-    if ssh_keys:
-        modelconfig = modelconfig + ['authorized-keys="{}"'.format(ssh_keys)]
-    if len(modelconfig):
-        modelconfig = ['--config'] + modelconfig
-    check_call(['juju', 'add-credential', '--replace', token.c_name, '-f', tmp.name])
-    check_call(['juju', 'add-model', token.modelname, '--credential', token.username] + modelconfig)
-    check_call(['juju', 'grant', token.username, 'admin', token.modelname])
-
-
-def get_gui_url(token):
-    modelname = 'controller'
-    if token.modelname:
-        modelname = token.modelname
-    return check_output(['juju', 'gui', '--no-browser', '--model', modelname], universal_newlines=True, stderr=STDOUT).rstrip()
-
-
-def status(token):
-    output = check_output(['juju', 'status', '--format', 'json', '--model', token.modelname], universal_newlines=True)
-    return json.loads(output)
-
-
 def config(token, appname):
     output = check_output(['juju', 'config', appname, '--model', token.modelname, '--format', 'json'], universal_newlines=True)
     return json.loads(output)
@@ -165,17 +184,7 @@ def user_exists(username, modelname=None):
     return exists
 
 
-def model_exists(token):
-    exists = False
-    data = json.loads(check_output(['juju', 'list-models', '--format', 'json']))
-    for model in data['models']:
-        if token.modelname == model['name']:
-            exists = True
-            break
-    return exists
-
-
 def get_controller_info(controller):
-    with open("/home/ubuntu/.local/share/juju/clouds.yaml", 'r') as y_clouds:
+    with open('/home/ubuntu/.local/share/juju/clouds.yaml', 'r') as y_clouds:
         clouds = yaml.load(y_clouds)
     return clouds['clouds'][controller]['type'], clouds['clouds'][controller]['endpoint']

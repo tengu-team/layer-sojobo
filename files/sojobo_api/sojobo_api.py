@@ -16,13 +16,14 @@
 # pylint: disable=c0111,c0301,c0325
 # !/usr/bin/env python3
 from distutils.util import strtobool
+import glob
+from importlib import import_module
 import os
 import socket
 
-from control_api import controller, model, user
 import helpers
 
-from flask import Flask, request, redirect
+from flask import Flask, redirect
 #
 # Init feature flags and global variables
 #
@@ -74,86 +75,26 @@ def forbidden(error):
 @APP.route('/')
 def api_root():
     # see http://semver.org/
-    return helpers.create_response(200, {"name": socket.gethostname(), "version": "1.0.0"})
+    api_list = []
+    for path in glob.glob('{}/api_*'.format(helpers.api_dir())):
+        api_list.append(path.split('/')[-1])
+    return helpers.create_response(200, {'name': socket.gethostname(),
+                                         'version': "1.0.0",
+                                         'api_dir': helpers.api_dir(),
+                                         'used_apis': api_list})
 
 
 @APP.route('/favicon.ico')
 def api_icon():
     return redirect("http://tengu.io/assets/icons/favicon.ico", code=302)
 ###############################################################################
-# CONTROLLER FUNCTIONS
-###############################################################################
-@APP.route('/controllers/create', methods=['POST'])
-def create_controller():
-    return controller.create(request)
-
-
-@APP.route('controllers/delete', methods=['DELETE'])
-def delete_controller():
-    return controller.delete(request)
-###############################################################################
-# MODEL FUNCTIONS
-###############################################################################
-@APP.route('/models/create', methods=['POST'])
-def create_model():
-    return model.create(request)
-
-
-@APP.route('/models/delete', method=['DELETE'])
-def delete_model():
-    return model.delete(request)
-
-
-@APP.route('/models/<modelname>/status', methods=['GET'])
-def status(modelname):
-    return model.status(request, modelname)
-
-
-@APP.route('/models/<modelname>/applications/<appname>/config', methods=['GET'])
-def get_config(modelname, appname):
-    return model.get_config(request, modelname, appname)
-###############################################################################
-# USER FUNCTIONS
-###############################################################################
-@APP.route('/users/create/', methods=['POST'])
-def create_user():
-    return user.create(request)
-
-
-@APP.route('/users/delete/', methods=['DELETE'])
-def delete_user():
-    return user.delete(request)
-
-
-@APP.route('/users/changepassword/', methods=['PUT'])
-def change_password():
-    return user.change_password(request)
-
-
-@APP.route('/users/addtomodel/', methods=['POST'])
-def add_to_model():
-    return user.add_to_model(request)
-
-
-@APP.route('/users/removefrommodel/', methods=['POST'])
-def remove_from_model():
-    return user.remove_from_model(request)
-
-
-@APP.route('/users/credentials.zip', methods=['GET'])
-def get_credentials():
-    return user.get_credentials(request)
-###############################################################################
 # START FLASK SERVER
 ###############################################################################
 if __name__ == '__main__':
-    # Enable monitoring and metering module if it's available to the user
-    # Not tested and naming must be agreed upon with Sebastien
-    try:
-        from monitoring_api import monitoring
-        APP.register_blueprint(monitoring, url_prefix='/monitoring')
-        from metering_api import metering
-        APP.register_blueprint(metering, url_prefix='/metering')
-    except ImportError:
-        pass
+    # Automatic loading of all the apis if present
+    # Not tested and naming must be agreed upon
+    for api in glob.glob('{}/api_*'.format(helpers.api_dir())):
+        name = api.split('_')[-1]
+        blueprint = import_module('{}.{}.{}'.format(api.split('/')[-1], name, name))
+        APP.register_blueprint(blueprint, url_prefix='/{}'.format(name))
     APP.run(host='0.0.0.0', port=os.environ.get('SOJOBO_API_PORT'), debug=DEBUG, threaded=True)

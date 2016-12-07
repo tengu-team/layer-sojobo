@@ -9,11 +9,15 @@ import tempfile
 
 from flask import send_file
 
-from .. import helpers
-import juju
+from .. import helpers, juju
+from flask import request, Blueprint
 
 
-def create(request):
+users = Blueprint('users', __name__)
+
+
+@users.route('/create', methods=['POST'])
+def create():
     data = request.form
     helpers.check_api_key(data['api-key'])
     token = juju.authenticate(request.authorization)
@@ -25,23 +29,38 @@ def create(request):
     return helpers.create_response(200, response)
 
 
-def delete(request):
+@users.route('/delete', methods=['DELETE'])
+def delete():
     return None
 
 
-def change_password(request):
+@users.route('/changepassword', methods=['PUT'])
+def change_password():
     return None
 
 
-def add_to_model(request):
+@users.route('/addtocontroller', methods=['POST'])
+def add_to_controller():
     return None
 
 
-def remove_from_model(request):
+@users.route('/removefromcontroller', methods=['POST'])
+def remove_from_controller():
     return None
 
 
-def get_credentials(request):
+@users.route('/addtomodel', methods=['POST'])
+def add_to_model():
+    return None
+
+
+@users.route('/removefrommodel', methods=['POST'])
+def remove_from_model():
+    return None
+
+
+@users.route('/credentials.zip', methods=['GET'])
+def get_credentials():
     credentials = juju.get_credentials(juju.authenticate(request.authorization))
     clouds = juju.get_clouds()
     controllers = helpers.get_controllers(juju.CONTROLLER_NAME)
