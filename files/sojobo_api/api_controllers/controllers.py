@@ -1,15 +1,15 @@
-# pylint: disable=c0111,c0301,c0325
+# pylint: disable=c0111,c0301,c0325,w0406
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
-from .. import helpers, juju
 from flask import request, Blueprint
+from .. import helpers, juju
 
 
-controllers = Blueprint('controllers', __name__)
+CONTROLLERS = Blueprint('controllers', __name__)
 
 
-@controllers.route('/create', methods=['POST'])
+@CONTROLLERS.route('/create', methods=['POST'])
 def create():
     data = request.form
     try:
@@ -21,7 +21,7 @@ def create():
     return helpers.create_response(status, {'message': response})
 
 
-@controllers.route('/delete', methods=['DELETE'])
+@CONTROLLERS.route('/delete', methods=['DELETE'])
 def delete():
     data = request.form
     try:

@@ -1,4 +1,4 @@
-# pylint: disable=c0111,c0301,c0325
+# pylint: disable=c0111,c0301,c0325,w0406
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
@@ -7,59 +7,66 @@ from os.path import dirname, realpath
 import shutil
 import tempfile
 
-from flask import send_file
+from flask import send_file, request, Blueprint
 
 from .. import helpers, juju
-from flask import request, Blueprint
 
 
-users = Blueprint('users', __name__)
+USERS = Blueprint('users', __name__)
 
 
-@users.route('/create', methods=['POST'])
+@USERS.route('/create', methods=['POST'])
 def create():
     data = request.form
     helpers.check_api_key(data['api-key'])
     token = juju.authenticate(request.authorization)
     if juju.user_exists(data['username']):
-        response = {'message': 'The user already exists'}
+        code, response = 200, 'The user already exists'
     else:
         juju.create_user(data['username'], data['password'])
         response = {'gui-url': juju.get_gui_url(token)}
-    return helpers.create_response(200, response)
+    return helpers.create_response(code, response)
 
 
-@users.route('/delete', methods=['DELETE'])
+@USERS.route('createadmin', methods=['POST'])
+def create_admin():
+    data = request.format
+    helpers.check_api_key(data['api-key'])
+    token = juju.authenticate(request.authorization)
+    return token
+
+
+@USERS.route('/delete', methods=['DELETE'])
 def delete():
     return None
 
 
-@users.route('/changepassword', methods=['PUT'])
+@USERS.route('/changepassword', methods=['PUT'])
 def change_password():
     return None
 
 
-@users.route('/addtocontroller', methods=['POST'])
+@USERS.route('/addtocontroller', methods=['POST'])
 def add_to_controller():
     return None
 
 
-@users.route('/removefromcontroller', methods=['POST'])
+@USERS.route('/removefromcontroller', methods=['POST'])
 def remove_from_controller():
     return None
 
 
-@users.route('/addtomodel', methods=['POST'])
+@USERS.route('/addtomodel', methods=['POST'])
 def add_to_model():
     return None
 
 
-@users.route('/removefrommodel', methods=['POST'])
+@USERS.route('/removefrommodel', methods=['POST'])
 def remove_from_model():
     return None
 
 
-@users.route('/credentials.zip', methods=['GET'])
+@USERS.route('/credentials.zip', methods=['GET'])
 def get_credentials():
     credentials = juju.get_credentials(juju.authenticate(request.authorization))
     clouds = juju.get_clouds()

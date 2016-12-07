@@ -1,15 +1,15 @@
-# pylint: disable=c0111,c0301,c0325
+# pylint: disable=c0111,c0301,c0325,w0406
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
-from .. import helpers, juju
 from flask import request, Blueprint
+from .. import helpers, juju
 
 
-models = Blueprint('models', __name__)
+MODELS = Blueprint('models', __name__)
 
 
-@models.route('/create', methods=['POST'])
+@MODELS.route('/create', methods=['POST'])
 def create():
     data = request.form
     try:
@@ -30,7 +30,7 @@ def create():
     return helpers.create_response(code, {'message': response})
 
 
-@models.route('/delete', method=['DELETE'])
+@MODELS.route('/delete', method=['DELETE'])
 def delete():
     data = request.form
     try:
@@ -49,7 +49,7 @@ def delete():
     return helpers.create_response(code, {'message': response})
 
 
-@models.route('/addsshkey', method=['PUT'])
+@MODELS.route('/addsshkey', method=['PUT'])
 def add_ssh_key():
     data = request.form
     try:
@@ -68,7 +68,7 @@ def add_ssh_key():
     return helpers.create_response(code, {'message': response})
 
 
-@models.route('/removesshkey', method=['PUT'])
+@MODELS.route('/removesshkey', method=['PUT'])
 def remove_ssh_key():
     data = request.format
     try:
@@ -87,7 +87,7 @@ def remove_ssh_key():
     return helpers.create_response(code, {'message': response})
 
 
-@models.route('/<controllername>/<modelname>/status', methods=['GET'])
+@MODELS.route('/<controllername>/<modelname>/status', methods=['GET'])
 def status(controllername, modelname):
     data = request.args
     helpers.check_api_key(data['api_key'])
