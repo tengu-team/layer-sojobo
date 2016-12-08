@@ -77,13 +77,22 @@ def remove_ssh_key():
 
 @MODELS.route('/<controllername>/<modelname>/status', methods=['GET'])
 def status(controllername, modelname):
-    data = request.args
-    token = juju.authenticate(data['api_key'], request.authorization, controllername, modelname)
     try:
+        token = juju.authenticate(request.args['api_key'], request.authorization, controllername, modelname)
         if token.m_access:
             code, response = 200, juju.model_status(token)
         else:
             code, response = 403, 'You do not have permission to see this model'
+    except KeyError:
+        code, response = helpers.invalid_data()
+    return helpers.create_response(code, response)
+
+
+@MODELS.route('/getmodels/<controllername>', methods=['GET'])
+def get_models(controllername):
+    try:
+        token = juju.authenticate(request.args['api_key'], request.authorization, controllername)
+        code, response = juju.get_models(token)
     except KeyError:
         code, response = helpers.invalid_data()
     return helpers.create_response(code, response)

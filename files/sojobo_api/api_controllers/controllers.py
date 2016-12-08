@@ -42,9 +42,8 @@ def delete():
 
 @CONTROLLERS.route('/backup', methods=['GET'])
 def backup_controllers():
-    data = request.args
     try:
-        token = juju.authenticate(data['api_key'], request.authorization)
+        token = juju.authenticate(request.args['api_key'], request.authorization)
         if token.is_admin:
             apidir = helpers.get_api_dir
             homedir = '/home/ubuntu/.local/share/juju'
@@ -56,6 +55,16 @@ def backup_controllers():
             return send_file('{}/backup.zip'.format(apidir))
         else:
             code, response = errors.no_permission()
+    except KeyError:
+        code, response = errors.invalid_data()
+    return helpers.create_response(code, {'message': response})
+
+
+@CONTROLLERS.route('/getcontrollers', methods=['GET'])
+def get_controllers():
+    try:
+        token = juju.authenticate(request.args['api_key'], request.authorization)
+        code, response = 200, juju.get_controllers(token)
     except KeyError:
         code, response = errors.invalid_data()
     return helpers.create_response(code, {'message': response})

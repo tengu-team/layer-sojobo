@@ -86,12 +86,7 @@ class JuJu_Token(object):
         return {'clouds':{self.c_name: self.c_token.get_cloud()}}
 
     def set_admin(self):
-        admin = True
-        for controller in get_all_controllers():
-            if get_controller_access(self.username, self.password, controller) != 'superuser':
-                admin = False
-                break
-        self.admin = admin
+        return self.username in get_admins()
 
 
 def authenticate(api_key, auth, controller=None, modelname=None):
@@ -100,7 +95,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
     if controller is None:
         return token
     else:
-        c_access = get_controller_access(token.username, token.password, controller)
+        c_access = get_controller_access(token, controller)
         if c_access is None:
             abort(403, {'message': 'This controller does not exist or you do not have permission to see it!'})
         c_type, c_endpoint = get_controller_info(controller)
@@ -143,9 +138,9 @@ def get_all_controllers():
     return controllers['controllers'].keys()
 
 
-def get_controller_access(username, password, controller):
+def get_controller_access(token, controller):
     try:
-        check_output(['juju', 'login', username, '--controller', controller], input=password + '\n',
+        check_output(['juju', 'login', token.username, '--controller', controller], input=token.password + '\n',
                      universal_newlines=True)
         controllers_info = json.loads(check_output(['juju', 'controllers', '--format', 'json']))
         access = controllers_info['controllers'][controller]['access']
@@ -163,7 +158,7 @@ def get_controller_info(controller):
 def get_controllers(token):
     result = {}
     for controller in get_all_controllers():
-        access = get_controller_access(token.username, token.password, controller)
+        access = get_controller_access(token, controller)
         if access is not None:
             result[controller] = access
     return result
@@ -181,6 +176,24 @@ def get_all_models(controller):
     for model in data['models']:
         models.append(model['name'])
     return models
+
+
+def get_models(token):
+    models = {}
+    for model in get_all_models(token.c_name):
+        access = get_model_access(token, model)
+        if access is not None:
+            models[model] = access
+    return models
+
+
+def get_model_access(token, model):
+    data = json.loads(check_output(['juju', 'users', '-c', token.c_name, model, '--format', 'json']))
+    try:
+        access = data[token.username]['access']
+    except KeyError:
+        access = None
+    return access
 
 
 def get_gui_url(token):
@@ -242,7 +255,8 @@ def get_users(controller):
 
 
 def get_admins():
-    superadminusers = []
+    result = set()
+    not_first = False
     for controller in get_all_controllers():
         users = get_users(controller)
         for model in get_all_models(controller):
@@ -251,10 +265,12 @@ def get_admins():
             for key, value in data.items:
                 if value['access'] == 'admin' and users[key] == 'superuser':
                     temp.add(key)
-            superadminusers.append(temp)
-    for i in range(0, len(superadminusers)-1):
-        superadminusers[0] = superadminusers[0].intersection(superadminusers[i+1])
-    return list(superadminusers[0])
+            if not_first:
+                result = result.intersection(temp)
+            else:
+                result = temp
+                not_first = True
+    return list(result)
 
 
 def make_admin(username):
