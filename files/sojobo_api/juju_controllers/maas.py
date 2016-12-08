@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,r0903
+# pylint: disable=c0111,c0301,c0325,r0903,w0406
 # !/usr/bin/env python3
 import json
 from subprocess import check_call, check_output
@@ -24,6 +24,7 @@ from .. .. import helpers
 
 class Token(object):
     def __init__(self, url, auth):
+        self.type = 'maas'
         self.url = url
         self.user = auth.username
         self.password = auth.password
@@ -48,7 +49,7 @@ def create_controller(name, endpoint, credentials):
 
 
 def create_cloud_file(name, endpoint):
-    path = '{}/cloud.yaml'.format(helpers.api_dir())
+    path = '{}/cloud.yaml'.format(helpers.get_api_dir())
     data = {'clouds': {name: {'type': 'maas',
                               'auth-types': '[oauth1]',
                               'endpoint': endpoint}}}
@@ -57,7 +58,7 @@ def create_cloud_file(name, endpoint):
 
 
 def create_credentials_file(name, credentials):
-    path = '{}/credentials.yaml'.format(helpers.api_dir())
+    path = '{}/credentials.yaml'.format(helpers.get_api_dir())
     data = {name: {credentials['username']: {'auth-type': 'oauth1',
                                              'maas-oauth': get_user_api_key(credentials['username'],
                                                                             credentials['password'])}}}

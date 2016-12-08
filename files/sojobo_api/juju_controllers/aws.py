@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325, r0903
+# pylint: disable=c0111,c0301,c0325, r0903,w0406
 # !/usr/bin/env python3
 from subprocess import check_output, check_call
 import yaml
@@ -21,6 +21,7 @@ from .. .. import helpers
 class Token(object):
     def __init__(self, url, auth):
         access_key, secret_key = get_credentials(auth)
+        self.type = 'aws'
         self.url = url
         self.access = access_key
         self.secret = secret_key
@@ -46,7 +47,7 @@ def create_controller(name, region, credentials):
 
 
 def create_credentials_file(region, credentials):
-    path = '{}/credentials.yaml'.format(helpers.api_dir())
+    path = '{}/credentials.yaml'.format(helpers.get_api_dir())
     data = {'aws': {'default-credential': 'admin',
                     'default-region': region,
                     'admin': {'auth-type': 'access-key',

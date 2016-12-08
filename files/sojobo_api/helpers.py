@@ -17,7 +17,7 @@
 
 import json
 import os
-from os.path import expanduser
+# from os.path import expanduser
 import socket
 import yaml
 
@@ -26,7 +26,7 @@ from flask import Response, request, abort
 from pygments import highlight, lexers, formatters
 
 
-def api_dir():
+def get_api_dir():
     return os.environ.get('SOJOBO_API_DIR')
 
 
@@ -64,22 +64,18 @@ def request_wants_json():
         request.accept_mimetypes['text/html']
 
 
-def get_controllers(name):
-    with open(expanduser('~/.local/share/juju/controllers.yaml'))as c_file:
-        c_contents = yaml.safe_load(c_file)
-    return {
-        'controllers': {
-            name : c_contents['controllers'][name]
-        }
-    }
+# def get_controllers(name):
+#     with open(expanduser('~/.local/share/juju/controllers.yaml'))as c_file:
+#         c_contents = yaml.safe_load(c_file)
+#     return {
+#         'controllers': {
+#             name : c_contents['controllers'][name]
+#         }
+#     }
 
 
 def check_api_key(api_key):
-    with open('{}/api-key'.format(api_dir()), 'r') as key:
+    with open('{}/api-key'.format(get_api_dir()), 'r') as key:
         apikey = key.readlines()
     if api_key != apikey:
-        abort(403)
-
-
-def invalid_data():
-    return 400, 'The request does not have all the required data or not in the right format. See the readme for more info'
+        abort(403, {'message': 'You do not have permission to perform this operation!'})
