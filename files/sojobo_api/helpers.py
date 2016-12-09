@@ -30,6 +30,10 @@ def get_api_dir():
     return os.environ.get('SOJOBO_API_DIR')
 
 
+def get_charm_dir():
+    return os.environ.get('LOCAL_CHARM_DIR')
+
+
 def write_yaml(path, content):
     with open(path, "w") as y_file:
         yaml.dump(content, y_file, default_flow_style=True)

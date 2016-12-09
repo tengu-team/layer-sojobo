@@ -83,6 +83,10 @@ def get_user_api_key(username, password):
 
 def login(token):
     check_call(['maas', 'login', token.user, token.url, token.api_key])
+
+
+def get_supported_series():
+    return ['trusty', 'xenial']
 #####################################################################################
 # To Check
 #####################################################################################

@@ -28,3 +28,8 @@ options:
     default: '5000'
     description: |
       The port on which the API will be listening.
+  charm-dir:
+    type: string
+    default: '/home/ubuntu/local_charms'
+    description: |
+      The location where the api will search for local charms, when the app_name is prefixed with "local:<app_name>"

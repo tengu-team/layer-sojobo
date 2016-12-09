@@ -46,6 +46,10 @@ def create_controller(name, region, credentials):
     return output
 
 
+def get_supported_series():
+    return ['precise', 'trusty', 'xenial', 'yakkety']
+
+
 def create_credentials_file(region, credentials):
     path = '{}/credentials.yaml'.format(helpers.get_api_dir())
     data = {'aws': {'default-credential': 'admin',
