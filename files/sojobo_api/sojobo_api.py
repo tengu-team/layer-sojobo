@@ -16,12 +16,11 @@
 # pylint: disable=c0111,c0301,c0325
 # !/usr/bin/env python3
 from distutils.util import strtobool
-import glob
 from importlib import import_module
 import os
 import socket
 
-import helpers
+from api import w_helpers as helpers
 
 from flask import Flask, redirect
 #
@@ -45,6 +44,14 @@ def parse_flags_from_environment(flags):
         except ValueError:
             pass
         globals()[flagname] = value
+
+
+def get_apis():
+    api_list = []
+    for f_path in os.listdir('{}/api'.format(helpers.get_api_dir())):
+        if 'api_' in f_path and '.pyc' not in f_path:
+            api_list.append(f_path.split('.')[0])
+    return api_list
 
 
 DEBUG = False
@@ -74,14 +81,10 @@ def forbidden(error):
 ###############################################################################
 @APP.route('/')
 def api_root():
-    # see http://semver.org/
-    api_list = []
-    for path in glob.glob('{}/api_*'.format(helpers.api_dir())):
-        api_list.append(path.split('/')[-1])
     return helpers.create_response(200, {'name': socket.gethostname(),
-                                         'version': "1.0.0",
-                                         'api_dir': helpers.api_dir(),
-                                         'used_apis': api_list})
+                                         'version': "1.0.0",  # see http://semver.org/
+                                         'api_dir': helpers.get_api_dir(),
+                                         'used_apis': get_apis()})
 
 
 @APP.route('/favicon.ico')
@@ -91,10 +94,7 @@ def api_icon():
 # START FLASK SERVER
 ###############################################################################
 if __name__ == '__main__':
-    # Automatic loading of all the apis if present
-    # Not tested and naming must be agreed upon
-    for api in glob.glob('{}/api_*'.format(helpers.api_dir())):
-        name = api.split('_')[-1]
-        blueprint = import_module('{}.{}.{}'.format(api.split('/')[-1], name, name))
-        APP.register_blueprint(blueprint, url_prefix='/{}'.format(name))
+    for api in get_apis():
+        module = import_module('api.{}'.format(api))
+        APP.register_blueprint(getattr(module, 'get')(), url_prefix='/{}'.format(api.split('_')[1]))
     APP.run(host='0.0.0.0', port=os.environ.get('SOJOBO_API_PORT'), debug=DEBUG, threaded=True)

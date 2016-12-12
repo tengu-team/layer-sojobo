@@ -21,7 +21,7 @@ import os
 import socket
 import yaml
 
-from flask import Response, request, abort
+from flask import Response, request
 
 from pygments import highlight, lexers, formatters
 
@@ -76,10 +76,3 @@ def request_wants_json():
 #             name : c_contents['controllers'][name]
 #         }
 #     }
-
-
-def check_api_key(api_key):
-    with open('{}/api-key'.format(get_api_dir()), 'r') as key:
-        apikey = key.readlines()
-    if api_key != apikey:
-        abort(403, {'message': 'You do not have permission to perform this operation!'})

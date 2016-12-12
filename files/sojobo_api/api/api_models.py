@@ -3,10 +3,23 @@
 # MODEL FUNCTIONS
 ###############################################################################
 from flask import request, Blueprint
-from .. import helpers, juju
+import w_errors as errors
+import w_helpers as helpers
+import w_juju as juju
 
 
-MODELS = Blueprint('models', __name__)
+MODELS = Blueprint('jmodels', __name__)
+
+
+def get():
+    return MODELS
+
+
+@MODELS.route('/')
+def home():
+    return helpers.create_response(200, {'name': 'Models API',
+                                         'version': "1.0.0",  # see http://semver.org/
+                                        })
 
 
 @MODELS.route('/create', methods=['POST'])
@@ -26,11 +39,11 @@ def create():
             else:
                 code, response = 403, 'You do not have permission to add models to this controller!'
     except KeyError:
-        code, response = helpers.invalid_data()
+        code, response = errors.invalid_data()
     return helpers.create_response(code, {'message': response})
 
 
-@MODELS.route('/delete', method=['DELETE'])
+@MODELS.route('/delete', methods=['DELETE'])
 def delete():
     data = request.form
     try:
@@ -41,11 +54,11 @@ def delete():
         else:
             code, response = 403, 'You do not have permission to remove this model!'
     except KeyError:
-        code, response = helpers.invalid_data()
+        code, response = errors.invalid_data()
     return helpers.create_response(code, {'message': response})
 
 
-@MODELS.route('/addsshkey', method=['PUT'])
+@MODELS.route('/addsshkey', methods=['PUT'])
 def add_ssh_key():
     data = request.form
     try:
@@ -56,11 +69,11 @@ def add_ssh_key():
         else:
             code, response = 403, 'You do not have permission to add ssh-keys to this model'
     except KeyError:
-        code, response = helpers.invalid_data()
+        code, response = errors.invalid_data()
     return helpers.create_response(code, {'message': response})
 
 
-@MODELS.route('/removesshkey', method=['PUT'])
+@MODELS.route('/removesshkey', methods=['PUT'])
 def remove_ssh_key():
     data = request.format
     try:
@@ -71,7 +84,7 @@ def remove_ssh_key():
         else:
             code, response = 403, 'You do not have permission to remove ssh-keys from this model'
     except KeyError:
-        code, response = helpers.invalid_data()
+        code, response = errors.invalid_data()
     return helpers.create_response(code, {'message': response})
 
 
@@ -84,7 +97,7 @@ def status(controllername, modelname):
         else:
             code, response = 403, 'You do not have permission to see this model'
     except KeyError:
-        code, response = helpers.invalid_data()
+        code, response = errors.invalid_data()
     return helpers.create_response(code, response)
 
 
@@ -94,5 +107,5 @@ def get_models(controllername):
         token = juju.authenticate(request.args['api_key'], request.authorization, controllername)
         code, response = juju.get_models(token)
     except KeyError:
-        code, response = helpers.invalid_data()
+        code, response = errors.invalid_data()
     return helpers.create_response(code, response)

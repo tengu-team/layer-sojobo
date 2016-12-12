@@ -18,12 +18,13 @@
 import json
 from subprocess import check_call, check_output
 from lxml import html
+import yaml
 import requests
-from .. .. import helpers
 
 
 class Token(object):
     def __init__(self, url, auth):
+        self.type = 'maas'
         self.url = url
         self.user = auth.username
         self.password = auth.password
@@ -48,20 +49,22 @@ def create_controller(name, endpoint, credentials):
 
 
 def create_cloud_file(name, endpoint):
-    path = '{}/cloud.yaml'.format(helpers.api_dir())
+    path = '/tmp/cloud.yaml'
     data = {'clouds': {name: {'type': 'maas',
                               'auth-types': '[oauth1]',
                               'endpoint': endpoint}}}
-    helpers.write_yaml(path, data)
+    with open(path, "w") as y_file:
+        yaml.dump(data, y_file, default_flow_style=True)
     return path
 
 
 def create_credentials_file(name, credentials):
-    path = '{}/credentials.yaml'.format(helpers.api_dir())
+    path = 'temp/credentials.yaml'
     data = {name: {credentials['username']: {'auth-type': 'oauth1',
                                              'maas-oauth': get_user_api_key(credentials['username'],
                                                                             credentials['password'])}}}
-    helpers.write_yaml(path, data)
+    with open(path, "w") as y_file:
+        yaml.dump(data, y_file, default_flow_style=True)
     return path
 
 
@@ -82,6 +85,10 @@ def get_user_api_key(username, password):
 
 def login(token):
     check_call(['maas', 'login', token.user, token.url, token.api_key])
+
+
+def get_supported_series():
+    return ['trusty', 'xenial']
 #####################################################################################
 # To Check
 #####################################################################################

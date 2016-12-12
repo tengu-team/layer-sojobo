@@ -17,10 +17,12 @@
 # !/usr/bin/env python3
 from subprocess import check_output, check_call
 import yaml
-from .. .. import helpers
+
+
 class Token(object):
     def __init__(self, url, auth):
         access_key, secret_key = get_credentials(auth)
+        self.type = 'aws'
         self.url = url
         self.access = access_key
         self.secret = secret_key
@@ -45,8 +47,12 @@ def create_controller(name, region, credentials):
     return output
 
 
+def get_supported_series():
+    return ['precise', 'trusty', 'xenial', 'yakkety']
+
+
 def create_credentials_file(region, credentials):
-    path = '{}/credentials.yaml'.format(helpers.api_dir())
+    path = '/tmp/credentials.yaml'
     data = {'aws': {'default-credential': 'admin',
                     'default-region': region,
                     'admin': {'auth-type': 'access-key',

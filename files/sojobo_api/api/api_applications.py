@@ -3,10 +3,24 @@
 # APPLICATION FUNCTIONS
 ###############################################################################
 from flask import request, Blueprint
-from .. import errors, helpers, juju
+
+import w_errors as errors
+import w_helpers as helpers
+import w_juju as juju
 
 
 APPLICATIONS = Blueprint('applications', __name__)
+
+
+def get():
+    return APPLICATIONS
+
+
+@APPLICATIONS.route('/')
+def home():
+    return helpers.create_response(200, {'name': 'Applications API',
+                                         'version': "1.0.0",  # see http://semver.org/
+                                        })
 
 
 @APPLICATIONS.route('/addapp', methods=['PUT'])

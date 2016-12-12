@@ -4,11 +4,23 @@
 ###############################################################################
 from flask import request, Blueprint
 
-from .. import errors, helpers, juju
+import w_errors as errors
+import w_helpers as helpers
+import w_juju as juju
 
 
 USERS = Blueprint('users', __name__)
 
+
+def get():
+    return USERS
+
+
+@USERS.route('/')
+def home():
+    return helpers.create_response(200, {'name': 'Users API',
+                                         'version': "1.0.0",  # see http://semver.org/
+                                        })
 
 @USERS.route('/create', methods=['POST'])
 def create():
@@ -152,7 +164,7 @@ def remove_from_model():
         username = data['username']
         if juju.user_exists(username):
             if token.m_access == 'admin' and username not in juju.get_admins():
-                code, response = 200, juju.remove_from_model(token, username, data['access'])
+                code, response = 200, juju.remove_from_model(token, username)
             else:
                 code, response = errors.no_permission()
         else:

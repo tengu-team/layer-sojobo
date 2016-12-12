@@ -5,10 +5,23 @@
 import shutil
 
 from flask import send_file, request, Blueprint
-from .. import errors, helpers, juju
+import w_errors as errors
+import w_helpers as helpers
+import w_juju as juju
 
 
 CONTROLLERS = Blueprint('controllers', __name__)
+
+
+def get():
+    return CONTROLLERS
+
+
+@CONTROLLERS.route('/')
+def home():
+    return helpers.create_response(200, {'name': 'Controllers API',
+                                         'version': "1.0.0",  # see http://semver.org/
+                                        })
 
 
 @CONTROLLERS.route('/create', methods=['POST'])

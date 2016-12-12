@@ -20,12 +20,14 @@ import hashlib
 from importlib import import_module
 import json
 import os
-import requests
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
+import requests
+
 # import tempfile
 import yaml
 
-import helpers
+import w_helpers as helpers
+
 from flask import abort
 
 
@@ -34,13 +36,12 @@ PASSWORD = os.environ.get('JUJU_ADMIN_PASSWORD')
 
 
 def get_controller_types():
-    path = '{}/juju_controllers'.format(helpers.get_api_dir())
-    files = [f.split('.'[0]) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
-    files.remove('__init__')
-    result = {}
-    for c_file in files:
-        result[c_file] = import_module('juju_controllers.{}'.format(c_file))
-    return result
+    c_list = {}
+    for f_path in os.listdir('{}/api'.format(helpers.get_api_dir())):
+        if 'controller_' in f_path and '.pyc' not in f_path:
+            name = f_path.split('.')[0]
+            c_list[name.split('_')[1]] = import_module('api.{}'.format(name))
+    return c_list
 
 
 def app_supports_series(app_name, series):
@@ -107,7 +108,10 @@ class JuJu_Token(object):
 
 
 def authenticate(api_key, auth, controller=None, modelname=None):
-    helpers.check_api_key(api_key)
+    with open('{}/api-key'.format(helpers.get_api_dir()), 'r') as key:
+        apikey = key.readlines()
+    if api_key != apikey:
+        abort(403, {'message': 'You do not have permission to perform this operation!'})
     token = JuJu_Token(auth)
     if controller is None:
         return token
@@ -116,9 +120,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
         if c_access is None:
             abort(403, {'message': 'This controller does not exist or you do not have permission to see it!'})
         c_type, c_endpoint = get_controller_info(controller)
-        for key, value in get_controller_types().items():
-            if c_type == key:
-                c_token = value.Token(c_endpoint, auth)
+        c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, auth)
         token.set_controller(controller, c_access, c_token)
         if modelname:
             models_info = json.loads(check_output(['juju', 'models', '--format', 'json']))
@@ -260,6 +262,12 @@ def create_user(username, password):
     change_password(username, password)
 
 
+def delete_user(username):
+    for controller in get_all_controllers():
+        for model in get_all_models(controller):
+            check_call(['juju', 'revoke', username, 'read', model, '-c', controller])
+
+
 def change_password(username, password):
     for controller in get_all_controllers():
         check_output(['juju', 'change-user-password', '-c', controller, username],
@@ -318,6 +326,10 @@ def remove_from_controller(token, username):
 def add_to_model(token, username, access):
     check_call(['juju', 'enable-user', username, '-c', token.c_name])
     check_call(['juju', 'grant', '-c', token.c_name, username, access, token.m_name])
+
+
+def remove_from_model(token, username):
+    check_call(['juju', 'revoke', username, token.m_name, '-c', token.c_name])
 
 
 def user_exists(username):

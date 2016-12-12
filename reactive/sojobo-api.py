@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 # Copyright (C) 2016  Ghent University
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0103,c0301
+#!/usr/bin/env python3
 from base64 import b64encode
 import os
 from os.path import expanduser
@@ -41,7 +42,7 @@ API_DIR = '/opt/sojobo_api'
 USER = 'ubuntu'
 HOME = expanduser('~{}'.format(USER))
 SSH_DIR = HOME + '/.ssh'
-PORT = hookenv.config()['port']
+PORT = config()['port']
 
 
 ###############################################################################
@@ -97,7 +98,9 @@ def render_api_systemd_template():
         "JUJU_ADMIN_USER={}".format(appconf['juju-admin-username']),
         "JUJU_ADMIN_PASSWORD={}".format(appconf['juju-admin-password']),
         "SOJOBO_API_DIR={}".format(API_DIR),
-        "SOJOBO_API_PORT={}".format(PORT)
+        "SOJOBO_API_PORT={}".format(PORT),
+        "LOCAL_CHARM_DIR={}".format(appconf['charm-dir']),
+        "PYTHONPATH={}/api".format(API_DIR)
     ]
     flags = appconf['feature-flags'].replace(' ', '')
     flags = [x for x in flags.split(',') if x != '']
