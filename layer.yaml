@@ -1,4 +1,4 @@
-includes: ['layer:basic', 'layer:apt', 'layer:juju2-client', 'interface:opened-ports']
+includes: ['layer:basic', 'layer:apt', 'layer:juju2-client', 'interface:sojobo']
 repo: git@github.com:IBCNServices/tengu-charms.git
 options:
   apt:

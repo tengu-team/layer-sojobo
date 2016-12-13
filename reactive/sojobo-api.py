@@ -81,13 +81,13 @@ def install_api():
     adduser(USER)
     chownr(API_DIR, USER, USER, chowntopdir=True)
     subprocess.check_call([u'systemctl', 'enable', 'sojobo-api'])
-    restart_api()
     api_key = config()['api-key']
     if len(api_key) == 256:
         with open("/{}/api-key".format(API_DIR), "w") as key:
             key.write(api_key)
     else:
         generate_api_key()
+    restart_api()
     status_set('active', 'Sojobo API is running')
 
 
@@ -136,6 +136,10 @@ def feature_flags_changed():
     restart_api()
 
 
+@when('sojobo.available')
+def configure(sojobo):
+    with open("/{}/api-key".format(API_DIR), "r") as key:
+        sojobo.configure(PORT, key)
 ###############################################################################
 # UTILS
 ###############################################################################

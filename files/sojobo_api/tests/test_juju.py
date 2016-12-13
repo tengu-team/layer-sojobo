@@ -2,11 +2,14 @@ import os
 from subprocess import check_call, CalledProcessError
 import unittest
 import yaml
-from api.w_juju import create_controller, get_controller_types, app_supports_series
+from api.w_juju import create_controller, get_controller_types, app_supports_series, JuJu_Token
 from api import w_helpers as helpers
 
 
 class TestJuJu(unittest.TestCase):
+#    def setUp(self):
+#        self.token =
+
     def test_00_get_controller_types(self):
         self.assertIsInstance(get_controller_types(), dict)
 
