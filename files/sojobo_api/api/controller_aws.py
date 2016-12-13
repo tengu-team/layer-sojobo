@@ -20,12 +20,14 @@ import yaml
 
 
 class Token(object):
-    def __init__(self, url, auth):
-        access_key, secret_key = get_credentials(auth)
+    def __init__(self, url, auth=None, access_key=None, secret_key=None):
         self.type = 'aws'
         self.url = url
-        self.access = access_key
-        self.secret = secret_key
+        if auth is not None:
+            self.access_key, self.secret_key = get_credentials(auth)
+        elif auth is None and access_key is not None and secret_key is not None:
+            self.access = access_key
+            self.secret = secret_key
 
     def get_credentials(self):
         return {'auth-type': 'access-key', 'access-key': self.access, 'secret-key': self.secret}
@@ -40,8 +42,8 @@ def get_credentials(auth):
     return credentials['access-key'], credentials['secret-key']
 
 
-def create_controller(name, region, credentials):
-    path = create_credentials_file(region, credentials)
+def create_controller(name, region, token):
+    path = create_credentials_file(region, token)
     check_call(['juju', 'add-credential', 'aws', '-f', path])
     output = check_output(['juju', 'bootstrap', 'aws/{}'.format(region), name])
     return output
@@ -51,13 +53,13 @@ def get_supported_series():
     return ['precise', 'trusty', 'xenial', 'yakkety']
 
 
-def create_credentials_file(region, credentials):
+def create_credentials_file(region, token):
     path = '/tmp/credentials.yaml'
     data = {'aws': {'default-credential': 'admin',
                     'default-region': region,
                     'admin': {'auth-type': 'access-key',
-                              'access-key': credentials['access-key'],
-                              'secret-key': credentials['secret-key']}}}
+                              'access-key': token.access_key,
+                              'secret-key': token.secret_key}}}
     with open(path, 'w') as dest:
         yaml.dump(data, dest, default_flow_style=True)
     return path

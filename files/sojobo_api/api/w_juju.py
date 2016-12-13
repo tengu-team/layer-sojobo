@@ -31,10 +31,6 @@ import w_helpers as helpers
 from flask import abort
 
 
-USER = os.environ.get('JUJU_ADMIN_USER')
-PASSWORD = os.environ.get('JUJU_ADMIN_PASSWORD')
-
-
 def get_controller_types():
     c_list = {}
     for f_path in os.listdir('{}/api'.format(helpers.get_api_dir())):
@@ -95,7 +91,7 @@ class JuJu_Token(object):
         self.m_access = parse_m_access(modelaccess)
 
     def m_shared_name(self):
-        return "{}/{}".format(USER, self.m_name)
+        return "{}/{}".format(helpers.get_user(), self.m_name)
 
     def get_credentials(self):
         return {'credentials': {self.c_name: {self.username: self.c_token.get_credentials()}}}
@@ -124,12 +120,12 @@ def authenticate(api_key, auth, controller=None, modelname=None):
         token.set_controller(controller, c_access, c_token)
         if modelname:
             models_info = json.loads(check_output(['juju', 'models', '--format', 'json']))
-            if '{}/{}'.format(USER, modelname) in models_info.values():
+            if '{}/{}'.format(helpers.get_user(), modelname) in models_info.values():
                 token.set_model(modelname, models_info[0]['models']['users'][token.username]['access'])
             else:
                 abort(403, {'message': 'This model does not exist or you do not have permission to see it!'})
         check_call(['juju', 'logout'])
-        check_output(['juju', 'login', USER, '--controller', token.c_name], input=PASSWORD + '\n',
+        check_output(['juju', 'login', helpers.get_user(), '--controller', token.c_name], input=helpers.get_password() + '\n',
                      universal_newlines=True)
         return token
 ###############################################################################
@@ -149,7 +145,7 @@ def create_controller(token, c_type, name, region, credentials):
 
 
 def delete_controller(token):
-    return check_call(['juju', 'destroy-controller', '--destroy-all-models', token.c_name, '-y'])
+    return check_output(['juju', 'destroy-controller', '--destroy-all-models', token.c_name, '-y'])
 
 
 def get_all_controllers():
@@ -226,25 +222,27 @@ def create_model(token, model, ssh_key=None):
     # tmp.write(json.dumps(credentials))
     # tmp.close()  # deletes the file
     # check_call(['juju', 'add-credential', '--replace', token.c_name, '-f', tmp.name])
-    check_call(['juju', 'add-model', model, '--credential', USER]) # token.username])
-    check_call(['juju', 'grant', token.username, 'admin', model])
+    output = {}
+    output['add-model'] = check_output(['juju', 'add-model', model, '--credential', helpers.get_user()]) # token.username])
+    output['grant'] = check_output(['juju', 'grant', token.username, 'admin', model])
     if ssh_key is not None:
-        add_ssh_key(token, ssh_key)
+        output['ssh'] = add_ssh_key(token, ssh_key)
+    return output
 
 
 def delete_model(token):
-    check_call(['juju', 'destroy-model', '-y', token.m_name])
+    return check_output(['juju', 'destroy-model', '-y', token.m_name])
 
 
 def add_ssh_key(token, ssh_key):
-    check_call(['juju', 'add-ssh-key', '-m', token.m_name, '"{}"'.format(ssh_key)])
+    return check_output(['juju', 'add-ssh-key', '-m', token.m_name, '"{}"'.format(ssh_key)])
 
 
 def remove_ssh_key(token, ssh_key):
     key = base64.b64decode(bytes(ssh_key.strip().split()[1].encode('ascii')))
     fp_plain = hashlib.md5(key).hexdigest()
     fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
-    check_call(['juju', 'remove-ssh-key', '-m', token.m_name, fingerprint])
+    return check_output(['juju', 'remove-ssh-key', '-m', token.m_name, fingerprint])
 
 
 def model_status(token):
@@ -260,18 +258,22 @@ def create_user(username, password):
         check_call(['juju', 'grant', '-c', controller, username, 'login'])
         check_call(['juju', 'disable-user', '-c', controller, username])
     change_password(username, password)
+    return 'The user {} has been created'.format(username)
 
 
 def delete_user(username):
     for controller in get_all_controllers():
         for model in get_all_models(controller):
             check_call(['juju', 'revoke', username, 'read', model, '-c', controller])
+        check_call(['juju', 'disable-user', '-c', controller, username])
+    return 'The user {} has been disabled'.format(username)
 
 
 def change_password(username, password):
     for controller in get_all_controllers():
         check_output(['juju', 'change-user-password', '-c', controller, username],
                      input="{}\n{}".format(password, password))
+    return '{} password has been changed'.format(username)
 
 
 def get_users(controller):
@@ -303,33 +305,29 @@ def make_admin(username):
         check_call(['juju', 'grant', username, 'superuser', '-c', controller])
         for model in get_all_models(controller):
             check_call(['juju', 'grant', username, 'admin', model, '-c', controller])
+    return '{} has been made an admin'.format(username)
 
 
 def add_superuser(username, controller):
-    return check_call(['juju', 'grant', username, 'superuser', '-c', controller])
-
-
-def enable_user(username):
-    for controller in get_all_controllers():
-        check_call(['juju', 'enable-user', username, '-c', controller])
+    return check_output(['juju', 'grant', username, 'superuser', '-c', controller])
 
 
 def add_to_controller(token, username, access):
     check_call(['juju', 'enable-user', username, '-c', token.c_name])
-    check_call(['juju', 'grant', username, parse_c_access(access), '-c', token.c_name])
+    return check_output(['juju', 'grant', username, parse_c_access(access), '-c', token.c_name])
 
 
 def remove_from_controller(token, username):
-    check_call(['juju', 'disable-user', username, '-c', token.c_name])
+    return check_output(['juju', 'disable-user', username, '-c', token.c_name])
 
 
 def add_to_model(token, username, access):
     check_call(['juju', 'enable-user', username, '-c', token.c_name])
-    check_call(['juju', 'grant', '-c', token.c_name, username, access, token.m_name])
+    return check_output(['juju', 'grant', '-c', token.c_name, username, access, token.m_name])
 
 
 def remove_from_model(token, username):
-    check_call(['juju', 'revoke', username, token.m_name, '-c', token.c_name])
+    return check_output(['juju', 'revoke', username, token.m_name, '-c', token.c_name])
 
 
 def user_exists(username):
