@@ -52,12 +52,11 @@ def create_controller(name, region, credentials):
 def get_supported_series():
     return ['trusty', 'xenial']
 ```
-<p>
+
 * A Token object, which has the controllers type in lowercase, the url of the endpoint, the required information to log into the controller (username, password, api_key, etc.). The Token objects must have the `get_credentials` and `get_cloud`
 functions, which return the required JuJu-styled data.
 * A `create_controller(name, region, credentials)` function, which houses all the required code required to successfully bootstrap a controller of this type.
 * A `get_supported_series()` function which returns a list of Ubuntu-versions this controller can deploy.
-</p>
 
 # Documentation
 Documentation concerning the api or test-bench can be found in the api - and test-folder.
