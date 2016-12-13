@@ -46,6 +46,7 @@ def get_supported_series():
 functions, which return the required JuJu-styled data.
 * A `create_controller(name, region, credentials)` function, which houses all the required code required to successfully bootstrap a controller of this type.
 * A `get_supported_series()` function which returns a list of Ubuntu-versions this controller can deploy.
+</p>
 # Documentation
 Documentation concerning the api or test-bench can be found in the api - and test-folder
 # Bugs
