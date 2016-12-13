@@ -2,15 +2,12 @@
 import os
 from subprocess import check_call, CalledProcessError
 import unittest
-from api.controller_aws import Token, get_supported_series, create_credentials_file, create_controller
+from api.controller_aws import get_supported_series, create_credentials_file, create_controller
 
 
 class TestAWS(unittest.TestCase):
-    def setUp(self):
-        self.token = Token('url', None, 'access_key', 'secret_key')
-
     def test_1_create_credentials_file(self):
-        create_credentials_file('aws-unittesting', self.token)
+        create_credentials_file('aws-unittesting', {'access_key': 'ToDo', 'secret_key': 'ToDo'})
         path = '/tmp/credentials.yaml'
         self.assertTrue(os.path.exists(path))
         self.assertGreater(os.path.getsize(path), 0)
@@ -22,11 +19,11 @@ class TestAWS(unittest.TestCase):
         except CalledProcessError:
             pass
         try:
-            check_call(['juju', 'remove-credential', 'aws-unittesting', self.token.user])
+            check_call(['juju', 'remove-credential', 'aws-unittesting', 'admin'])
         except CalledProcessError:
             pass
         try:
-            create_controller('unittesting', self.token)
+            create_controller('unittesting', 'eu-west-1', {'access_key': 'ToDo', 'secret_key': 'ToDo'})
             self.assertTrue(True)
         except CalledProcessError:
             self.assertTrue(False)
@@ -35,7 +32,7 @@ class TestAWS(unittest.TestCase):
         except CalledProcessError:
             pass
         try:
-            check_call(['juju', 'remove-credential', 'aws-unittesting', self.token.user])
+            check_call(['juju', 'remove-credential', 'aws-unittesting', 'admin'])
         except CalledProcessError:
             pass
         os.remove('/tmp/credentials.yaml')

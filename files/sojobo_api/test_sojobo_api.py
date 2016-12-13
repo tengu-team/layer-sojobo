@@ -1,6 +1,6 @@
 # pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902
 import os
-from subprocess import check_output, CalledProcessError
+from subprocess import check_call, CalledProcessError
 
 from api import w_helpers as helpers
 
@@ -15,7 +15,8 @@ def get_tests():
             elif 'test_c_' in f_path:
                 test_c_list.append(f_path)
     test_c_list.append('test_juju.py')
-    return test_c_list + test_a_list
+    # return test_c_list + test_a_list
+    return ['test_juju.py']
 
 
 if __name__ == '__main__':
@@ -25,7 +26,7 @@ if __name__ == '__main__':
     for count, test in enumerate(tests):
         print('\033[1mEXECUTING {}/{}: {}\033[0m'.format(count+1, n_tests, test))
         try:
-            print(check_output((['python3', '{}/tests/{}'.format(helpers.get_api_dir(), test), '-v'])))
+            check_call((['python3', '{}/tests/{}'.format(helpers.get_api_dir(), test), '-v']))
         except CalledProcessError:
             failed.append(test)
     print('\n')

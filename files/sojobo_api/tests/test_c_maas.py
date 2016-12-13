@@ -17,14 +17,14 @@ class TestMaas(unittest.TestCase):
         self.token = Token('http://193.190.127.161/MAAS', Auth(helpers.get_user(), helpers.get_password()))
 
     def test_0_create_cloud_file(self):
-        create_cloud_file('test1', 'test2')
+        create_cloud_file('maas-unittesting', self.token.url)
         path = '/tmp/cloud.yaml'
         self.assertTrue(os.path.exists(path))
         self.assertGreater(os.path.getsize(path), 0)
         os.remove('/tmp/cloud.yaml')
 
     def test_1_create_credentials_file(self):
-        create_credentials_file('maas-unittesting', self.token)
+        create_credentials_file('maas-unittesting', {'username': self.token.user, 'api_key': self.token.api_key})
         path = '/tmp/credentials.yaml'
         self.assertTrue(os.path.exists(path))
         self.assertGreater(os.path.getsize(path), 0)
@@ -44,7 +44,7 @@ class TestMaas(unittest.TestCase):
         except CalledProcessError:
             pass
         try:
-            create_controller('unittesting', self.token)
+            create_controller('unittesting', self.token.url, {'username': self.token.user, 'api_key': self.token.api_key})
             self.assertTrue(True)
         except CalledProcessError:
             self.assertTrue(False)

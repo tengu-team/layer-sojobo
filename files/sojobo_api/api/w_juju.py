@@ -26,7 +26,7 @@ import requests
 # import tempfile
 import yaml
 
-import w_helpers as helpers
+from api import w_helpers as helpers
 
 from flask import abort
 
@@ -45,10 +45,12 @@ def app_supports_series(app_name, series):
         with open('{}/{}/metadata.yaml'.format(helpers.get_charm_dir(), app_name.split(':')[1])) as data:
             supports = series in yaml.load(data)['series']
     else:
+        supports = False
         data = requests.get('https://api.jujucharms.com/v4/{}/expand-id'.format(app_name))
-        for value in data:
-            value = value['Id'].split(':')[1].split('/')[0]
-        supports = series in data
+        for value in json.loads(data.text):
+            if series in value['Id']:
+                supports = True
+                break
     return supports
 
 
@@ -145,7 +147,7 @@ def create_controller(token, c_type, name, region, credentials):
 
 
 def delete_controller(token):
-    return check_output(['juju', 'destroy-controller', '--destroy-all-models', token.c_name, '-y'])
+    return check_output(['juju', 'destroy-controller', token.c_name, '-y'])
 
 
 def get_all_controllers():

@@ -40,7 +40,8 @@ def get_password():
     return '4vQwtSKMNTyRtTfU'
 
 def get_charm_dir():
-    return os.environ.get('LOCAL_CHARM_DIR')
+    # return os.environ.get('LOCAL_CHARM_DIR')
+    return '/tmp'
 
 
 def write_yaml(path, content):

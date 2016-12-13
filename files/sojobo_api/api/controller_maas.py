@@ -54,10 +54,10 @@ class Token(object):
         return str(api_keys[-1])
 
 
-def create_controller(name, token):
+def create_controller(name, region, credentials):
     cloudname = 'maas-{}'.format(name)
-    cloud_path = create_cloud_file(cloudname, token.url)
-    cred_path = create_credentials_file(cloudname, token)
+    cloud_path = create_cloud_file(cloudname, region)
+    cred_path = create_credentials_file(cloudname, credentials)
     check_call(['juju', 'add-cloud', cloudname, cloud_path])
     check_call(['juju', 'add-credential', cloudname, '-f', cred_path])
     return check_output(['juju', 'bootstrap', cloudname, name])
@@ -73,9 +73,9 @@ def create_cloud_file(name, endpoint):
     return path
 
 
-def create_credentials_file(name, token):
+def create_credentials_file(name, credentials):
     path = '/tmp/credentials.yaml'
-    data = {'credentials': {name: {token.user: {'auth-type': 'oauth1', 'maas-oauth': token.api_key}}}}
+    data = {'credentials': {name: {credentials['username']: {'auth-type': 'oauth1', 'maas-oauth': credentials['api_key']}}}}
     with open(path, "w") as y_file:
         yaml.dump(data, y_file, default_flow_style=True)
     return path
