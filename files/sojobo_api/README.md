@@ -1,14 +1,21 @@
 # Introduction
-<p>This is the api for the Tengu platform. Besides providing all the necessary Tengu - commands, it also introduces
-JuJu - wide users (instead of users on a controller-level) and the principle of an admin-user.</p>
+<p>
+This is the api for the Tengu platform. Besides providing all the necessary Tengu - commands, it also introduces
+JuJu - wide users (instead of users on a controller-level) and the principle of an admin-user.
+</p>
 
 # Working
-<p>The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
-follow the naming rules and provide the required functions.</p>
+<p>
+The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
+follow the naming rules and provide the required functions.
+</p>
+
 ## API-modules
-<p>The api is written in Flask. This allows the use of blueprints to expand the api. API-modules file names must follow
-this scheme : `api_<modulename>.py`. The modulename MAY NOT contain an underscore. The module itself must have the following
-inside:</p>
+<p>
+The api is written in Flask. This allows the use of blueprints to expand the api. API-modules file names must follow
+this scheme: `api_<modulename>.py`. The modulename MAY NOT contain an underscore. The module itself must have the following
+inside:
+</p>
 ```python
 <MODULENAME> = Blueprint(<modulename>, __name__)
 
@@ -16,9 +23,12 @@ inside:</p>
 def get():
     return <MODULENAME>
 ```
+
 ## Controller-modules
-<p>Controller modules name must follow this scheme: `controller_<controllername>.py`. The controllername MAY NOT contain
-an underscore. The module itself must have the following inside:</p>
+<p>
+Controller modules name must follow this scheme: `controller_<controllername>.py`. The controllername MAY NOT contain
+an underscore. The module itself must have the following inside:
+</p>
 ```python
 class Token(object):
     def __init__(self, url, auth):
@@ -48,9 +58,12 @@ functions, which return the required JuJu-styled data.
 * A `create_controller(name, region, credentials)` function, which houses all the required code required to successfully bootstrap a controller of this type.
 * A `get_supported_series()` function which returns a list of Ubuntu-versions this controller can deploy.
 </p>
+
 # Documentation
-Documentation concerning the api or test-bench can be found in the api - and test-folder
+Documentation concerning the api or test-bench can be found in the api - and test-folder.
+
 # Bugs
 Report bugs on <a href="https://github.com/IBCNServices/tengu-charms/issues">Github</a>
+
 # Author
 Mathijs Moerman <a href="mailto:mathijs.moerman@qrama.io">mathijs.moerman@qrama.io</a>
