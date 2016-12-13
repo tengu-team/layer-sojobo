@@ -9,7 +9,7 @@ follow the naming rules and provide the required functions.</p>
 <p>The api is written in Flask. This allows the use of blueprints to expand the api. API-modules file names must follow
 this scheme : `api_<modulename>.py`. The modulename MAY NOT contain an underscore. The module itself must have the following
 inside:</p>
-```
+```python
 <MODULENAME> = Blueprint(<modulename>, __name__)
 
 
@@ -19,7 +19,7 @@ def get():
 ## Controller-modules
 <p>Controller modules name must follow this scheme: `controller_<controllername>.py`. The controllername MAY NOT contain
 an underscore. The module itself must have the following inside:
-```
+```python
 class Token(object):
     def __init__(self, url, auth):
         self.type = 'maas'
