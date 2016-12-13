@@ -18,7 +18,7 @@ def get():
 ```
 ## Controller-modules
 <p>Controller modules name must follow this scheme: `controller_<controllername>.py`. The controllername MAY NOT contain
-an underscore. The module itself must have the following inside:
+an underscore. The module itself must have the following inside:</p>
 ```python
 class Token(object):
     def __init__(self, url, auth):
@@ -42,6 +42,7 @@ def create_controller(name, region, credentials):
 def get_supported_series():
     return ['trusty', 'xenial']
 ```
+<p>
 * A Token object, which has the controllers type in lowercase, the url of the endpoint, the required information to log into the controller (username, password, api_key, etc.). The Token objects must have the `get_credentials` and `get_cloud`
 functions, which return the required JuJu-styled data.
 * A `create_controller(name, region, credentials)` function, which houses all the required code required to successfully bootstrap a controller of this type.
