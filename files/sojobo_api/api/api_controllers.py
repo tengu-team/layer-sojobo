@@ -5,9 +5,9 @@
 import shutil
 
 from flask import send_file, request, Blueprint
-import w_errors as errors
-import w_helpers as helpers
-import w_juju as juju
+from api import w_errors as errors
+from api import w_helpers as helpers
+from api import w_juju as juju
 
 
 CONTROLLERS = Blueprint('controllers', __name__)

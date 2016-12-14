@@ -1,11 +1,13 @@
 # pylint: disable=c0111,c0301,c0325
 import os
+from subprocess import CalledProcessError, check_call
 import unittest
 import yaml
 from api.w_juju import create_controller, get_controller_types, app_supports_series, JuJu_Token, cloud_supports_series
 from api.w_juju import authenticate
 import api.controller_maas as maas
 from api import w_helpers as helpers
+from tests.test_c_maas import cleanup_controller
 from werkzeug.exceptions import Forbidden
 
 
@@ -38,7 +40,20 @@ class TestJuJu(unittest.TestCase):
         os.remove('{}/unittest/metadata.yaml'.format(helpers.get_charm_dir()))
         os.rmdir('{}/unittest'.format(helpers.get_charm_dir()))
 
-    def test_02_authenticate(self):
+    def test_02_create_controller(self):
+        auth = Auth(helpers.get_user(), helpers.get_password())
+        output = create_controller(JuJu_Token(auth), 'blablabla', 'shouldfail', 'shouldfail', {'should': 'fail'})
+        self.assertTrue('Incorrect controller type' in output)
+        cleanup_controller('maas', 'unittesting', auth.username)
+        maas_token = maas.Token('http://193.190.127.161/MAAS', auth)
+        try:
+            create_controller(JuJu_Token(auth), 'maas', 'unittesting', 'http://193.190.127.161/MAAS',
+                              {'username': auth.username, 'password': auth.password, 'api_key': maas_token.api_key})
+            self.assertTrue(True)
+        except CalledProcessError:
+            self.assertTrue(False)
+
+    def test_03_authenticate(self):
         auth = Auth(helpers.get_user(), helpers.get_password())
         api = 'api-key-unittesting'
         with open('{}/api-key'.format(helpers.get_api_dir()), 'w') as a_file:
@@ -60,4 +75,4 @@ class TestJuJu(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main(buffer=True)
+    unittest.main()

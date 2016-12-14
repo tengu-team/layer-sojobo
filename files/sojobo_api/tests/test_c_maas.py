@@ -6,6 +6,30 @@ from api.controller_maas import Token, get_supported_series, create_cloud_file, 
 import api.w_helpers as helpers
 
 
+def cleanup_controller(c_type, c_name, user):
+    with open(os.devnull, 'w') as FNULL:
+        try:
+            check_call(['juju', 'destroy-controller', c_name, '-y'], stdout=FNULL, stderr=FNULL)
+        except CalledProcessError:
+            pass
+        try:
+            check_call(['juju', 'remove-cloud', '{}-{}'.format(c_type, c_name)], stdout=FNULL, stderr=FNULL)
+        except CalledProcessError:
+            pass
+        try:
+            check_call(['juju', 'remove-credential', '{}-{}'.format(c_type, c_name), user], stdout=FNULL, stderr=FNULL)
+        except CalledProcessError:
+            pass
+        try:
+            os.remove('/tmp/cloud.yaml')
+        except FileNotFoundError:
+            pass
+        try:
+            os.remove('/tmp/credentials.yaml')
+        except FileNotFoundError:
+            pass
+
+
 class Auth(object):
     def __init__(self, username, password):
         self.username = username
@@ -31,37 +55,13 @@ class TestMaas(unittest.TestCase):
         os.remove('/tmp/credentials.yaml')
 
     def test_2_create_controller(self):
-        try:
-            check_call(['juju', 'destroy-controller', 'unittesting', '-y'])
-        except CalledProcessError:
-            pass
-        try:
-            check_call(['juju', 'remove-cloud', 'maas-unittesting'])
-        except CalledProcessError:
-            pass
-        try:
-            check_call(['juju', 'remove-credential', 'maas-unittesting', self.token.user])
-        except CalledProcessError:
-            pass
+        cleanup_controller('maas', 'unittesting', self.token.user)
         try:
             create_controller('unittesting', self.token.url, {'username': self.token.user, 'api_key': self.token.api_key})
             self.assertTrue(True)
         except CalledProcessError:
             self.assertTrue(False)
-        try:
-            check_call(['juju', 'destroy-controller', 'unittesting', '-y'])
-        except CalledProcessError:
-            pass
-        try:
-            check_call(['juju', 'remove-cloud', 'maas-unittesting'])
-        except CalledProcessError:
-            pass
-        try:
-            check_call(['juju', 'remove-credential', 'maas-unittesting', self.token.user])
-        except CalledProcessError:
-            pass
-        os.remove('/tmp/cloud.yaml')
-        os.remove('/tmp/credentials.yaml')
+        cleanup_controller('maas', 'unittesting', self.token.user)
 
 
     def test_3_get_supported_series(self):

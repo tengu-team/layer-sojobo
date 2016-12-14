@@ -100,7 +100,7 @@ def render_api_systemd_template():
         "SOJOBO_API_DIR={}".format(API_DIR),
         "SOJOBO_API_PORT={}".format(PORT),
         "LOCAL_CHARM_DIR={}".format(appconf['charm-dir']),
-        "PYTHONPATH={}/api".format(API_DIR)
+        "PYTHONPATH={}".format(API_DIR)
     ]
     flags = appconf['feature-flags'].replace(' ', '')
     flags = [x for x in flags.split(',') if x != '']

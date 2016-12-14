@@ -27,21 +27,21 @@ from pygments import highlight, lexers, formatters
 
 
 def get_api_dir():
-    # return os.environ.get('SOJOBO_API_DIR')
-    return '/home/mathijs/Documents/repos/Sojobo-api/files/sojobo_api'
+    return os.environ.get('SOJOBO_API_DIR')
+    # return '/home/mathijs/Documents/repos/Sojobo-api/files/sojobo_api'
 
 
 def get_user():
-    # return os.environ.get('JUJU_ADMIN_USER')
-    return 'tengu-ui'
+    return os.environ.get('JUJU_ADMIN_USER')
+    # return 'tengu-ui'
 
 def get_password():
-    # return os.environ.get('JUJU_ADMIN_PASSWORD')
-    return '4vQwtSKMNTyRtTfU'
+    return os.environ.get('JUJU_ADMIN_PASSWORD')
+    # return '4vQwtSKMNTyRtTfU'
 
 def get_charm_dir():
-    # return os.environ.get('LOCAL_CHARM_DIR')
-    return '/tmp'
+    return os.environ.get('LOCAL_CHARM_DIR')
+    # return '/tmp'
 
 
 def write_yaml(path, content):

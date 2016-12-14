@@ -25,6 +25,7 @@ import requests
 class Token(object):
     def __init__(self, url, auth):
         self.type = 'maas'
+        self.supportlxd = True
         self.url = url
         self.user = auth.username
         self.password = auth.password
@@ -55,6 +56,7 @@ class Token(object):
 
 
 def create_controller(name, region, credentials):
+    print('called')
     cloudname = 'maas-{}'.format(name)
     cloud_path = create_cloud_file(cloudname, region)
     cred_path = create_credentials_file(cloudname, credentials)

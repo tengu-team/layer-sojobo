@@ -4,9 +4,9 @@
 ###############################################################################
 from flask import request, Blueprint
 
-import w_errors as errors
-import w_helpers as helpers
-import w_juju as juju
+from api import w_errors as errors
+from api import w_helpers as helpers
+from api import w_juju as juju
 
 
 APPLICATIONS = Blueprint('applications', __name__)

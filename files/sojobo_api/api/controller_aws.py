@@ -23,6 +23,7 @@ class Token(object):
     def __init__(self, url, auth):
         self.access, self.secret = get_credentials(auth)
         self.type = 'aws'
+        self.supportlxd = False
         self.url = url
 
 

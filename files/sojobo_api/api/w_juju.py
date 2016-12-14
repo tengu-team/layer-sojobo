@@ -148,6 +148,7 @@ def create_controller(token, c_type, name, region, credentials):
     for key, value in get_controller_types().items():
         if c_type == key:
             output = value.create_controller(name, region, credentials)
+            print(output)
             add_superuser(token, name)
             exists = True
             break
@@ -379,8 +380,8 @@ def app_exists(token, app_name):
 
 
 def deploy_app(token, app_name, series=None, target=None):
-    if token.c_token.type == 'aws' and 'lxd' in target:
-        return 'AWS doesn\'t support lxd-containers'
+    if not token.c_token.supportlxd and 'lxd' in target:
+        return '{} doesn\'t support lxd-containers'.format(token.c_token.c_type.upper())
     else:
         if 'local:' in app_name:
             app_name = app_name.replace('local:', '{}/'.format(helpers.get_charm_dir()))
