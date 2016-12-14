@@ -2,14 +2,20 @@ import os
 from subprocess import check_call, CalledProcessError
 import unittest
 import yaml
-from api.w_juju import create_controller, get_controller_types, app_supports_series, JuJu_Token
+from api.w_juju import create_controller, get_controller_types, app_supports_series, JuJu_Token, cloud_supports_series
+from api.w_juju import authenticate
+import api.controller_maas as maas
 from api import w_helpers as helpers
+from werkzeug.exceptions import Forbidden
+
+
+class Auth(object):
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
 
 
 class TestJuJu(unittest.TestCase):
-#    def setUp(self):
-#        self.token =
-
     def test_00_get_controller_types(self):
         self.assertIsInstance(get_controller_types(), dict)
 
@@ -31,6 +37,24 @@ class TestJuJu(unittest.TestCase):
         self.assertFalse(app_supports_series('local:unittest', 'blablabla'))
         os.remove('{}/unittest/metadata.yaml'.format(helpers.get_charm_dir()))
         os.rmdir('{}/unittest'.format(helpers.get_charm_dir()))
+
+    def test_02_authenticate(self):
+        auth = Auth(helpers.get_user(), helpers.get_password())
+        with open('{}/api-key'.format(helpers.get_api_dir()), 'w') as a_file:
+            a_file.write('api-key-unittesting')
+        self.assertRaises(Forbidden, lambda: authenticate('bad-api-key-unittesting', auth))
+        self.assertIsInstance(authenticate('api-key-unittesting', auth), JuJu_Token)
+
+
+    #def test_03_cloud_supports_series(self):
+    #    with open('{}/api-key'.format(helpers.get_api_dir()), 'w') as a_file:
+    #        a_file.write('api-key-unittesting')
+    #    auth = Auth(helpers.get_user(), helpers.get_password())
+    #    token = authenticate('api-key-unittesting', auth)
+    #    token.c_token = maas.Token('http://193.190.127.161/MAAS', auth)
+    #    self.assertTrue(cloud_supports_series(token, 'xenial'))
+    #    self.assertFalse(cloud_supports_series(token, 'blablabla'))
+
 
 
 if __name__ == '__main__':

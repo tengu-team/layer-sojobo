@@ -15,8 +15,7 @@ def get_tests():
             elif 'test_c_' in f_path:
                 test_c_list.append(f_path)
     test_c_list.append('test_juju.py')
-    # return test_c_list + test_a_list
-    return ['test_juju.py']
+    return test_c_list + test_a_list
 
 
 if __name__ == '__main__':
