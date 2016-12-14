@@ -66,8 +66,8 @@ functions, which return the required JuJu-styled data.
 
 
 # Documentation
-Documentation of the api can be found under [sojobo_api/docs/api!](docs/api).
-Documentation of the different tests can be found under [sojobo_api/docs/tests!](docs/tests)
+Documentation of the api can be found under [sojobo_api/docs/api](./docs/api).<br>
+Documentation of the different tests can be found under [sojobo_api/docs/tests](./docs/tests)
 
 # Bugs
 Report bugs on <a href="https://github.com/Qrama/Sojobo-api/issues">Github</a>
