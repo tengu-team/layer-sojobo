@@ -1,5 +1,5 @@
+# pylint: disable=c0111,c0301,c0325
 import os
-from subprocess import check_call, CalledProcessError
 import unittest
 import yaml
 from api.w_juju import create_controller, get_controller_types, app_supports_series, JuJu_Token, cloud_supports_series
@@ -58,4 +58,4 @@ class TestJuJu(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(buffer=True)

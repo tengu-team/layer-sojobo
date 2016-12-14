@@ -73,9 +73,14 @@ def parse_m_access(access):
 
 
 def login(controller, user=helpers.get_user(), password=helpers.get_password()):
-    check_call(['juju', 'logout'])
-    check_output(['juju', 'login', user, '--controller', controller], input=password + '\n', universal_newlines=True)
-    check_call(['juju', 'switch', controller])
+    FNULL = open(os.devnull, 'w')
+    check_call(['juju', 'logout'], stdout=FNULL, stderr=STDOUT)
+    check_output(['juju', 'login', user, '--controller', controller], input=password + '\n', universal_newlines=True, stderr=STDOUT)
+    check_call(['juju', 'switch', controller], stdout=FNULL, stderr=STDOUT)
+
+
+def output_pass(commands, password=helpers.get_password()):
+    return check_output(commands, input=password + '\n', universal_newlines=True)
 
 
 class JuJu_Token(object):
@@ -151,18 +156,18 @@ def create_controller(token, c_type, name, region, credentials):
 
 def delete_controller(token):
     login(token.c_name)
-    return check_output(['juju', 'destroy-controller', token.c_name, '-y'])
+    return output_pass(['juju', 'destroy-controller', token.c_name, '-y'])
 
 
 def get_all_controllers():
-    controllers = json.loads(check_output(['juju', 'controllers', '--format', 'json']).decode('utf-8'))
+    controllers = json.loads(output_pass(['juju', 'controllers', '--format', 'json']))
     return controllers['controllers'].keys()
 
 
 def get_controller_access(token, controller):
     try:
         login(controller, token.username, token.password)
-        controllers_info = json.loads(check_output(['juju', 'controllers', '--format', 'json']).decode('utf-8'))
+        controllers_info = json.loads(output_pass(['juju', 'controllers', '--format', 'json'], token.password))
         access = controllers_info['controllers'][controller]['access']
     except CalledProcessError:
         access = None
@@ -187,13 +192,13 @@ def get_controllers(token):
 ###############################################################################
 def model_exists(token, model):
     login(token.c_name)
-    data = json.loads(check_output(['juju', 'list-models', '--format', 'json']).decode('utf-8'))
+    data = json.loads(output_pass(['juju', 'list-models', '--format', 'json']))
     return model in data.values()
 
 
 def get_all_models(controller):
     login(controller)
-    data = json.loads(check_output(['juju', 'list-models', '--format', 'json']).decode('utf-8'))
+    data = json.loads(output_pass(['juju', 'list-models', '--format', 'json']))
     models = []
     for model in data['models']:
         models.append(model['name'])
@@ -201,7 +206,6 @@ def get_all_models(controller):
 
 
 def get_models(token):
-    login(token.c_name)
     models = {}
     for model in get_all_models(token.c_name):
         access = get_model_access(token, model)
@@ -212,7 +216,7 @@ def get_models(token):
 
 def get_model_access(token, model):
     login(token.c_name)
-    data = json.loads(check_output(['juju', 'users', model, '--format', 'json']).decode('utf-8'))
+    data = json.loads(output_pass(['juju', 'users', model, '--format', 'json']))
     try:
         access = data[token.username]['access']
     except KeyError:
@@ -234,8 +238,8 @@ def create_model(token, model, ssh_key=None):
     # check_call(['juju', 'add-credential', '--replace', token.c_name, '-f', tmp.name])
     login(token.c_name)
     output = {}
-    output['add-model'] = check_output(['juju', 'add-model', model, '--credential', helpers.get_user()]) # token.username])
-    output['grant'] = check_output(['juju', 'grant', token.username, 'admin', model])
+    output['add-model'] = output_pass(['juju', 'add-model', model, '--credential', helpers.get_user()]) # token.username])
+    output['grant'] = output_pass(['juju', 'grant', token.username, 'admin', model])
     if ssh_key is not None:
         output['ssh'] = add_ssh_key(token, ssh_key)
     return output
@@ -243,12 +247,12 @@ def create_model(token, model, ssh_key=None):
 
 def delete_model(token):
     login(token.c_name)
-    return check_output(['juju', 'destroy-model', '-y', token.m_name])
+    return output_pass(['juju', 'destroy-model', '-y', token.m_name])
 
 
 def add_ssh_key(token, ssh_key):
     login(token.c_name)
-    return check_output(['juju', 'add-ssh-key', '-m', token.m_name, '"{}"'.format(ssh_key)])
+    return output_pass(['juju', 'add-ssh-key', '-m', token.m_name, '"{}"'.format(ssh_key)])
 
 
 def remove_ssh_key(token, ssh_key):
@@ -256,13 +260,13 @@ def remove_ssh_key(token, ssh_key):
     key = base64.b64decode(bytes(ssh_key.strip().split()[1].encode('ascii')))
     fp_plain = hashlib.md5(key).hexdigest()
     fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
-    return check_output(['juju', 'remove-ssh-key', '-m', token.m_name, fingerprint])
+    return output_pass(['juju', 'remove-ssh-key', '-m', token.m_name, fingerprint])
 
 
 def model_status(token):
     login(token.c_name)
-    general = check_output(['juju', 'show-model', '-m', token.m_name, '--format', 'json'])
-    detail = check_output(['juju', 'status', '-m', token.m_name, '--format', 'json'])
+    general = output_pass(['juju', 'show-model', '-m', token.m_name, '--format', 'json'])
+    detail = output_pass(['juju', 'status', '-m', token.m_name, '--format', 'json'])
     return json.loads({'general': general, 'detail': detail})
 ###############################################################################
 # USER FUNCTIONS
@@ -293,11 +297,12 @@ def change_password(username, password):
 
 def get_users(controller):
     if controller is None:
-        return None
+        result = None
     else:
         login(controller)
-        users = json.loads(check_output(['juju', 'list-users', '--format', 'json']).decode('utf-8'))
-        return {u['user-name']: u['access'] for u in users}
+        users = json.loads(output_pass(['juju', 'list-users', '--format', 'json']))
+        result = {u['user-name']: u['access'] for u in users}
+    return result
 
 
 def get_admins():
@@ -306,7 +311,7 @@ def get_admins():
     for controller in get_all_controllers():
         users = get_users(controller)
         for model in get_all_models(controller):
-            data = json.loads(check_output(['juju', 'users', model, '--format', 'json']).decode('utf-8'))
+            data = json.loads(output_pass(['juju', 'users', model, '--format', 'json']))
             temp = set()
             for key, value in data.items():
                 if value['access'] == 'admin' and users[key] == 'superuser':
@@ -330,46 +335,44 @@ def make_admin(username):
 
 def add_superuser(username, controller):
     login(controller)
-    return check_output(['juju', 'grant', username, 'superuser'])
+    return output_pass(['juju', 'grant', username, 'superuser'])
 
 
 def add_to_controller(token, username, access):
     login(token.c_name)
     check_call(['juju', 'enable-user', username])
-    return check_output(['juju', 'grant', username, parse_c_access(access)])
+    return output_pass(['juju', 'grant', username, parse_c_access(access)])
 
 
 def remove_from_controller(token, username):
     login(token.c_name)
-    return check_output(['juju', 'disable-user', username])
+    return output_pass(['juju', 'disable-user', username])
 
 
 def add_to_model(token, username, access):
     login(token.c_name)
     check_call(['juju', 'enable-user', username])
-    return check_output(['juju', 'grant', username, access, token.m_name])
+    return output_pass(['juju', 'grant', username, access, token.m_name])
 
 
 def remove_from_model(token, username):
     login(token.c_name)
-    return check_output(['juju', 'revoke', username, token.m_name])
+    return output_pass(['juju', 'revoke', username, token.m_name])
 
 
 def user_exists(username):
-    output = check_output(['juju', 'users', '--format', 'json']).decode('utf-8')
-    return username in json.loads(output[1:-2]).values()
+    return username in json.loads(output_pass(['juju', 'users', '--format', 'json'])[1:-2]).values()
 #####################################################################################
 # APPLICATION FUNCTIONS
 #####################################################################################
 def config(token, app_name):
     login(token.c_name)
-    output = check_output(['juju', 'config', app_name, '--model', token.modelname, '--format', 'json']).decode('utf-8')
-    return json.loads(output)
+    return json.loads(output_pass(['juju', 'config', app_name, '--model', token.modelname, '--format', 'json']))
 
 
 def app_exists(token, app_name):
     login(token.c_name)
-    data = json.loads(check_output(['juju', 'status', '-c', token.c_name, '-m', token.m_name]).decode('utf-8'))
+    data = json.loads(output_pass(['juju', 'status', '-c', token.c_name, '-m', token.m_name]))
     return app_name in data['applications'].keys()
 
 
@@ -380,22 +383,22 @@ def deploy_app(token, app_name, series=None, target=None):
         if 'local:' in app_name:
             app_name = app_name.replace('local:', '{}/'.format(helpers.get_charm_dir()))
         login(token.c_name)
-        return check_output(['juju', 'deploy', app_name, '-m', token.m_name, '--series', series, '--to', target])
+        return output_pass(['juju', 'deploy', app_name, '-m', token.m_name, '--series', series, '--to', target])
 
 
 def remove_app(token, app_name):
     login(token.c_name)
-    return check_output(['juju', 'remove-application', '-m', token.m_name, app_name])
+    return output_pass(['juju', 'remove-application', '-m', token.m_name, app_name])
 
 
 def add_machine(token, series=None):
     login(token.c_name)
-    return check_output(['juju', 'add-machine', '-m', token.m_name, '--series', series])
+    return output_pass(['juju', 'add-machine', '-m', token.m_name, '--series', series])
 
 
 def machine_exists(token, machine):
     login(token.c_name)
-    data = json.loads(check_output(['juju', 'status', '-m', token.m_name, '--format', 'json']).decode('utf-8'))
+    data = json.loads(output_pass(['juju', 'status', '-m', token.m_name, '--format', 'json']))
     if 'lxd' in machine:
         return machine in data['machines'][machine.split('/')[0]]['containers'].keys()
     else:
@@ -404,7 +407,7 @@ def machine_exists(token, machine):
 
 def get_machine_series(token, machine):
     login(token.c_name)
-    data = json.loads(check_output(['juju', 'list-machines' '-m', token.m_name, '--format', 'json']).decode('utf-8'))
+    data = json.loads(output_pass(['juju', 'list-machines' '-m', token.m_name, '--format', 'json']))
     if 'lxd' in machine:
         return data['machines'][machine.split('/')[0]]['containers'][machine]['series']
     else:
@@ -413,36 +416,35 @@ def get_machine_series(token, machine):
 
 def remove_machine(token, machine):
     login(token.c_name)
-    return check_output(['juju', 'remove-machine', '--force', token.m_name, machine])
+    return output_pass(['juju', 'remove-machine', '--force', token.m_name, machine])
 
 
 def unit_exists(token, unit):
     login(token.c_name)
-    data = json.loads(check_output(['juju', 'status', '-m', token.m_name, '--format', 'json']).decode('utf-8'))
+    data = json.loads(output_pass(['juju', 'status', '-m', token.m_name, '--format', 'json']))
     return unit in data['units'].keys()
 
 
 def add_unit(token, app_name, target=None):
     login(token.c_name)
-    return check_output(['juju', 'add-unit', app_name, '-m', token.m_name, '--to', target])
+    return output_pass(['juju', 'add-unit', app_name, '-m', token.m_name, '--to', target])
 
 
 def remove_unit(token, unit_name):
     login(token.c_name)
-    return check_output(['juju', 'remove-unit', '-m', token.m_name, unit_name])
+    return output_pass(['juju', 'remove-unit', '-m', token.m_name, unit_name])
 
 
 def add_relation(token, app1, app2):
     login(token.c_name)
-    return check_output(['juju', 'add-relation', '-m', token.m_name, app1, app2])
+    return output_pass(['juju', 'add-relation', '-m', token.m_name, app1, app2])
 
 
 def remove_relation(token, app1, app2):
     login(token.c_name)
-    return check_output(['juju', 'remove-relation', '-m', token.m_name, app1, app2])
+    return output_pass(['juju', 'remove-relation', '-m', token.m_name, app1, app2])
 
 
 def get_app_info(token, app_name):
     login(token.c_name)
-    data = json.loads(check_output(['juju', 'status', '-m', token.m_name]).decode('utf-8'))
-    return data['applications'][app_name]
+    return json.loads(output_pass(['juju', 'status', '-m', token.m_name]))['applications'][app_name]
