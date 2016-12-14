@@ -40,10 +40,12 @@ class TestJuJu(unittest.TestCase):
 
     def test_02_authenticate(self):
         auth = Auth(helpers.get_user(), helpers.get_password())
+        api = 'api-key-unittesting'
         with open('{}/api-key'.format(helpers.get_api_dir()), 'w') as a_file:
             a_file.write('api-key-unittesting')
         self.assertRaises(Forbidden, lambda: authenticate('bad-api-key-unittesting', auth))
-        self.assertIsInstance(authenticate('api-key-unittesting', auth), JuJu_Token)
+        self.assertIsInstance(authenticate(api, auth), JuJu_Token)
+        self.assertRaises(Forbidden, lambda: authenticate(api, auth, 'nocontroller'))
 
 
     #def test_03_cloud_supports_series(self):

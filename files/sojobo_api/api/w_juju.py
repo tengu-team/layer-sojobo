@@ -73,14 +73,16 @@ def parse_m_access(access):
 
 
 def login(controller, user=helpers.get_user(), password=helpers.get_password()):
-    FNULL = open(os.devnull, 'w')
-    check_call(['juju', 'logout'], stdout=FNULL, stderr=STDOUT)
-    check_output(['juju', 'login', user, '--controller', controller], input=password + '\n', universal_newlines=True, stderr=STDOUT)
-    check_call(['juju', 'switch', controller], stdout=FNULL, stderr=STDOUT)
+    with open(os.devnull, 'w') as FNULL:
+        check_call(['juju', 'logout'], stdout=FNULL, stderr=FNULL)
+        check_output(['juju', 'login', user, '--controller', controller], input=password + '\n', universal_newlines=True, stderr=FNULL)
+        check_call(['juju', 'switch', controller], stdout=FNULL, stderr=FNULL)
 
 
 def output_pass(commands, password=helpers.get_password()):
-    return check_output(commands, input=password + '\n', universal_newlines=True)
+    with open(os.devnull, 'w') as FNULL:
+        return check_output(commands, input=password + '\n', universal_newlines=True, stderr=FNULL)
+
 
 
 class JuJu_Token(object):
