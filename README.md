@@ -57,8 +57,7 @@ def get_supported_series():
     return ['trusty', 'xenial']
 ```
 
-* A Token object, which has the controller type in lowercase, whether or not it supports lxd containers, the url of the endpoint, the required information to log into the controller (username, password, api_key, etc.). The Token objects must have the `get_credentials` and `get_cloud`
-functions, which return the required JuJu-styled data.
+* A Token object, which has the controller type in lowercase, whether or not it supports lxd containers, the url of the endpoint, the required information to log into the controller (username, password, api_key, etc.). The Token objects must have the `get_credentials` and `get_cloud` functions, which return the required JuJu-styled data.
 * A `create_controller(name, region, credentials)` function, which houses all the required code required to successfully bootstrap a controller of this type.
 * A `get_supported_series()` function which returns a list of Ubuntu-versions this controller can deploy.
 

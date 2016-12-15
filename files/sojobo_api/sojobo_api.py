@@ -81,10 +81,10 @@ def forbidden(error):
 ###############################################################################
 @APP.route('/')
 def api_root():
-    return helpers.create_response(200, {'name': socket.gethostname(),
-                                         'version': "1.0.0",  # see http://semver.org/
-                                         'api_dir': helpers.get_api_dir(),
-                                         'used_apis': get_apis()})
+    return helpers.create_response(200, {'message': {'name': socket.gethostname(),
+                                                     'version': "1.0.0",  # see http://semver.org/
+                                                     'api_dir': helpers.get_api_dir(),
+                                                     'used_apis': get_apis()}})
 
 
 @APP.route('/favicon.ico')

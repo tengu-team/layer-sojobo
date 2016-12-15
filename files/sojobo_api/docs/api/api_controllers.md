@@ -1,0 +1,29 @@
+# Info
+<p>
+The `api_controllers.py` provides all the calls to interact with cloud controllers.
+</p>
+
+# Routes
+* `/controllers/`
+  * HTTP Method: ALL
+  * Required data: None
+  * Response codes:
+    * 200: `{'name': 'Controllers API', 'version': <version>}`
+* `/controllers/create`
+  * HTTP Method: POST
+  * Required data: api_key, type, name, region, credentials
+  * Response codes: 200, 400, 403
+* `/controllers/delete`
+  * HTTP Method: DELETE
+  * Required data: api_key, controller
+  * Response: 200, 400, 403
+* `/controllers/backup`
+  * HTTP Method: GET
+  * Required data: api_key
+  * Response codes:
+    * 200: zipfile
+    * 400, 403
+* `/controllers/getcontrollers`
+  * HTTP Method: GET
+  * Required data: api_key
+  * Response codes: 200, 400, 403
