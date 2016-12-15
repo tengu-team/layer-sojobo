@@ -32,7 +32,7 @@ def create():
             code, response = 200, 'The model already exists'
         else:
             if token.c_access == 'add-model' or token.c_access == 'superuser':
-                juju.create_model(token, model, data.get('ssh-keys', None))
+                juju.create_model(token, model, data.get('ssh_key', None))
                 code, response = 200, {'model-name': token.m_name,
                                        'model-fullname': token.m_shared_name(),
                                        'gui-url': juju.get_gui_url(token)}
@@ -98,7 +98,7 @@ def status(controllername, modelname):
             code, response = 403, 'You do not have permission to see this model'
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, response)
+    return helpers.create_response(code, {'message': response})
 
 
 @MODELS.route('/getmodels/<controllername>', methods=['GET'])
@@ -108,4 +108,4 @@ def get_models(controllername):
         code, response = juju.get_models(token)
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, response)
+    return helpers.create_response(code, {'message': response})

@@ -116,7 +116,7 @@ def add_unit():
     data = request.form
     try:
         token = juju.authenticate(data['api_key'], request.authorization, data['controller'], data['model'])
-        app = data['app']
+        app = data['app_name']
         if juju.app_exists(token, app):
             if token.m_access == 'write' or token.m_access == 'admin':
                 code, response = 200, juju.add_unit(token, app, data.get('target', None))
