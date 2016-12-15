@@ -1,7 +1,5 @@
 # Info
-<p>
 The `api_controllers.py` provides all the calls to interact with cloud controllers.
-</p>
 
 # Routes
 * `/controllers/`
@@ -16,7 +14,7 @@ The `api_controllers.py` provides all the calls to interact with cloud controlle
 * `/controllers/delete`
   * HTTP Method: DELETE
   * Required data: api_key, controller
-  * Response: 200, 400, 403
+  * Response codes: 200, 400, 403
 * `/controllers/backup`
   * HTTP Method: GET
   * Required data: api_key

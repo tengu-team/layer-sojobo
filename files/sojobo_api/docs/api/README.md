@@ -1,13 +1,10 @@
 # Info
-<p>
 The `sojobo_api.py` script is responsible for starting the api. It will load the api blueprints (`api_<modulename>.py`)
 and register them under `/<modulename>`. It also sets the necessary access-control values and content types. A code 403
-error handler is provided.</p>
+error handler is provided.
 
 # General working
-<p>
 Every call of the api returns a json `{'message': '<response>'}`, unless otherwise specified in the documentation
-</p>
 
 # Routes
 * `/`

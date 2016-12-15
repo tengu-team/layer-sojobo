@@ -1,24 +1,16 @@
 # Introduction
-<p>
 This is the api for the Tengu platform. Besides providing all the necessary Tengu - commands, it also introduces
 JuJu - wide users (instead of users on a controller-level) and the principle of an admin-user.
-</p>
 # Charm
-<p>
 
-</p>
 # API
-<p>
 The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
 follow the naming rules and provide the required functions.
-</p>
 
 ## API-modules
-<p>
 The api is written in Flask. This allows the use of blueprints to expand the api. API-modules file names must follow
 this scheme: `api_<modulename>.py`. The modulename MAY NOT contain an underscore. The module itself must have the following
 inside:
-</p>
 ```python
 <MODULENAME> = Blueprint(<modulename>, __name__)
 
@@ -28,10 +20,8 @@ def get():
 ```
 
 ## Controller-modules
-<p>
 Controller modules name must follow this scheme: `controller_<controllername>.py`. The controllername MAY NOT contain
 an underscore. The module itself must have the following inside:
-</p>
 ```python
 class Token(object):
     def __init__(self, url, auth):
@@ -65,7 +55,7 @@ def get_supported_series():
 
 
 # Documentation
-Documentation of the api can be found under [files/sojobo_api/docs/api](files/sojobo_api/docs/api).<br>
+Documentation of the api can be found under [files/sojobo_api/docs/api](files/sojobo_api/docs/api).  
 Documentation of the different tests can be found under [files/sojobo_api/docs/tests](files/sojobo_api/docs/tests)
 
 # Bugs
