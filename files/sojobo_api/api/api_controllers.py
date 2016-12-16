@@ -6,7 +6,7 @@ import shutil
 
 from flask import send_file, request, Blueprint
 from api import w_errors as errors
-from api import w_helpers as helpers
+from sojobo_api import create_response, get_api_dir
 from api import w_juju as juju
 
 
@@ -19,8 +19,8 @@ def get():
 
 @CONTROLLERS.route('/')
 def home():
-    return helpers.create_response(200, {'name': 'Controllers API',
-                                         'version': "1.0.0",  # see http://semver.org/
+    return create_response(200, {'name': 'Controllers API',
+                                         'controllers': list(juju.get_controller_types().keys())
                                         })
 
 
@@ -36,7 +36,7 @@ def create():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @CONTROLLERS.route('/delete', methods=['DELETE'])
@@ -50,7 +50,7 @@ def delete():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @CONTROLLERS.route('/backup', methods=['GET'])
@@ -58,7 +58,7 @@ def backup_controllers():
     try:
         token = juju.authenticate(request.args['api_key'], request.authorization)
         if token.is_admin:
-            apidir = helpers.get_api_dir
+            apidir = get_api_dir()
             homedir = '/home/ubuntu/.local/share/juju'
             shutil.copy2('{}/install_credentials.py'.format(apidir), '{}/backup/install_credentials.py'.format(apidir))
             shutil.copy2('{}/clouds.yaml'.format(homedir), '{}/backup/clouds.yaml'.format(apidir))
@@ -70,7 +70,7 @@ def backup_controllers():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @CONTROLLERS.route('/getcontrollers', methods=['GET'])
@@ -80,4 +80,4 @@ def get_controllers():
         code, response = 200, juju.get_controllers(token)
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})

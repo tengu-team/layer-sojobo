@@ -65,8 +65,7 @@ def upgrade_charm():
 
 def install_api():
     # Install pip pkgs
-    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'lxml',
-                'apscheduler']:
+    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler']:
         pip_install(pkg)
     # Install The Sojobo API. Existing /etc files don't get overwritten.
     if os.path.isdir(API_DIR + '/etc'):

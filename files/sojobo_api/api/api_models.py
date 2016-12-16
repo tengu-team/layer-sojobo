@@ -4,7 +4,7 @@
 ###############################################################################
 from flask import request, Blueprint
 from api import w_errors as errors
-from api import w_helpers as helpers
+from sojobo_api import create_response
 from api import w_juju as juju
 
 
@@ -17,7 +17,7 @@ def get():
 
 @MODELS.route('/')
 def home():
-    return helpers.create_response(200, {'name': 'Models API',
+    return create_response(200, {'name': 'Models API',
                                          'version': "1.0.0",  # see http://semver.org/
                                         })
 
@@ -40,7 +40,7 @@ def create():
                 code, response = 403, 'You do not have permission to add models to this controller!'
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @MODELS.route('/delete', methods=['DELETE'])
@@ -55,7 +55,7 @@ def delete():
             code, response = 403, 'You do not have permission to remove this model!'
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @MODELS.route('/addsshkey', methods=['PUT'])
@@ -70,7 +70,7 @@ def add_ssh_key():
             code, response = 403, 'You do not have permission to add ssh-keys to this model'
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @MODELS.route('/removesshkey', methods=['PUT'])
@@ -85,7 +85,7 @@ def remove_ssh_key():
             code, response = 403, 'You do not have permission to remove ssh-keys from this model'
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @MODELS.route('/<controllername>/<modelname>/status', methods=['GET'])
@@ -98,7 +98,7 @@ def status(controllername, modelname):
             code, response = 403, 'You do not have permission to see this model'
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @MODELS.route('/getmodels/<controllername>', methods=['GET'])
@@ -108,4 +108,4 @@ def get_models(controllername):
         code, response = juju.get_models(token)
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})

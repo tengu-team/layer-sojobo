@@ -5,7 +5,7 @@
 from flask import request, Blueprint
 
 from api import w_errors as errors
-from api import w_helpers as helpers
+from sojobo_api import create_response
 from api import w_juju as juju
 
 
@@ -18,7 +18,7 @@ def get():
 
 @USERS.route('/')
 def home():
-    return helpers.create_response(200, {'name': 'Users API',
+    return create_response(200, {'name': 'Users API',
                                          'version': "1.0.0",  # see http://semver.org/
                                         })
 
@@ -37,7 +37,7 @@ def create():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @USERS.route('/makeadmin', methods=['POST'])
@@ -58,7 +58,7 @@ def make_admin():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @USERS.route('/delete', methods=['DELETE'])
@@ -80,7 +80,7 @@ def delete():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @USERS.route('/changepassword', methods=['PUT'])
@@ -98,7 +98,7 @@ def change_password():
             code, response = errors.no_user()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @USERS.route('/addtocontroller', methods=['PUT'])
@@ -116,7 +116,7 @@ def add_to_controller():
             code, response = errors.no_user()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @USERS.route('/removefromcontroller', methods=['DELETE'])
@@ -135,7 +135,7 @@ def remove_from_controller():
             code, response = errors.no_user()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @USERS.route('/addtomodel', methods=['PUT'])
@@ -153,7 +153,7 @@ def add_to_model():
             code, response = errors.no_user()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @USERS.route('/removefrommodel', methods=['DELETE'])
@@ -171,4 +171,4 @@ def remove_from_model():
             code, response = errors.no_user()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})

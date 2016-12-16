@@ -22,18 +22,30 @@ import json
 import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
 import requests
-
 # import tempfile
 import yaml
-
-from api import w_helpers as helpers
-
+from sojobo_api import get_api_dir
 from flask import abort
+
+
+def get_user():
+    return os.environ.get('JUJU_ADMIN_USER')
+    # return 'tengu-ui'
+
+
+def get_password():
+    return os.environ.get('JUJU_ADMIN_PASSWORD')
+    # return '4vQwtSKMNTyRtTfU'
+
+
+def get_charm_dir():
+    return os.environ.get('LOCAL_CHARM_DIR')
+    # return '/tmp'
 
 
 def get_controller_types():
     c_list = {}
-    for f_path in os.listdir('{}/api'.format(helpers.get_api_dir())):
+    for f_path in os.listdir('{}/api'.format(get_api_dir())):
         if 'controller_' in f_path and '.pyc' not in f_path:
             name = f_path.split('.')[0]
             c_list[name.split('_')[1]] = import_module('api.{}'.format(name))
@@ -42,7 +54,7 @@ def get_controller_types():
 
 def app_supports_series(app_name, series):
     if 'local:' in app_name:
-        with open('{}/{}/metadata.yaml'.format(helpers.get_charm_dir(), app_name.split(':')[1])) as data:
+        with open('{}/{}/metadata.yaml'.format(get_charm_dir(), app_name.split(':')[1])) as data:
             supports = series in yaml.load(data)['series']
     else:
         supports = False
@@ -72,17 +84,16 @@ def parse_m_access(access):
         return 'read'
 
 
-def login(controller, user=helpers.get_user(), password=helpers.get_password()):
+def login(controller, user=get_user(), password=get_password()):
     with open(os.devnull, 'w') as FNULL:
         check_call(['juju', 'logout'], stdout=FNULL, stderr=FNULL)
         check_output(['juju', 'login', user, '--controller', controller], input=password + '\n', universal_newlines=True, stderr=FNULL)
         check_call(['juju', 'switch', controller], stdout=FNULL, stderr=FNULL)
 
 
-def output_pass(commands, password=helpers.get_password()):
+def output_pass(commands, password=get_password()):
     with open(os.devnull, 'w') as FNULL:
         return check_output(commands, input=password + '\n', universal_newlines=True, stderr=FNULL)
-
 
 
 class JuJu_Token(object):
@@ -106,7 +117,7 @@ class JuJu_Token(object):
         self.m_access = parse_m_access(modelaccess)
 
     def m_shared_name(self):
-        return "{}/{}".format(helpers.get_user(), self.m_name)
+        return "{}/{}".format(get_user(), self.m_name)
 
     def get_credentials(self):
         return {'credentials': {self.c_name: {self.username: self.c_token.get_credentials()}}}
@@ -119,7 +130,7 @@ class JuJu_Token(object):
 
 
 def authenticate(api_key, auth, controller=None, modelname=None):
-    with open('{}/api-key'.format(helpers.get_api_dir()), 'r') as key:
+    with open('{}/api-key'.format(get_api_dir()), 'r') as key:
         apikey = key.readlines()[0]
     if api_key != apikey:
         abort(403, {'message': 'You do not have permission to perform this operation!'})
@@ -135,7 +146,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
         token.set_controller(controller, c_access, c_token)
         if modelname:
             models_info = json.loads(check_output(['juju', 'models', '--format', 'json']).decode('utf-8'))
-            if '{}/{}'.format(helpers.get_user(), modelname) in models_info.values():
+            if '{}/{}'.format(get_user(), modelname) in models_info.values():
                 token.set_model(modelname, models_info[0]['models']['users'][token.username]['access'])
             else:
                 abort(403, {'message': 'This model does not exist or you do not have permission to see it!'})
@@ -241,7 +252,7 @@ def create_model(token, model, ssh_key=None):
     # check_call(['juju', 'add-credential', '--replace', token.c_name, '-f', tmp.name])
     login(token.c_name)
     output = {}
-    output['add-model'] = output_pass(['juju', 'add-model', model, '--credential', helpers.get_user()]) # token.username])
+    output['add-model'] = output_pass(['juju', 'add-model', model, '--credential', get_user()]) # token.username])
     output['grant'] = output_pass(['juju', 'grant', token.username, 'admin', model])
     if ssh_key is not None:
         output['ssh'] = add_ssh_key(token, ssh_key)
@@ -384,7 +395,7 @@ def deploy_app(token, app_name, series=None, target=None):
         return '{} doesn\'t support lxd-containers'.format(token.c_token.c_type.upper())
     else:
         if 'local:' in app_name:
-            app_name = app_name.replace('local:', '{}/'.format(helpers.get_charm_dir()))
+            app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
         login(token.c_name)
         return output_pass(['juju', 'deploy', app_name, '-m', token.m_name, '--series', series, '--to', target])
 

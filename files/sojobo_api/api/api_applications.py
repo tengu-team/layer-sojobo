@@ -5,8 +5,8 @@
 from flask import request, Blueprint
 
 from api import w_errors as errors
-from api import w_helpers as helpers
 from api import w_juju as juju
+from sojobo_api import create_response
 
 
 APPLICATIONS = Blueprint('applications', __name__)
@@ -18,7 +18,7 @@ def get():
 
 @APPLICATIONS.route('/')
 def home():
-    return helpers.create_response(200, {'name': 'Applications API',
+    return create_response(200, {'name': 'Applications API',
                                          'version': "1.0.0",  # see http://semver.org/
                                         })
 
@@ -51,7 +51,7 @@ def add_app():
                 code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @APPLICATIONS.route('/removeapp', methods=['DELETE'])
@@ -69,7 +69,7 @@ def remove_app():
             code, response = errors.no_app()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @APPLICATIONS.route('/addmachine', methods=['PUT'])
@@ -90,7 +90,7 @@ def add_machine():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @APPLICATIONS.route('/removemachine', methods=['DELETE'])
@@ -108,7 +108,7 @@ def remove_machine():
             code, response = errors.no_machine()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @APPLICATIONS.route('/addunit', methods=['PUT'])
@@ -126,7 +126,7 @@ def add_unit():
             code, response = errors.no_app()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @APPLICATIONS.route('/removeunit', methods=['DELETE'])
@@ -144,7 +144,7 @@ def remove_unit():
             code, response = errors.no_app()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @APPLICATIONS.route('/addrelation', methods=['PUT'])
@@ -162,7 +162,7 @@ def add_relation():
             code, response = errors.no_app()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @APPLICATIONS.route('/removerelation', methods=['DELETE'])
@@ -180,7 +180,7 @@ def remove_relation():
             code, response = errors.no_app()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @APPLICATIONS.route('/config/<controllername>/<modelname>/<appname>', methods=['GET'])
@@ -190,7 +190,7 @@ def get_config(controllername, modelname, appname):
         code, response = 200, juju.config(token, appname)
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})
 
 
 @APPLICATIONS.route('/info/<controllername>/<modelname>/<appname>', methods=['GET'])
@@ -203,4 +203,4 @@ def get_info(controllername, modelname, appname):
             code, response = errors.no_app()
     except KeyError:
         code, response = errors.invalid_data()
-    return helpers.create_response(code, {'message': response})
+    return create_response(code, {'message': response})

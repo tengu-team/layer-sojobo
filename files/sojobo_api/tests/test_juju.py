@@ -4,11 +4,11 @@ from subprocess import CalledProcessError, check_call
 import unittest
 import yaml
 from api.w_juju import create_controller, get_controller_types, app_supports_series, JuJu_Token, cloud_supports_series
-from api.w_juju import authenticate
+from api.w_juju import authenticate, get_charm_dir, get_user, get_password
 import api.controller_maas as maas
-from api import w_helpers as helpers
 from tests.test_c_maas import cleanup_controller
 from werkzeug.exceptions import Forbidden
+from sojobo_api import get_api_dir
 
 
 class Auth(object):
@@ -23,25 +23,25 @@ class TestJuJu(unittest.TestCase):
 
     def test_01_app_supports_series(self):
         try:
-            os.remove('{}/unittest/metadata.yaml'.format(helpers.get_charm_dir()))
+            os.remove('{}/unittest/metadata.yaml'.format(get_charm_dir()))
         except OSError:
             pass
         try:
-            os.rmdir('{}/unittest'.format(helpers.get_charm_dir()))
+            os.rmdir('{}/unittest'.format(get_charm_dir()))
         except OSError:
             pass
         self.assertTrue(app_supports_series('mysql', 'trusty'))
         self.assertFalse(app_supports_series('mysql', 'blablabla'))
-        os.mkdir('{}/unittest'.format(helpers.get_charm_dir()))
-        with open('{}/unittest/metadata.yaml'.format(helpers.get_charm_dir()), 'w') as y_file:
+        os.mkdir('{}/unittest'.format(get_charm_dir()))
+        with open('{}/unittest/metadata.yaml'.format(get_charm_dir()), 'w') as y_file:
             yaml.dump({'series': ['trusty', 'xenial']}, y_file, default_flow_style=True)
         self.assertTrue(app_supports_series('local:unittest', 'trusty'))
         self.assertFalse(app_supports_series('local:unittest', 'blablabla'))
-        os.remove('{}/unittest/metadata.yaml'.format(helpers.get_charm_dir()))
-        os.rmdir('{}/unittest'.format(helpers.get_charm_dir()))
+        os.remove('{}/unittest/metadata.yaml'.format(get_charm_dir()))
+        os.rmdir('{}/unittest'.format(get_charm_dir()))
 
     def test_02_create_controller(self):
-        auth = Auth(helpers.get_user(), helpers.get_password())
+        auth = Auth(get_user(), get_password())
         output = create_controller(JuJu_Token(auth), 'blablabla', 'shouldfail', 'shouldfail', {'should': 'fail'})
         self.assertTrue('Incorrect controller type' in output)
         cleanup_controller('maas', 'unittesting', auth.username)
@@ -54,9 +54,9 @@ class TestJuJu(unittest.TestCase):
             self.assertTrue(False)
 
     def test_03_authenticate(self):
-        auth = Auth(helpers.get_user(), helpers.get_password())
+        auth = Auth(get_user(), get_password())
         api = 'api-key-unittesting'
-        with open('{}/api-key'.format(helpers.get_api_dir()), 'w') as a_file:
+        with open('{}/api-key'.format(get_api_dir()), 'w') as a_file:
             a_file.write('api-key-unittesting')
         self.assertRaises(Forbidden, lambda: authenticate('bad-api-key-unittesting', auth))
         self.assertIsInstance(authenticate(api, auth), JuJu_Token)

@@ -17,12 +17,11 @@
 # !/usr/bin/env python3
 from distutils.util import strtobool
 from importlib import import_module
+import json
 import os
 import socket
 
-from api import w_helpers as helpers
-
-from flask import Flask, redirect
+from flask import Flask, redirect, Response
 #
 # Init feature flags and global variables
 #
@@ -46,12 +45,25 @@ def parse_flags_from_environment(flags):
         globals()[flagname] = value
 
 
+def get_api_dir():
+    return os.environ.get('SOJOBO_API_DIR')
+    # return '/home/mathijs/Documents/repos/Sojobo-api/files/sojobo_api'
+
+
 def get_apis():
     api_list = []
-    for f_path in os.listdir('{}/api'.format(helpers.get_api_dir())):
+    for f_path in os.listdir('{}/api'.format(get_api_dir())):
         if 'api_' in f_path and '.pyc' not in f_path:
             api_list.append(f_path.split('.')[0])
     return api_list
+
+
+def create_response(http_code, return_object):
+    return Response(
+        json.dumps(return_object),
+        status=http_code,
+        mimetype='application/json',
+    )
 
 
 DEBUG = False
@@ -75,16 +87,16 @@ def apply_caching(response):
 
 @APP.errorhandler(403)
 def forbidden(error):
-    return helpers.create_response(403, {'message': error.description})
+    return create_response(403, {'message': error.description})
 ###############################################################################
 # ROUTES
 ###############################################################################
 @APP.route('/')
 def api_root():
-    return helpers.create_response(200, {'message': {'name': socket.gethostname(),
-                                                     'version': "1.0.0",  # see http://semver.org/
-                                                     'api_dir': helpers.get_api_dir(),
-                                                     'used_apis': get_apis()}})
+    return create_response(200, {'message': {'name': socket.gethostname(),
+                                             'version': "1.0.0",  # see http://semver.org/
+                                             'api_dir': get_api_dir(),
+                                             'used_apis': get_apis()}})
 
 
 @APP.route('/favicon.ico')

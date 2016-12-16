@@ -1,14 +1,13 @@
 # pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902
 import os
 from subprocess import check_call, CalledProcessError
-
-from api import w_helpers as helpers
+from sojobo_api import get_api_dir
 
 
 def get_tests():
     test_c_list = []
     test_a_list = []
-    for f_path in os.listdir('{}/tests'.format(helpers.get_api_dir())):
+    for f_path in os.listdir('{}/tests'.format(get_api_dir())):
         if '.pyc' not in f_path:
             if 'test_a_' in f_path:
                 test_a_list.append(f_path)
@@ -25,7 +24,7 @@ if __name__ == '__main__':
     for count, test in enumerate(tests):
         print('\033[1mEXECUTING {}/{}: {}\033[0m'.format(count+1, n_tests, test))
         try:
-            check_call((['python3', '{}/tests/{}'.format(helpers.get_api_dir(), test), '-v']))
+            check_call((['python3', '{}/tests/{}'.format(get_api_dir(), test), '-v']))
         except CalledProcessError:
             failed.append(test)
     print('\n')
