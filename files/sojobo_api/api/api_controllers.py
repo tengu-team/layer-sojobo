@@ -5,6 +5,7 @@
 import shutil
 
 from flask import send_file, request, Blueprint
+from werkzeug.utils import secure_filename
 from api import w_errors as errors
 from sojobo_api import create_response, get_api_dir
 from api import w_juju as juju
@@ -30,7 +31,13 @@ def create():
     try:
         token = juju.authenticate(data['api_key'], request.authorization)
         if token.is_admin:
-            response = juju.create_controller(token, data['type'], data['name'], data['region'], data['credentials'])
+            if 'file' in request.files:
+                cfile = request.files['file']
+                cfile.save('{}/files'.format(get_api_dir), '{}.json'.format(data['credentials']['project-id']))
+                response = juju.create_controller(token, data['type'], data['name'], data['region'],
+                                                  data['credentials'], cfile)
+            else:
+                response = juju.create_controller(token, data['type'], data['name'], data['region'], data['credentials'])
             code = 200
         else:
             code, response = errors.no_permission()
