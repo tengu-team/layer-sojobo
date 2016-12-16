@@ -37,7 +37,7 @@ def create():
                                        'model-fullname': token.m_shared_name(),
                                        'gui-url': juju.get_gui_url(token)}
             else:
-                code, response = 403, 'You do not have permission to add models to this controller!'
+                code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
@@ -52,7 +52,7 @@ def delete():
             juju.delete_model(token)
             code, response = 200, 'The model has been destroyed'
         else:
-            code, response = 403, 'You do not have permission to remove this model!'
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
@@ -67,7 +67,7 @@ def add_ssh_key():
             juju.add_ssh_key(token, data['ssh_key'])
             code, response = 200, 'The ssh-key has been added'
         else:
-            code, response = 403, 'You do not have permission to add ssh-keys to this model'
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
@@ -82,7 +82,7 @@ def remove_ssh_key():
             juju.remove_ssh_key(token, data['ssh_key'])
             code, response = 200, 'The ssh-key has been removed'
         else:
-            code, response = 403, 'You do not have permission to remove ssh-keys from this model'
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
@@ -95,7 +95,7 @@ def status(controllername, modelname):
         if token.m_access:
             code, response = 200, juju.model_status(token)
         else:
-            code, response = 403, 'You do not have permission to see this model'
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})

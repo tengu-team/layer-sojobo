@@ -6,7 +6,7 @@ The `api_controllers.py` provides all the calls to interact with cloud controlle
   * HTTP Method: ALL
   * Required data: None
   * Response codes:
-    * 200: `{'name': 'Controllers API', 'version': <version>}`
+    * 200: `{'controllers': <list of available controllers>, 'version': <version>}`
 * `/controllers/create`
   * HTTP Method: POST
   * Required data: api_key, type, name, region, credentials
