@@ -85,9 +85,34 @@ def apply_caching(response):
     return response
 
 
+@APP.errorhandler(400)
+def bad_request(error):
+    return create_response(400, {'message': error.description})
+
+
+@APP.errorhandler(401)
+def unauthorized(error):
+    return create_response(401, {'message': error.description})
+
+
 @APP.errorhandler(403)
 def forbidden(error):
     return create_response(403, {'message': error.description})
+
+
+@APP.errorhandler(404)
+def not_found(error):
+    return create_response(404, {'message': error.description})
+
+
+@APP.errorhandler(405)
+def method_not_allowed(error):
+    return create_response(405, {'message': error.description})
+
+
+@APP.errorhandler(409)
+def conflict(error):
+    return create_response(409, {'message': error.description})
 ###############################################################################
 # ROUTES
 ###############################################################################

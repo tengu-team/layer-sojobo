@@ -21,17 +21,21 @@ def invalid_data():
     return 400, 'The request does not have all the required data or the data is not in the right format.'
 
 
+def no_access(item):
+    return 401, 'You do not have access to this {}'.format(item)
+
+
+def unauthorized():
+    return 403, 'You do not have permission to use the API'
+
+
+def does_not_exist(item):
+    return 404, 'The {} does not exist!'.format(item)
+
+
 def no_permission():
-    return 403, 'You do not have permission to perform this operation!'
+    return 405, 'You do not have permission to perform this operation!'
 
 
-def no_user():
-    return 400, 'The user does not exist!'
-
-
-def no_app():
-    return 400, 'The application does not exist!'
-
-
-def no_machine():
-    return 400, 'The machine does not exist!'
+def already_exists(item):
+    return 409, 'The {} already exists!'.format(item)

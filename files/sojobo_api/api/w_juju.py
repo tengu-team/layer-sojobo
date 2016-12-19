@@ -27,6 +27,8 @@ import yaml
 from sojobo_api import get_api_dir
 from flask import abort
 
+from api import w_errors as errors
+
 
 def get_user():
     return os.environ.get('JUJU_ADMIN_USER')
@@ -133,24 +135,26 @@ def authenticate(api_key, auth, controller=None, modelname=None):
     with open('{}/api-key'.format(get_api_dir()), 'r') as key:
         apikey = key.readlines()[0]
     if api_key != apikey:
-        abort(403, {'message': 'You do not have permission to perform this operation!'})
+        abort(errors.unauthorized())
     token = JuJu_Token(auth)
-    if controller is None:
-        return token
-    else:
+    if controller is not None and controller_exists(controller):
         c_access = get_controller_access(token, controller)
         if c_access is None:
-            abort(403, {'message': 'This controller does not exist or you do not have permission to see it!'})
+            abort(errors.no_access('controller'))
         c_type, c_endpoint = get_controller_info(controller)
         c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, auth)
         token.set_controller(controller, c_access, c_token)
-        if modelname:
+        if modelname is not None and model_exists(controller, modelname):
             models_info = json.loads(check_output(['juju', 'models', '--format', 'json']).decode('utf-8'))
             if '{}/{}'.format(get_user(), modelname) in models_info.values():
                 token.set_model(modelname, models_info[0]['models']['users'][token.username]['access'])
             else:
-                abort(403, {'message': 'This model does not exist or you do not have permission to see it!'})
-        return token
+                abort(errors.no_access('model'))
+        elif not model_exists(controller, modelname):
+            abort(errors.does_not_exist('model'))
+    elif not controller_exists(controller):
+        abort(errors.does_not_exist('controller'))
+    return token
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
@@ -178,6 +182,10 @@ def get_all_controllers():
     return controllers['controllers'].keys()
 
 
+def controller_exists(controllername):
+    return controllername in get_all_controllers()
+
+
 def get_controller_access(token, controller):
     try:
         login(controller, token.username, token.password)
@@ -189,9 +197,8 @@ def get_controller_access(token, controller):
 
 
 def get_controller_info(controller):
-    with open('/home/ubuntu/.local/share/juju/clouds.yaml', 'r') as y_clouds:
-        clouds = yaml.load(y_clouds)
-    return clouds['clouds'][controller]['type'], clouds['clouds'][controller]['endpoint']
+    result = json.loads(output_pass(['juju', 'list-controllers', '--format', 'json']))
+    return result['controllers'][controller]['cloud'], result['controllers'][controller]['api-endpoints'][0]
 
 
 def get_controllers(token):
@@ -204,8 +211,8 @@ def get_controllers(token):
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
-def model_exists(token, model):
-    login(token.c_name)
+def model_exists(controller, model):
+    login(controller)
     data = json.loads(output_pass(['juju', 'list-models', '--format', 'json']))
     return model in data.values()
 

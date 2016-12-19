@@ -18,12 +18,11 @@
 # MODEL FUNCTIONS
 ###############################################################################
 from flask import request, Blueprint
-from api import w_errors as errors
+from api import w_errors as errors, w_juju as juju
 from sojobo_api import create_response
-from api import w_juju as juju
 
 
-MODELS = Blueprint('jmodels', __name__)
+MODELS = Blueprint('models', __name__)
 
 
 def get():
@@ -33,8 +32,7 @@ def get():
 @MODELS.route('/')
 def home():
     return create_response(200, {'name': 'Models API',
-                                         'version': "1.0.0",  # see http://semver.org/
-                                        })
+                                         'version': "1.0.0"})
 
 
 @MODELS.route('/create', methods=['POST'])
