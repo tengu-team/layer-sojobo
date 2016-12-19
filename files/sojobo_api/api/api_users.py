@@ -1,12 +1,11 @@
-# pylint: disable=c0111,c0301,c0325,c0326,w0406
+# pylint: disable=c0111,c0301,c0325,c0326,w0406,e0401
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
 from flask import request, Blueprint
 
-from api import w_errors as errors
+from api import w_errors as errors, w_juju as juju
 from sojobo_api import create_response
-from api import w_juju as juju
 
 
 USERS = Blueprint('users', __name__)
@@ -19,8 +18,9 @@ def get():
 @USERS.route('/')
 def home():
     return create_response(200, {'name': 'Users API',
-                                         'version': "1.0.0",  # see http://semver.org/
-                                        })
+                                 'version': "1.0.0",  # see http://semver.org/
+                                })
+
 
 @USERS.route('/create', methods=['POST'])
 def create():
