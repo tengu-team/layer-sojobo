@@ -1,5 +1,5 @@
-
-# Copyright (C) 2016  Ghent University
+# !/usr/bin/env python3
+# Copyright (C) 2016  Qrama
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325
-# !/usr/bin/env python3
+
 from distutils.util import strtobool
 from importlib import import_module
 import json
