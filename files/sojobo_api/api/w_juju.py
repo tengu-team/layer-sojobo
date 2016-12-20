@@ -211,6 +211,19 @@ def get_controllers(token):
         if access is not None:
             result[controller] = access
     return result
+
+
+def get_all_info():
+    result = {}
+    for controller in get_all_controllers():
+        models = {}
+        for model in get_all_models(controller):
+            users = []
+            for user in get_all_users(controller, model):
+                users.append(user)
+            models[model] = users
+        result[controller] = models
+    return result
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
@@ -391,6 +404,11 @@ def user_exists(username):
             exists = True
             break
     return exists
+
+
+def get_all_users(controller, model):
+    data = json.loads(output_pass(['juju', 'users', '-c', controller, model]))
+    return {key: value['access'] for key, value in data.items()}
 #####################################################################################
 # APPLICATION FUNCTIONS
 #####################################################################################
@@ -450,6 +468,12 @@ def machine_matches_series(token, machine, series):
 def remove_machine(token, machine):
     login(token.c_name, token.m_name)
     return output_pass(['juju', 'remove-machine', '--force', machine])
+
+
+def get_machine_info(token, machine):
+    login(token.c_name, token.m_name)
+    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))
+    return data['machines'][machine]
 
 
 def unit_exists(token, unit):

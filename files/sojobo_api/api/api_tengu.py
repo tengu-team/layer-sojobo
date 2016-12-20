@@ -14,9 +14,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,w0406,e0401
-###############################################################################
-# CONTROLLER FUNCTIONS
-###############################################################################
 import shutil
 
 from flask import send_file, request, Blueprint
@@ -35,7 +32,7 @@ def get():
 def get_all_info():
     try:
         token = juju.authenticate(request.args['api_key'], request.authorization)
-        code, response = 200, juju.get_all_info(token)  # ToDo: write this function
+        code, response = 200, juju.get_all_info(token)
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
@@ -234,7 +231,7 @@ def get_machine_info(controller, model, machine):
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
         if juju.machine_exists(token, machine):
-            code, response = 200, juju.get_machine_info(token, machine)  # ToDo: write function
+            code, response = 200, juju.get_machine_info(token, machine)
         else:
             code, response = errors.does_not_exist('machine')
     except KeyError:
