@@ -28,8 +28,9 @@ from sojobo_api import get_api_dir
 from flask import abort
 
 from api import w_errors as errors
-
-
+################################################################################
+# TENGU FUNCTIONS
+################################################################################
 def get_user():
     return os.environ.get('JUJU_ADMIN_USER')
     # return 'tengu-ui'
@@ -112,14 +113,15 @@ class JuJu_Token(object):
         self.m_name = None
         self.m_access = None
 
-    def set_controller(self, c_name, c_access, c_token):
+    def set_controller(self, c_name):
+        c_type, c_endpoint = get_controller_info(c_name)
         self.c_name = c_name
-        self.c_access = parse_c_access(c_access)
-        self.c_token = c_token
+        self.c_access = get_controller_access(self, c_name)
+        self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, self.username, self.password)
 
-    def set_model(self, modelname, modelaccess):
+    def set_model(self, modelname):
         self.m_name = modelname
-        self.m_access = parse_m_access(modelaccess)
+        self.m_access = get_model_access(self, modelname)
 
     def m_shared_name(self):
         return "{}/{}".format(get_user(), self.m_name)
@@ -141,17 +143,12 @@ def authenticate(api_key, auth, controller=None, modelname=None):
         abort(errors.unauthorized())
     token = JuJu_Token(auth)
     if controller is not None and controller_exists(controller):
-        c_access = get_controller_access(token, controller)
-        if c_access is None:
+        token.set_controller(controller)
+        if token.c_access is None:
             abort(errors.no_access('controller'))
-        c_type, c_endpoint = get_controller_info(controller)
-        c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, auth)
-        token.set_controller(controller, c_access, c_token)
         if modelname is not None and model_exists(controller, modelname):
-            models_info = json.loads(check_output(['juju', 'models', '--format', 'json']).decode('utf-8'))
-            if '{}/{}'.format(get_user(), modelname) in models_info.values():
-                token.set_model(modelname, models_info[0]['models']['users'][token.username]['access'])
-            else:
+            token.set_model(modelname)
+            if token.m_access is None:
                 abort(errors.no_access('model'))
         elif not model_exists(controller, modelname):
             abort(errors.does_not_exist('model'))
@@ -199,31 +196,13 @@ def get_controller_access(token, controller):
     return access
 
 
-def get_controller_info(controller):
-    result = json.loads(output_pass(['juju', 'list-controllers', '--format', 'json']))
-    return result['controllers'][controller]['cloud'], result['controllers'][controller]['api-endpoints'][0]
+def get_controllers_info(token):
+    return [get_controller_info(token.set_controller(c)) for c in get_all_controllers()]
 
 
-def get_controllers(token):
-    result = {}
-    for controller in get_all_controllers():
-        access = get_controller_access(token, controller)
-        if access is not None:
-            result[controller] = access
-    return result
-
-
-def get_all_info():
-    result = {}
-    for controller in get_all_controllers():
-        models = {}
-        for model in get_all_models(controller):
-            users = []
-            for user in get_all_users(controller, model):
-                users.append(user)
-            models[model] = users
-        result[controller] = models
-    return result
+def get_controller_info(token):
+    if token.c_access is not None:
+        return {'name': token.c_name, 'models': get_models_info(token), 'users': get_users_controller(token)}
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
@@ -231,6 +210,15 @@ def model_exists(controller, model):
     login(controller)
     data = json.loads(output_pass(['juju', 'list-models', '--format', 'json']))
     return model in data.values()
+
+
+def get_model_access(token, model):
+    login(token.c_name)
+    models_info = json.loads(check_output(['juju', 'models', '--format', 'json']).decode('utf-8'))
+    if '{}/{}'.format(get_user(), model) in models_info.values():
+        return models_info[0]['models']['users'][token.username]['access']
+    else:
+        return None
 
 
 def get_all_models(controller):
@@ -242,6 +230,42 @@ def get_all_models(controller):
     return models
 
 
+def get_ssh_keys(token):
+    login(token.c_name, token.m_name)
+    return json.loads(output_pass(['juju', 'ssh-keys', '--full'])).decode('utf-8').split('\n')[1:-1]
+
+
+def get_applications_info(token):
+    login(token.c_name, token.m_name)
+    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))
+    return [{'name': a,
+             'relations': ai['relations'],
+             'units': [{'name': u,
+                        'machine': ui['machine'],
+                        'ip': ui['public-address'],
+                        'ports': ui['open-ports']}
+                       for u, ui in ai['units'].items()]}
+            for a, ai in data['applications'].items()]
+
+
+def get_units_info(token, application):
+    login(token.c_name, token.m_name)
+    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))[application]['units']
+    return [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'],
+             'ports': ui['open-ports']} for u, ui in data.items()]
+
+def get_machines_info(token):
+    login(token.c_name, token.m_name)
+    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))
+    machines = []
+    for machine, minfo in data['machines'].items():
+        containers = []
+        if 'containers' in minfo.keys():
+            containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in minfo.keys()]
+        machines.append({'name': machine, 'ip': minfo['dns-name'], 'series': minfo['series'], 'containers': containers})
+    return machines
+
+
 def get_models(token):
     models = {}
     for model in get_all_models(token.c_name):
@@ -249,16 +273,6 @@ def get_models(token):
         if access is not None:
             models[model] = access
     return models
-
-
-def get_model_access(token, model):
-    login(token.c_name, model)
-    data = json.loads(output_pass(['juju', 'users', '--format', 'json']))
-    try:
-        access = data[token.username]['access']
-    except KeyError:
-        access = None
-    return access
 
 
 def get_gui_url(token):
@@ -300,11 +314,14 @@ def remove_ssh_key(token, ssh_key):
     return output_pass(['juju', 'remove-ssh-key', fingerprint])
 
 
-def model_status(token):
-    login(token.c_name, token.m_name)
-    general = output_pass(['juju', 'show-model', '--format', 'json'])
-    detail = output_pass(['juju', 'status', '--format', 'json'])
-    return json.loads({'general': general, 'detail': detail})
+def get_models_info(token):
+    return [get_model_info(token.set_model(m)) for m in get_all_models(token)]
+
+
+def get_model_info(token):
+    if token.m_access is not None:
+        return {'name': token.m_name, 'users': get_users_model(token), 'ssh-keys': get_ssh_keys(token),
+                'applications': get_applications_info(token), 'machines': get_machines_info(token)}
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
@@ -333,13 +350,32 @@ def change_password(username, password):
 
 
 def get_users(controller):
-    if controller is None:
-        result = None
+    login(controller)
+    data = json.loads(output_pass(['juju', 'list-users', '--format', 'json']))
+    return {u['user-name']: u['access'] for u in data}
+
+
+def get_users_controller(token):
+    if token.c_access == 'superuser' or token.c_access == 'add-model':
+        login(token.c_name)
+        data = json.loads(output_pass(['juju', 'list-users', '--format', 'json']))
+        users = [{'name': u['user-name'], 'access': u['access']} for u in data]
+    elif token.c_access is not None:
+        users = [{'name': token.username, 'access': token.c_access}]
     else:
-        login(controller)
-        users = json.loads(output_pass(['juju', 'list-users', '--format', 'json']))
-        result = {u['user-name']: u['access'] for u in users}
-    return result
+        users = None
+    return users
+
+
+def get_users_model(token):
+    if token.m_access == 'admin' or token.m_access == 'write':
+        login(token.c_name, token.m_name)
+        users = json.loads(output_pass([]))
+    elif token.m_access is not None:
+        users = [{'name': token.username, 'access': token.m_access}]
+    else:
+        users = None
+    return users
 
 
 def get_admins():
@@ -409,6 +445,11 @@ def user_exists(username):
 def get_all_users(controller, model):
     data = json.loads(output_pass(['juju', 'users', '-c', controller, model]))
     return {key: value['access'] for key, value in data.items()}
+
+
+def get_all_users_info():
+    for ToDo in get_all_controllers():
+        return ToDo
 #####################################################################################
 # APPLICATION FUNCTIONS
 #####################################################################################
@@ -472,8 +513,29 @@ def remove_machine(token, machine):
 
 def get_machine_info(token, machine):
     login(token.c_name, token.m_name)
-    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))
-    return data['machines'][machine]
+    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))[machine]
+    containers = None
+    if 'containers' in data.keys():
+        containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data.keys()]
+    return {'name': machine, 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
+
+
+def get_application_info(token, application):
+    login(token.c_name, token.m_name)
+    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))[application]
+    return {'name': application, 'relations': data['relations'],
+            'units': [{'name': u,
+                       'machine': ui['machine'],
+                       'ip': ui['public-address'],
+                       'ports': ui['open-ports']}
+                      for u, ui in data['units'].items()]}
+
+
+def get_unit_info(token, application, unit):
+    data = get_application_info(token, application)
+    for u in data['units']:
+        if u['name'] == unit:
+            return u
 
 
 def unit_exists(token, unit):

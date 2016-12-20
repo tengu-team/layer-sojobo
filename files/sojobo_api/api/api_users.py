@@ -19,7 +19,7 @@ def get():
 def get_all_user_info():
     try:
         juju.authenticate(request.args['api_key'], request.authorization)
-        code, response = 200, juju.get_all_user_info()
+        code, response = 200, juju.get_all_users_info()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
