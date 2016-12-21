@@ -471,7 +471,7 @@ def get_users_info():
 
 def get_user_info(username):
     for user in get_users_info():
-        if user['name'] == username:
+        if user['name'] == username and username != get_user():
             return user
 
 
