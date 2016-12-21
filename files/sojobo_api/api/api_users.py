@@ -16,10 +16,13 @@ def get():
 
 
 @USERS.route('/', methods=['GET'])
-def get_all_user_info():
+def get_users_info():
     try:
-        juju.authenticate(request.args['api_key'], request.authorization)
-        code, response = 200, juju.get_all_users_info()
+        token = juju.authenticate(request.args['api_key'], request.authorization)
+        if token.is_admin:
+            code, response = 200, juju.get_users_info()
+        else:
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
@@ -43,20 +46,17 @@ def create_user():
     return create_response(code, {'message': response})
 
 
-@USERS.route('/<user>/makeadmin', methods=['PUT'])
-def make_admin(user):
+@USERS.route('/<user>', methods=['PUT'])
+def get_user_info(user):
+    data = request.json
     try:
-        token = juju.authenticate(request.json['api_key'], request.authorization)
-        if token.is_admin:
-            if juju.user_exists(user):
-                if user in juju.get_admins():
-                    code, response = errors.already_exists('admin')
-                else:
-                    code, response = 200, juju.make_admin(user)
-            else:
-                code, response = errors.does_not_exist('errors')
-        else:
+        token = juju.authenticate(data['api_key'], request.authorization)
+        if (juju.user_exists(user) and user == token.username) or token.is_admin:
+            code, response = 200, juju.get_user_info(user)
+        elif juju.user_exists(user):
             code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
@@ -82,16 +82,28 @@ def delete(user):
     return create_response(code, {'message': response})
 
 
-@USERS.route('/<user>/changepassword', methods=['PUT'])
-def change_password(user):
+@USERS.route('/<user>', methods=['PUT'])
+def make_admin(user):
     data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization)
         if juju.user_exists(user):
-            if token.is_admin or token.username == user:
-                code, response = 200, juju.change_password(user, data['password'])
+            if data['action'] == 'makeadmin':
+                if token.is_admin and user in juju.get_admins():
+                    code, response = errors.already_exist('admin')
+                elif token.is_admin:
+                    make_admin(user)
+                    code, response = 200, juju.get_user_info(user)
+                else:
+                    code, response = errors.no_permission()
+            elif data['action'] == 'changepassword':
+                if token.is_admin or user == token.username:
+                    juju.change_password(user, data['password'])
+                    code, response = 200, juju.get_user_info(user)
+                else:
+                    code, response = errors.no_permission()
             else:
-                code, response = errors.no_permission()
+                code, response = errors.does_not_exist('action')
         else:
             code, response = errors.does_not_exist('user')
     except KeyError:
@@ -99,14 +111,15 @@ def change_password(user):
     return create_response(code, {'message': response})
 
 
-@USERS.route('/<user>/<controller>', methods=['PUT'])
+@USERS.route('/<user>/controllers/<controller>', methods=['PUT'])
 def add_to_controller(user, controller):
     data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller)
         if juju.user_exists(user) and juju.controller_exists(controller):
             if token.c_access == 'superuser' and user not in juju.get_admins():
-                code, response = 200, juju.add_to_controller(token, user, data['access'])
+                juju.add_to_controller(token, user, data['access'])
+                code, response = 200, juju.get_user_info(user)
             else:
                 code, response = errors.no_permission()
         elif juju.controller_exists(controller):
@@ -120,7 +133,7 @@ def add_to_controller(user, controller):
     return create_response(code, {'message': response})
 
 
-@USERS.route('/<user>/<controller>', methods=['DELETE'])
+@USERS.route('/<user>/controllers/<controller>', methods=['DELETE'])
 def remove_from_controller(user, controller):
     data = request.json
     try:
@@ -142,14 +155,15 @@ def remove_from_controller(user, controller):
     return create_response(code, {'message': response})
 
 
-@USERS.route('/<user>/<controller>/<model>', methods=['PUT'])
+@USERS.route('/<user>/controllers/<controller>/<model>', methods=['PUT'])
 def add_to_model(user, controller, model):
     data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
         if juju.user_exists(user) and juju.controller_exists(controller) and juju.model_exists(model):
             if token.m_access == 'admin' and user not in juju.get_admins():
-                code, response = 200, juju.add_to_model(token, user, data['access'])
+                juju.add_to_model(token, user, data['access'])
+                code, response = 200, juju.get_user_info(user)
             else:
                 code, response =  errors.no_permission()
         elif juju.user_exists(user) and juju.controller_exists(controller):
@@ -171,14 +185,15 @@ def add_to_model(user, controller, model):
     return create_response(code, {'message': response})
 
 
-@USERS.route('/<user>/<controller>/<model>', methods=['DELETE'])
+@USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['DELETE'])
 def remove_from_model(user, controller, model):
     data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
         if juju.user_exists(user) and juju.controller_exists(controller) and juju.model_exists(model):
             if token.m_access == 'admin' and user not in juju.get_admins():
-                code, response = 200, juju.remove_from_model(token, user)
+                juju.remove_from_model(token, user)
+                code, response = 200, juju.get_user_info(user)
             else:
                 code, response = errors.no_permission()
         elif juju.user_exists(user) and juju.controller_exists(controller):

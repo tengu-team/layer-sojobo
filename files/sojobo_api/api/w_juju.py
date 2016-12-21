@@ -447,9 +447,34 @@ def get_all_users(controller, model):
     return {key: value['access'] for key, value in data.items()}
 
 
-def get_all_users_info():
-    for ToDo in get_all_controllers():
-        return ToDo
+def get_users_info():
+    controllers = {}
+    for controller in get_all_controllers():
+        login(controller)
+        users = json.loads(output_pass(['juju', 'users', '--format', 'json']))
+        controllers[controller] = {u['user-name']: u['acces'] for u in users}
+    all_users = {}
+    for controller, users in controllers.items():
+        for user, access in users.items():
+            if user in all_users.keys():
+                all_users[user].append({'name': controller, 'access': access})
+            else:
+                all_users[user] = [{'name': controller, 'access': access}]
+    users = [{'name': u, 'controllers': c} for u, c in all_users.items()]
+    for user in users:
+        for controller in user['controllers']:
+            login(controller['name'])
+            models = json.loads(output_pass(['juju', 'models', '--format', 'json']))['models']
+            controller['models'] = [{'name': m['name'], 'access': m['users'][user]['access']} for m in models]
+    return users
+
+
+def get_user_info(username):
+    for user in get_users_info():
+        if user['name'] == username:
+            return user
+
+
 #####################################################################################
 # APPLICATION FUNCTIONS
 #####################################################################################
