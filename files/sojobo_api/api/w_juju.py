@@ -48,10 +48,10 @@ def get_charm_dir():
 
 def get_controller_types():
     c_list = {}
-    for f_path in os.listdir('{}/api'.format(get_api_dir())):
+    for f_path in os.listdir('{}/controllers'.format(get_api_dir())):
         if 'controller_' in f_path and '.pyc' not in f_path:
             name = f_path.split('.')[0]
-            c_list[name.split('_')[1]] = import_module('api.{}'.format(name))
+            c_list[name.split('_')[1]] = import_module('controllers.{}'.format(name))
     return c_list
 
 

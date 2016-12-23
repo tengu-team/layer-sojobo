@@ -51,12 +51,8 @@ def get_supported_series():
 * A `create_controller(name, region, credentials)` function, which houses all the required code required to successfully bootstrap a controller of this type.
 * A `get_supported_series()` function which returns a list of Ubuntu-versions this controller can deploy.
 
-# Tests
-
-
 # Documentation
-Documentation of the api can be found under [files/sojobo_api/docs/api](files/sojobo_api/docs/api).  
-Documentation of the different tests can be found under [files/sojobo_api/docs/tests](files/sojobo_api/docs/tests)
+Documentation of the api can be found under [files/sojobo_api/docs](files/sojobo_api/docs).  
 
 # Bugs
 Report bugs on <a href="https://github.com/Qrama/Sojobo-api/issues">Github</a>

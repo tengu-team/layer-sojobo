@@ -62,7 +62,7 @@ def get_apis():
 
 def get_controllers():
     c_list = []
-    for f_path in os.listdir('{}/api'.format(get_api_dir())):
+    for f_path in os.listdir('{}/controllers'.format(get_api_dir())):
         if 'controller_' in f_path and '.pyc' not in f_path:
             c_list.append(f_path.split('.')[0])
     return c_list
