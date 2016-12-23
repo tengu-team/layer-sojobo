@@ -229,7 +229,7 @@ def remove_app(controller, model, application):
     return create_response(code, {'message': response})
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', method=['GET'])
+@TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['GET'])
 def get_machine_info(controller, model, machine):
     data = request.args
     try:
@@ -353,7 +353,7 @@ def add_relation(controller, model):
     return create_response(code, {'message': response})
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/relations/<application>', method=['GET'])
+@TENGU.route('/controllers/<controller>/models/<model>/relations/<application>', methods=['GET'])
 def get_relations(controller, model, application):
     data = request.json
     try:
