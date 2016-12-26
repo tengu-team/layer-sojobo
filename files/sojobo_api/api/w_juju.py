@@ -158,11 +158,11 @@ def authenticate(api_key, auth, controller=None, modelname=None):
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
-def create_controller(token, c_type, name, region, credentials, cfile=None):
+def create_controller(token, c_type, name, region, credentials):
     exists = False
     for key, value in get_controller_types().items():
         if c_type == key:
-            output = value.create_controller(name, region, credentials, cfile)
+            output = value.create_controller(name, region, credentials)
             print(output)
             add_superuser(token, name)
             exists = True

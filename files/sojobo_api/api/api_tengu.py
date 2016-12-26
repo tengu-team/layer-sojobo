@@ -49,9 +49,8 @@ def create_controller():
                 code, response = errors.already_exists('controller')
             elif 'file' in request.files:
                 cfile = request.files['file']
-                cfile.save('{}/files'.format(get_api_dir()), '{}.json'.format(data['credentials']['project-id']))
-                juju.create_controller(token, data['type'], data['controller'], data['region'],
-                                       data['credentials'], cfile)
+                cfile.save('{}/files'.format(get_api_dir()), 'gce-{}.json'.format(data['controller']))
+                juju.create_controller(token, data['type'], data['controller'], data['region'], cfile)
                 response = juju.get_controller_info(token.set_controller(data['controller']))
             else:
                 juju.create_controller(token, data['type'], data['controller'], data['region'], data['credentials'])
