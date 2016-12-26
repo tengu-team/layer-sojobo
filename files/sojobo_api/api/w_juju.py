@@ -126,12 +126,6 @@ class JuJu_Token(object):
     def m_shared_name(self):
         return "{}/{}".format(get_user(), self.m_name)
 
-    def get_credentials(self):
-        return {'credentials': {self.c_name: {self.username: self.c_token.get_credentials()}}}
-
-    def get_cloud(self):
-        return {'clouds':{self.c_name: self.c_token.get_cloud()}}
-
     def set_admin(self):
         return self.username in get_admins()
 
