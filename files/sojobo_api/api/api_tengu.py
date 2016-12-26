@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,w0406,e0401
 import shutil
+from subprocess import CalledProcessError
 
 from flask import send_file, request, Blueprint
 from api import w_errors as errors, w_juju as juju
@@ -48,7 +49,7 @@ def create_controller():
                 code, response = errors.already_exists('controller')
             elif 'file' in request.files:
                 cfile = request.files['file']
-                cfile.save('{}/files'.format(get_api_dir), '{}.json'.format(data['credentials']['project-id']))
+                cfile.save('{}/files'.format(get_api_dir()), '{}.json'.format(data['credentials']['project-id']))
                 juju.create_controller(token, data['type'], data['controller'], data['region'],
                                        data['credentials'], cfile)
                 response = juju.get_controller_info(token.set_controller(data['controller']))
@@ -224,6 +225,25 @@ def remove_app(controller, model, application):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('application')
+    except KeyError:
+        code, response = errors.invalid_data()
+    return create_response(code, {'message': response})
+
+
+@TENGU.route('controllers/<controller>/models/<model>/bundles/', methods=['POST'])
+def add_bundle(controller, model):
+    data = request.json
+    try:
+        token = juju.authenticate(data['api_key'], request.authorization, controller, model)
+        if token.m_access == 'write' or token.m_access == 'admin':
+            bundle = request.files['bundle']
+            bundle.save('{}/files'.format(get_api_dir()), 'bundle.yaml')
+            try:
+                code, response = 200, juju.deploy_app(token, '{}/files/bundle.yaml'.format(get_api_dir()))
+            except CalledProcessError:
+                code, response = 409, 'Something is wrong with the provided bundle!'
+        else:
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
