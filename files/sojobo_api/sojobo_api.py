@@ -76,13 +76,14 @@ def create_response(http_code, return_object):
     )
 
 
-DEBUG = False
-parse_flags_from_environment(['DEBUG', 'FEATURE_FLAG_AUTH'])
+# DEBUG = False
+parse_flags_from_environment(['FEATURE_FLAG_AUTH'])# ['DEBUG', 'FEATURE_FLAG_AUTH'])
 ###############################################################################
 # INIT FLASK
 ###############################################################################
 APP = Flask(__name__)
 APP.url_map.strict_slashes = False
+APP.debug = True
 
 
 @APP.after_request
@@ -148,4 +149,4 @@ if __name__ == '__main__':
     for api in get_apis():
         module = import_module('api.{}'.format(api))
         APP.register_blueprint(getattr(module, 'get')(), url_prefix='/{}'.format(api.split('_')[1]))
-    APP.run(host='0.0.0.0', port=os.environ.get('SOJOBO_API_PORT'), threaded=True)
+    APP.run(host='0.0.0.0', port=int(os.environ.get('SOJOBO_API_PORT')), threaded=True)

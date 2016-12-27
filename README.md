@@ -3,6 +3,9 @@ This is the api for the Tengu platform. Besides providing all the necessary Teng
 JuJu - wide users (instead of users on a controller-level) and the principle of an admin-user.
 # Charm
 
+# Initial setup
+Before the api can be used, one must manually bootstrap a controller, create a model and add a user to the model which has no
+admin rights to the model.
 # API
 The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
 follow the naming rules and provide the required functions.

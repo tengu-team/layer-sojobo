@@ -13,7 +13,7 @@ options:
       This is the user the api will use to do everything. He will be owner off every controller and model.
   juju-admin-password:
     type: string
-    default: ''
+    default: 'admin'
     description: |
       MUST NOT BE LEFT BLANK
   api-key:

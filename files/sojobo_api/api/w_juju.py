@@ -33,17 +33,14 @@ from api import w_errors as errors
 ################################################################################
 def get_user():
     return os.environ.get('JUJU_ADMIN_USER')
-    # return 'tengu-ui'
 
 
 def get_password():
     return os.environ.get('JUJU_ADMIN_PASSWORD')
-    # return '4vQwtSKMNTyRtTfU'
 
 
 def get_charm_dir():
     return os.environ.get('LOCAL_CHARM_DIR')
-    # return '/tmp'
 
 
 def get_controller_types():
@@ -90,7 +87,7 @@ def parse_m_access(access):
 def login(controller, model=None, user=get_user(), password=get_password()):
     with open(os.devnull, 'w') as FNULL:
         check_call(['juju', 'logout'], stdout=FNULL, stderr=FNULL)
-        check_output(['juju', 'login', user, '--controller', controller], input=password + '\n', universal_newlines=True, stderr=FNULL)
+        check_output(['juju', 'login', user, '-c', controller], input=bytes('{}\n'.format(password), 'utf-8'), stderr=FNULL)
         if model is None:
             check_call(['juju', 'switch', controller], stdout=FNULL, stderr=FNULL)
         else:

@@ -46,7 +46,7 @@ def create_user():
     return create_response(code, {'message': response})
 
 
-@USERS.route('/<user>', methods=['PUT'])
+@USERS.route('/<user>', methods=['GET'])
 def get_user_info(user):
     data = request.json
     try:
@@ -62,7 +62,7 @@ def get_user_info(user):
     return create_response(code, {'message': response})
 
 
-@USERS.route('/<user>/delete', methods=['DELETE'])
+@USERS.route('/<user>', methods=['DELETE'])
 def delete(user):
     try:
         token = juju.authenticate(request.json['api_key'], request.authorization)
