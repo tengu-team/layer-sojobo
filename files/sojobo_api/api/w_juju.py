@@ -87,7 +87,10 @@ def parse_m_access(access):
 def login(controller, model=None, user=get_user(), password=get_password()):
     with open(os.devnull, 'w') as FNULL:
         check_call(['juju', 'logout'], stdout=FNULL, stderr=FNULL)
-        check_output(['juju', 'login', user, '-c', controller], input=bytes('{}\n'.format(password), 'utf-8'), stderr=FNULL)
+        try:
+            check_output(['juju', 'login', user, '-c', controller], input=bytes('{}\n'.format(password), 'utf-8'), stderr=FNULL)
+        except CalledProcessError:
+            abort(errors.unauthorized())
         if model is None:
             check_call(['juju', 'switch', controller], stdout=FNULL, stderr=FNULL)
         else:
@@ -124,7 +127,7 @@ class JuJu_Token(object):
         return "{}/{}".format(get_user(), self.m_name)
 
     def set_admin(self):
-        return self.username in get_admins()
+        return self.username == get_user() and self.password == get_password()
 
 
 def authenticate(api_key, auth, controller=None, modelname=None):

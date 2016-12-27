@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0103,c0301
 
-from base64 import b64encode
+from hashlib import sha256
 import os
 from os.path import expanduser
 import shutil
@@ -94,7 +94,7 @@ def install_api():
 def render_api_systemd_template():
     appconf = config()
     env_vars = [
-        "JUJU_ADMIN_USER={}".format(appconf['juju-admin-username']),
+        "JUJU_ADMIN_USER=admin",
         "JUJU_ADMIN_PASSWORD={}".format(appconf['juju-admin-password']),
         "SOJOBO_API_DIR={}".format(API_DIR),
         "SOJOBO_API_PORT={}".format(PORT),
@@ -167,4 +167,4 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 
 def generate_api_key():
     with open("/{}/api-key".format(API_DIR), "w") as key:
-        key.write(b64encode(os.urandom(256)).decode('utf-8'))
+        key.write(sha256(os.urandom(256)).hexdigest())
