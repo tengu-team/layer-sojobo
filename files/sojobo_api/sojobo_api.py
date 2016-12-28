@@ -79,6 +79,10 @@ def create_response(http_code, return_object):
 # DEBUG = False
 parse_flags_from_environment(['FEATURE_FLAG_AUTH'])# ['DEBUG', 'FEATURE_FLAG_AUTH'])
 ###############################################################################
+# SETUP LOGGING 
+###############################################################################
+logging.basicConfig(filename='/home/ubuntu/flask-sojobo-api.log', level=logging.DEBUG)
+###############################################################################
 # INIT FLASK
 ###############################################################################
 APP = Flask(__name__)
@@ -143,9 +147,6 @@ def api_icon():
 # START FLASK SERVER
 ###############################################################################
 if __name__ == '__main__':
-    logger = logging.getLogger('werkzeug')
-    handler = logging.FileHandler('/home/ubuntu/flask-sojobo-api.log')
-    logger.addHandler(handler)
     for api in get_apis():
         module = import_module('api.{}'.format(api))
         APP.register_blueprint(getattr(module, 'get')(), url_prefix='/{}'.format(api.split('_')[1]))

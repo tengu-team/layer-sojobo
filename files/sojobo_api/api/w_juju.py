@@ -19,6 +19,7 @@ import base64
 import hashlib
 from importlib import import_module
 import json
+import logging
 import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
 import requests
@@ -114,7 +115,7 @@ class JuJu_Token(object):
         self.m_access = None
 
     def set_controller(self, c_name):
-        c_type, c_endpoint = get_controller_info(c_name)
+        c_type, c_endpoint = controller_info(c_name)
         self.c_name = c_name
         self.c_access = get_controller_access(self, c_name)
         self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, self.username, self.password)
@@ -134,20 +135,25 @@ def authenticate(api_key, auth, controller=None, modelname=None):
     with open('{}/api-key'.format(get_api_dir()), 'r') as key:
         apikey = key.readlines()[0]
     if api_key != apikey:
-        abort(errors.unauthorized())
+        error = errors.unauthorized()
+        abort(error[0], error[1])
     token = JuJu_Token(auth)
     if controller is not None and controller_exists(controller):
         token.set_controller(controller)
         if token.c_access is None:
-            abort(errors.no_access('controller'))
+            error = errors.no_access('controller')
+            abort(error[0], error[1])
         if modelname is not None and model_exists(controller, modelname):
             token.set_model(modelname)
             if token.m_access is None:
-                abort(errors.no_access('model'))
+                error = errors.no_access('model')
+                abort(error[0], error[1])
         elif not model_exists(controller, modelname):
-            abort(errors.does_not_exist('model'))
-    elif not controller_exists(controller):
-        abort(errors.does_not_exist('controller'))
+            error = errors.does_not_exist('model')
+            abort(error[0], error[1])
+    elif not controller_exists(controller) and controller is not None:
+        error = errors.does_not_exist('controller')
+        abort(error[0], error[1])
     return token
 ###############################################################################
 # CONTROLLER FUNCTIONS
@@ -191,10 +197,15 @@ def get_controller_access(token, controller):
 
 
 def get_controllers_info(token):
+    logging.debug(type(token).__name__)
+    token = token.set_controller('testing')
+    logging.debug('test')
+    logging.debug(type(token).__name__)
     return [get_controller_info(token.set_controller(c)) for c in get_all_controllers()]
 
 
 def get_controller_info(token):
+    logging.debug(type(token).__name__)
     if token.c_access is not None:
         return {'name': token.c_name, 'models': get_models_info(token), 'users': get_users_controller(token)}
 ###############################################################################
