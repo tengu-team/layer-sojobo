@@ -120,10 +120,10 @@ def get_model_info(controller, model):
 
 
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['DELETE'])
-def delete():
+def delete(controller, model):
     data = request.json
     try:
-        token = juju.authenticate(data['api_key'], request.authorization, data['controller'], data['model'])
+        token = juju.authenticate(data['api_key'], request.authorization, controller, model)
         if token.m_access == 'admin':
             juju.delete_model(token)
             code, response = 200, 'The model has been destroyed'
