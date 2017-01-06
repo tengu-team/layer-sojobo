@@ -19,7 +19,6 @@ import base64
 import hashlib
 from importlib import import_module
 import json
-import logging
 import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
 import requests
@@ -251,8 +250,8 @@ def get_applications_info(token):
     login(token.c_name, token.m_name)
     data = json.loads(output_pass(['juju', 'status', '--format', 'json']))
     return [{'name': a, 'relations': ai['relations'],
-            'units': [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
-                      for u, ui in ai['units'].items()]} for a, ai in data['applications'].items()]
+             'units': [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
+                       for u, ui in ai['units'].items()]} for a, ai in data['applications'].items()]
 
 
 def get_units_info(token, application):
@@ -378,7 +377,7 @@ def get_users_model(token):
     if token.m_access == 'admin' or token.m_access == 'write':
         login(token.c_name, token.m_name)
         users_info = json.loads(check_output(['juju', 'show-model', '--format', 'json']).decode('utf-8'))[token.m_name]['users']
-        users = [{'name': k, 'access': v['access']} for k,v in users_info.items()]
+        users = [{'name': k, 'access': v['access']} for k, v in users_info.items()]
     elif token.m_access is not None:
         users = [{'name': token.username, 'access': token.m_access}]
     else:
@@ -493,18 +492,24 @@ def config(token, app_name):
 
 def app_exists(token, app_name):
     login(token.c_name, token.m_name)
-    data = json.loads(output_pass(['juju', 'status']))
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json']))
     return app_name in data['applications'].keys()
 
 
 def deploy_app(token, app_name, series=None, target=None):
-    if not token.c_token.supportlxd and 'lxd' in target:
-        return '{} doesn\'t support lxd-containers'.format(token.c_token.c_type.upper())
+    if target is None and series is None:
+        result = output_pass(['juju', 'deploy', app_name, '-m', token.m_name])
+    elif target is None:
+        result = output_pass(['juju', 'deploy', app_name, '-m', token.m_name, '--series', series])
     else:
-        if 'local:' in app_name:
-            app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
-        login(token.c_name)
-        return output_pass(['juju', 'deploy', app_name, '-m', token.m_name, '--series', series, '--to', target])
+        if not token.c_token.supportlxd and 'lxd' in target:
+            result = '{} doesn\'t support lxd-containers'.format(token.c_token.c_type.upper())
+        else:
+            if 'local:' in app_name:
+                app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
+            login(token.c_name)
+            result = output_pass(['juju', 'deploy', app_name, '-m', token.m_name, '--series', series, '--to', target])
+    return result
 
 
 def remove_app(token, app_name):
