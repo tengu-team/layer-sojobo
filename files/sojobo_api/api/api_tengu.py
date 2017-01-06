@@ -41,20 +41,23 @@ def get_all_info():
 
 @TENGU.route('/controllers', methods=['POST'])
 def create_controller():
-    data = request.json
+    if request.json is None:
+        data = request.form
+    else:
+        data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization)
         if token.is_admin:
             if juju.controller_exists(data['controller']):
                 code, response = errors.already_exists('controller')
             elif 'file' in request.files:
-                cfile = request.files['file']
-                cfile.save('{}/files'.format(get_api_dir()), 'gce-{}.json'.format(data['controller']))
-                juju.create_controller(token, data['type'], data['controller'], data['region'], cfile)
+                path = '{}/files/google-{}.json'.format(get_api_dir(), data['controller'])
+                request.files['file'].save(path)
+                juju.create_controller(token, data['type'], data['controller'], data['region'], path)
                 response = juju.get_controller_info(token.set_controller(data['controller']))
             else:
                 juju.create_controller(token, data['type'], data['controller'], data['region'], data['credentials'])
-                response = juju.get_controller_info(data['controller'])
+                response = juju.get_controller_info(token.set_controller(data['controller']))
             code = 200
         else:
             code, response = errors.no_permission()

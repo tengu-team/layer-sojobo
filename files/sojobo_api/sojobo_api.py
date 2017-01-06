@@ -77,9 +77,9 @@ def create_response(http_code, return_object):
 
 
 # DEBUG = False
-parse_flags_from_environment(['FEATURE_FLAG_AUTH'])# ['DEBUG', 'FEATURE_FLAG_AUTH'])
+parse_flags_from_environment(['FEATURE_FLAG_AUTH'])
 ###############################################################################
-# SETUP LOGGING 
+# SETUP LOGGING
 ###############################################################################
 logging.basicConfig(filename='/home/ubuntu/flask-sojobo-api.log', level=logging.DEBUG)
 ###############################################################################

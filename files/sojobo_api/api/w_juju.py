@@ -119,10 +119,12 @@ class JuJu_Token(object):
         self.c_name = c_name
         self.c_access = get_controller_access(self, c_name)
         self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, self.username, self.password)
+        return self
 
     def set_model(self, modelname):
         self.m_name = modelname
         self.m_access = get_model_access(self, modelname)
+        return self
 
     def m_shared_name(self):
         return "{}/{}".format(get_user(), self.m_name)
@@ -148,7 +150,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
             if token.m_access is None:
                 error = errors.no_access('model')
                 abort(error[0], error[1])
-        elif not model_exists(controller, modelname):
+        elif modelname is not None and not model_exists(controller, modelname):
             error = errors.does_not_exist('model')
             abort(error[0], error[1])
     elif not controller_exists(controller) and controller is not None:
@@ -163,8 +165,8 @@ def create_controller(token, c_type, name, region, credentials):
     for key, value in get_controller_types().items():
         if c_type == key:
             output = value.create_controller(name, region, credentials)
-            print(output)
-            add_superuser(token, name)
+            pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
+            check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
             exists = True
             break
     if not exists:
@@ -172,9 +174,18 @@ def create_controller(token, c_type, name, region, credentials):
     return output
 
 
+def controller_info(c_name):
+    with open('/home/ubuntu/.local/share/juju/controllers.yaml') as data:
+        controller = yaml.load(data)['controllers'][c_name]
+    return controller['cloud'], controller['api-endpoints'][-1].split(':')[0]
+
+
 def delete_controller(token):
     login(token.c_name)
-    return output_pass(['juju', 'destroy-controller', token.c_name, '-y'])
+    output_pass(['juju', 'destroy-controller', token.c_name, '-y'])
+    check_call(['juju', 'remove-credential', token.c_token.type, token.c_name])
+    check_call(['juju', 'switch', get_all_controllers()[0]])
+    return '{} has been successfully removed'.format(token.c_name)
 
 
 def get_all_controllers():
@@ -188,7 +199,7 @@ def controller_exists(controllername):
 
 def get_controller_access(token, controller):
     try:
-        login(controller, token.username, token.password)
+        login(controller, None, token.username, token.password)
         controllers_info = json.loads(output_pass(['juju', 'controllers', '--format', 'json'], token.password))
         access = controllers_info['controllers'][controller]['access']
     except CalledProcessError:
@@ -197,15 +208,10 @@ def get_controller_access(token, controller):
 
 
 def get_controllers_info(token):
-    logging.debug(type(token).__name__)
-    token = token.set_controller('testing')
-    logging.debug('test')
-    logging.debug(type(token).__name__)
     return [get_controller_info(token.set_controller(c)) for c in get_all_controllers()]
 
 
 def get_controller_info(token):
-    logging.debug(type(token).__name__)
     if token.c_access is not None:
         return {'name': token.c_name, 'models': get_models_info(token), 'users': get_users_controller(token)}
 ###############################################################################
@@ -217,13 +223,14 @@ def model_exists(controller, model):
     return model in data.values()
 
 
-def get_model_access(token, model):
-    login(token.c_name)
-    models_info = json.loads(check_output(['juju', 'models', '--format', 'json']).decode('utf-8'))
-    if '{}/{}'.format(get_user(), model) in models_info.values():
-        return models_info[0]['models']['users'][token.username]['access']
-    else:
-        return None
+def get_model_access(token, m_name):
+    login(token.c_name, m_name)
+    model_info = json.loads(check_output(['juju', 'show-model', '--format', 'json']).decode('utf-8'))
+    try:
+        access = model_info[m_name]['users'][token.username]['access']
+    except KeyError:
+        access = None
+    return access
 
 
 def get_all_models(controller):
@@ -232,25 +239,20 @@ def get_all_models(controller):
     models = []
     for model in data['models']:
         models.append(model['name'])
-    return models
+    return models[1:]
 
 
 def get_ssh_keys(token):
     login(token.c_name, token.m_name)
-    return json.loads(output_pass(['juju', 'ssh-keys', '--full'])).decode('utf-8').split('\n')[1:-1]
+    return output_pass(['juju', 'ssh-keys', '--full']).split('\n')[1:-1]
 
 
 def get_applications_info(token):
     login(token.c_name, token.m_name)
-    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))
-    return [{'name': a,
-             'relations': ai['relations'],
-             'units': [{'name': u,
-                        'machine': ui['machine'],
-                        'ip': ui['public-address'],
-                        'ports': ui['open-ports']}
-                       for u, ui in ai['units'].items()]}
-            for a, ai in data['applications'].items()]
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json']))
+    return [{'name': a, 'relations': ai['relations'],
+            'units': [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
+                      for u, ui in ai['units'].items()]} for a, ai in data['applications'].items()]
 
 
 def get_units_info(token, application):
@@ -320,7 +322,7 @@ def remove_ssh_key(token, ssh_key):
 
 
 def get_models_info(token):
-    return [get_model_info(token.set_model(m)) for m in get_all_models(token)]
+    return [get_model_info(token.set_model(m)) for m in get_all_models(token.c_name)]
 
 
 def get_model_info(token):
@@ -375,7 +377,8 @@ def get_users_controller(token):
 def get_users_model(token):
     if token.m_access == 'admin' or token.m_access == 'write':
         login(token.c_name, token.m_name)
-        users = json.loads(output_pass([]))
+        users_info = json.loads(check_output(['juju', 'show-model', '--format', 'json']).decode('utf-8'))[token.m_name]['users']
+        users = [{'name': k, 'access': v['access']} for k,v in users_info.items()]
     elif token.m_access is not None:
         users = [{'name': token.username, 'access': token.m_access}]
     else:

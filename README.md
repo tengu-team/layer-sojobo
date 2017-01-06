@@ -23,22 +23,14 @@ def get():
 ```
 
 ## Controller-modules
-Controller modules name must follow this scheme: `controller_<controllername>.py`. The controllername MAY NOT contain
-an underscore. The module itself must have the following inside:
+Controller modules name must follow this scheme: `controller_<controllername>.py` and must be placed in the controller folder. 
+The controllername MAY NOT contain an underscore. The module itself must have the following inside:
 ```python
 class Token(object):
-    def __init__(self, url, auth):
-        self.type = 'maas'
+    def __init__(self, url, username, password):
+        self.type = <juju_controller_type>
         self.supportlxd = True
         self.url = url
-        self.user = auth.username
-        self.password = auth.password
-
-    def get_credentials(self):
-        return {'auth-type': 'oauth1', 'maas-oath': self.api_key}
-
-    def get_cloud(self):
-        return {'type': 'maas', 'auth-types': ['oauth1'], 'endpoint': self.url}
 
 
 def create_controller(name, region, credentials):
@@ -55,7 +47,7 @@ def get_supported_series():
 * A `get_supported_series()` function which returns a list of Ubuntu-versions this controller can deploy.
 
 # Documentation
-Documentation of the api can be found under [files/sojobo_api/docs](files/sojobo_api/docs).  
+Documentation of the api can be found under [docs](docs).  
 
 # Bugs
 Report bugs on <a href="https://github.com/Qrama/Sojobo-api/issues">Github</a>
