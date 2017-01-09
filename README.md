@@ -10,6 +10,11 @@ admin rights to the model.
 The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
 follow the naming rules and provide the required functions.
 
+## Tengu - api
+This api is used to control Juju controllers, models, applications, relations and machines. All it's calls are available under
+`http://host/tengu/<call>` and are protected with basic-Authentication. The username is `admin` and the password is set with
+the charm config.
+
 ## API-modules
 The api is written in Flask. This allows the use of blueprints to expand the api. API-modules file names must follow
 this scheme: `api_<modulename>.py`. The modulename MAY NOT contain an underscore. The module itself must have the following
@@ -23,7 +28,7 @@ def get():
 ```
 
 ## Controller-modules
-Controller modules name must follow this scheme: `controller_<controllername>.py` and must be placed in the controller folder. 
+Controller modules name must follow this scheme: `controller_<controllername>.py` and must be placed in the controller folder.
 The controllername MAY NOT contain an underscore. The module itself must have the following inside:
 ```python
 class Token(object):

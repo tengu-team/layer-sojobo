@@ -232,13 +232,13 @@ def remove_app(controller, model, application):
     return create_response(code, {'message': response})
 
 
-@TENGU.route('controllers/<controller>/models/<model>/bundles/', methods=['POST'])
+@TENGU.route('/controllers/<controller>/models/<model>/bundles/', methods=['POST'])
 def add_bundle(controller, model):
     data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
         if token.m_access == 'write' or token.m_access == 'admin':
-            bundle = request.files['bundle']
+            bundle = request.files['file']
             bundle.save('{}/files'.format(get_api_dir()), 'bundle.yaml')
             try:
                 code, response = 200, juju.deploy_app(token, '{}/files/bundle.yaml'.format(get_api_dir()))
