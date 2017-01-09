@@ -353,7 +353,7 @@ def remove_unit(controller, model, application, unitnumber):
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['GET'])
 def get_unit_info(controller, model, application, unitnumber):
-    data = request.json
+    data = request.args
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
         if juju.unit_exists(token, application, unitnumber):
@@ -365,7 +365,7 @@ def get_unit_info(controller, model, application, unitnumber):
     return create_response(code, {'message': response})
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['POST'])
+@TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['PUT'])
 def add_relation(controller, model):
     data = request.json
     try:
@@ -387,11 +387,11 @@ def add_relation(controller, model):
 
 @TENGU.route('/controllers/<controller>/models/<model>/relations/<application>', methods=['GET'])
 def get_relations(controller, model, application):
-    data = request.json
+    data = request.args
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
         if juju.app_exists(token, application):
-            code, response = 200, juju.get_application_info(token, application['relations'])
+            code, response = 200, juju.get_application_info(token, application)['relations']
         else:
             code, response = errors.does_not_exist('application')
     except KeyError:
@@ -399,14 +399,15 @@ def get_relations(controller, model, application):
     return create_response(code, {'message': response})
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/relations/<app1>/<app2>', methods=['PUT'])
+@TENGU.route('/controllers/<controller>/models/<model>/relations/<app1>/<app2>', methods=['DELETE'])
 def remove_relation(controller, model, app1, app2):
     data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
         if juju.app_exists(token, app1) and juju.app_exists(token, app2):
             if token.m_access == 'write' or token.m_access == 'admin':
-                code, response = 200, juju.remove_relation(token, app1, app2)
+                juju.remove_relation(token, app1, app2)
+                code, response = 200, 'The relation is being removed'
             else:
                 code, response = errors.no_permission()
         else:
