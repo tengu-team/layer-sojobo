@@ -189,7 +189,7 @@ def delete_controller(token):
 
 def get_all_controllers():
     controllers = json.loads(output_pass(['juju', 'controllers', '--format', 'json']))
-    return controllers['controllers'].keys()
+    return list(controllers['controllers'].keys())
 
 
 def controller_exists(controllername):
@@ -560,36 +560,41 @@ def get_machine_info(token, machine):
 
 def get_application_info(token, application):
     login(token.c_name, token.m_name)
-    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))[application]
-    return {'name': application, 'relations': data['relations'],
-            'units': [{'name': u,
-                       'machine': ui['machine'],
-                       'ip': ui['public-address'],
-                       'ports': ui['open-ports']}
-                      for u, ui in data['units'].items()]}
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json']))['applications'][application]
+    result = {'name': application, 'relations': data['relations'], 'units': []}
+    for u, ui in data['units'].items():
+        try:
+            unit = {'name': u, 'machine': ui['machine'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
+        except KeyError:
+            unit = {'name': u, 'machine': 'Waiting', 'ip': 'Unknown', 'ports': 'Unknown'}
+        result['units'].append(unit)
+    return result
 
 
-def get_unit_info(token, application, unit):
+def get_unit_info(token, application, unitnumber):
     data = get_application_info(token, application)
     for u in data['units']:
-        if u['name'] == unit:
+        if u['name'] == '{}/{}'.format(application, unitnumber):
             return u
 
 
-def unit_exists(token, unit):
+def unit_exists(token, application, unitnumber):
     login(token.c_name, token.m_name)
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json']))
-    return unit in data['units'].keys()
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json']))['applications'][application]
+    return '{}/{}'.format(application, unitnumber) in data['units'].keys()
 
 
 def add_unit(token, app_name, target=None):
     login(token.c_name, token.m_name)
-    return output_pass(['juju', 'add-unit', app_name, '--to', target])
+    if target is None:
+        return output_pass(['juju', 'add-unit', app_name])
+    else:
+        return output_pass(['juju', 'add-unit', app_name, '--to', target])
 
 
-def remove_unit(token, unit_name):
+def remove_unit(token, application, unit_number):
     login(token.c_name, token.m_name)
-    return output_pass(['juju', 'remove-unit', unit_name])
+    return output_pass(['juju', 'remove-unit', '{}/{}'.format(application, unit_number)])
 
 
 def add_relation(token, app1, app2):

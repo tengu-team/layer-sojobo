@@ -324,14 +324,14 @@ def add_unit(controller, model, application):
     return create_response(code, {'message': response})
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unit>', methods=['DELETE'])
-def remove_unit(controller, model, application, unit):
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['DELETE'])
+def remove_unit(controller, model, application, unitnumber):
     data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
-        if juju.unit_exists(token, unit):
+        if juju.unit_exists(token, application, unitnumber):
             if token.m_access == 'write' or token.m_access == 'admin':
-                code, response = 200, juju.remove_unit(token, unit)
+                code, response = 200, juju.remove_unit(token, application, unitnumber)
             else:
                 code, response = errors.no_permission()
         else:
@@ -341,13 +341,13 @@ def remove_unit(controller, model, application, unit):
     return create_response(code, {'message': response})
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unit>', methods=['GET'])
-def get_unit_info(controller, model, application, unit):
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['GET'])
+def get_unit_info(controller, model, application, unitnumber):
     data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
-        if juju.unit_exists(token, unit):
-            code, response = 200, juju.get_unit_info(token, application, unit)
+        if juju.unit_exists(token, application, unitnumber):
+            code, response = 200, juju.get_unit_info(token, application, unitnumber)
         else:
             code, response = errors.does_not_exist('unit')
     except KeyError:
