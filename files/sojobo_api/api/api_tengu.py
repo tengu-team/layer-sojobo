@@ -251,6 +251,17 @@ def add_bundle(controller, model):
     return create_response(code, {'message': response})
 
 
+@TENGU.route('/controllers/<controller>/models/<model>/machines/', methods=['GET'])
+def get_machines_info(controller, model):
+    data = request.args
+    try:
+        token = juju.authenticate(data['api_key'], request.authorization, controller, model)
+        code, response = 200, juju.get_machines_info(token)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return create_response(code, {'message': response})
+
+
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['GET'])
 def get_machine_info(controller, model, machine):
     data = request.args
@@ -270,20 +281,18 @@ def add_machine(controller, model):
     data = request.json
     try:
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
-        if juju.machine_exists(token, data['machine']):
-            code, response = errors.already_exists('machine')
-        else:
-            if token.m_access == 'write' or token.m_access == 'admin':
-                series = data.get('series', None)
-                if series is None:
-                    juju.add_machine(token)
-                    code, response = 200, juju.add_machine(token)
-                elif juju.cloud_supports_series(token, series):
-                    code, response = 200, juju.add_machine(token, series)
-                else:
-                    code, response = 400, 'This cloud does not support this version of Ubuntu'
+        if token.m_access == 'write' or token.m_access == 'admin':
+            series = data.get('series', None)
+            if series is None:
+                juju.add_machine(token)
+                code, response = 200, 'The machine is being created'
+            elif juju.cloud_supports_series(token, series):
+                juju.add_machine(token, series)
+                code, response = 200, 'The machine is being created'
             else:
-                code, response = errors.no_permission()
+                code, response = 400, 'This cloud does not support this version of Ubuntu'
+        else:
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, {'message': response})
@@ -296,7 +305,8 @@ def remove_machine(controller, model, machine):
         token = juju.authenticate(data['api_key'], request.authorization, controller, model)
         if juju.machine_exists(token, machine):
             if token.m_access == 'write' or token.m_access == 'admin':
-                code, response = 200, juju.remove_machine(token, machine)
+                juju.remove_machine(token, machine)
+                code, response = 200, 'The machine is being removed'
             else:
                 code, response = errors.no_permission()
         else:

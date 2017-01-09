@@ -260,16 +260,24 @@ def get_units_info(token, application):
     return [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'],
              'ports': ui['open-ports']} for u, ui in data.items()]
 
+
 def get_machines_info(token):
     login(token.c_name, token.m_name)
-    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))
-    machines = []
-    for machine, minfo in data['machines'].items():
-        containers = []
-        if 'containers' in minfo.keys():
-            containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in minfo.keys()]
-        machines.append({'name': machine, 'ip': minfo['dns-name'], 'series': minfo['series'], 'containers': containers})
-    return machines
+    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))['machines'].keys()
+    return [get_machine_info(token, m) for m in data]
+
+
+def get_machine_info(token, machine):
+    login(token.c_name, token.m_name)
+    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))['machines'][machine]
+    try:
+        containers = None
+        if 'containers' in data.keys():
+            containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data.keys()]
+        result = {'name': machine, 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
+    except KeyError:
+        result = {'name': machine, 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
+    return result
 
 
 def get_models(token):
@@ -519,7 +527,11 @@ def remove_app(token, app_name):
 
 def add_machine(token, series=None):
     login(token.c_name, token.m_name)
-    return output_pass(['juju', 'add-machine', '--series', series])
+    if series is None:
+        result = output_pass(['juju', 'add-machine'])
+    else:
+        result = output_pass(['juju', 'add-machine', '--series', series])
+    return result
 
 
 def machine_exists(token, machine):
@@ -547,15 +559,6 @@ def machine_matches_series(token, machine, series):
 def remove_machine(token, machine):
     login(token.c_name, token.m_name)
     return output_pass(['juju', 'remove-machine', '--force', machine])
-
-
-def get_machine_info(token, machine):
-    login(token.c_name, token.m_name)
-    data = json.loads(output_pass(['juju', 'machines', '--format', 'json']))[machine]
-    containers = None
-    if 'containers' in data.keys():
-        containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data.keys()]
-    return {'name': machine, 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
 
 
 def get_application_info(token, application):
