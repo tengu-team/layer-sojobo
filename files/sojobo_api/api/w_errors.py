@@ -39,3 +39,7 @@ def no_permission():
 
 def already_exists(item):
     return 409, 'The {} already exists!'.format(item)
+
+
+def cmd_error(message):
+    return 500, message
