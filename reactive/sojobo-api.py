@@ -75,6 +75,7 @@ def install_api():
         mergecopytree(t_etc_dir, API_DIR + '/etc')
     else:
         mergecopytree('files/sojobo_api', API_DIR)
+    os.mkdir('{}/files'.format(API_DIR))
     render_api_systemd_template()
     # USER should get all access rights.
     adduser(USER)

@@ -1,11 +1,14 @@
 # Introduction
 This is the api for the Tengu platform. Besides providing all the necessary Tengu - commands, it also introduces
 JuJu - wide users (instead of users on a controller-level) and the principle of an admin-user.
-# Charm
+# Installation
+In order to use the api, at least one controller must be installed alongside the sojobo-api.
 
-# Initial setup
-Before the api can be used, one must manually bootstrap a controller, create a model and add a user to the model which has no
-admin rights to the model.
+Assuming all your build charms are in the same directory, and you are in that directory, the installation process is:
+* `juju deploy ./sojobo-api`
+* `juju deploy ./controller-<type>` e.g. `juju deploy ./controller-aws`
+* `juju add-relation sojobo-api controller-<type>` e.g. `juju add-relation sojobo-api controller-aws`
+
 # API
 The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
 follow the naming rules and provide the required functions.

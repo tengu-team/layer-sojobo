@@ -188,11 +188,15 @@ def delete_controller(token):
 
 def get_all_controllers():
     controllers = json.loads(output_pass(['juju', 'controllers', '--format', 'json']))
-    return list(controllers['controllers'].keys())
+    try:
+        result = list(controllers['controllers'].keys())
+    except AttributeError:
+        result = []
+    return result
 
 
-def controller_exists(controllername):
-    return controllername in get_all_controllers()
+def controller_exists(c_name):
+    return c_name in get_all_controllers()
 
 
 def get_controller_access(token, controller):
@@ -287,14 +291,13 @@ def get_models(token):
 
 def get_gui_url(token):
     data = output_pass(['juju', 'gui', '--no-browser'], token.c_name, token.m_name).rstrip().split(':')[2]
-    url = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, 'controller'))['machines'][0]['dns-name']
+    url = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, 'controller'))['machines']['0']['dns-name']
     return 'https://{}:{}'.format(url, data)
 
 
 def create_model(token, model, ssh_key=None):
     output = {}
     output['add-model'] = output_pass(['juju', 'add-model', model], token.c_name)
-    # output['grant'] = output_pass(['juju', 'grant', token.username, 'admin', model])
     if ssh_key is not None:
         output['ssh'] = add_ssh_key(token, ssh_key)
     return output
