@@ -270,9 +270,9 @@ def get_machine_info(token, machine):
         containers = None
         if 'containers' in data.keys():
             containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data.keys()]
-        result = {'name': machine, 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
+        result = {'name': machine, 'instance-id': data['instance-id'], 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
     except KeyError:
-        result = {'name': machine, 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
+        result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
     return result
 
 
@@ -291,7 +291,7 @@ def get_gui_url(token):
 
 def create_model(token, model, ssh_key=None):
     output = {}
-    output['add-model'] = output_pass(['juju', 'add-model', model, '--credential', get_user()], token.c_name)
+    output['add-model'] = output_pass(['juju', 'add-model', model], token.c_name)
     # output['grant'] = output_pass(['juju', 'grant', token.username, 'admin', model])
     if ssh_key is not None:
         output['ssh'] = add_ssh_key(token, ssh_key)
@@ -529,11 +529,11 @@ def remove_machine(token, machine):
 
 
 def get_application_info(token, application):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))['applications'][application]
-    result = {'name': application, 'relations': data['relations'], 'units': []}
-    for u, ui in data['units'].items():
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+    result = {'name': application, 'relations': data['applications'][application]['relations'], 'units': []}
+    for u, ui in data['applications'][application]['units'].items():
         try:
-            unit = {'name': u, 'machine': ui['machine'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
+            unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
         except KeyError:
             unit = {'name': u, 'machine': 'Waiting', 'ip': 'Unknown', 'ports': 'Unknown'}
         result['units'].append(unit)
