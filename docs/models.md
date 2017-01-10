@@ -2,12 +2,14 @@ All GET-requests send their data using url-parameters. Other requests use json.
 
 **/controllers/`<controller>`**
 * Request type: PUT
-* Required data: api_key, model
+* Required header: api-key
+* Required data: model
 
 **/controllers/`<controller>`/models/`<model>`**
 * Request type: GET, DELETE
-* Required data: api_key
+* Required header: api-key
 
 **/controllers/`<controller>`/models/`<model>`/sshkey**
 * Request type: POST. DELETE
-* Required data: api_key, ssh_key
+* Required header: api-key
+* Required data: ssh_key

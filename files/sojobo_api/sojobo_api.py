@@ -93,7 +93,7 @@ APP.debug = True
 @APP.after_request
 def apply_caching(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Authentication,Content-Type,Location,id-token'
+    response.headers['Access-Control-Allow-Headers'] = 'Authentication,Content-Type,Location,id-token,api-key'
     response.headers['Access-Control-Expose-Headers'] = 'Content-Type,Location'
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE'
     response.headers['Accept'] = 'application/json'

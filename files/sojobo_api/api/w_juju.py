@@ -159,7 +159,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
-def create_controller(token, c_type, name, region, credentials):
+def create_controller(c_type, name, region, credentials):
     exists = False
     for key, value in get_controller_types().items():
         if c_type == key:
@@ -269,7 +269,7 @@ def get_machine_info(token, machine):
     try:
         containers = None
         if 'containers' in data.keys():
-            containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data.keys()]
+            containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data.items()]
         result = {'name': machine, 'instance-id': data['instance-id'], 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
     except KeyError:
         result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
@@ -286,7 +286,9 @@ def get_models(token):
 
 
 def get_gui_url(token):
-    return output_pass(['juju', 'gui', '--no-browser'], token.c_name, token.m_name).rstrip()
+    data = output_pass(['juju', 'gui', '--no-browser'], token.c_name, token.m_name).rstrip().split(':')[2]
+    url = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, 'controller'))['machines'][0]['dns-name']
+    return 'https://{}:{}'.format(url, data)
 
 
 def create_model(token, model, ssh_key=None):
@@ -320,7 +322,7 @@ def get_models_info(token):
 def get_model_info(token):
     if token.m_access is not None:
         return {'name': token.m_name, 'users': get_users_model(token), 'ssh-keys': get_ssh_keys(token),
-                'applications': get_applications_info(token), 'machines': get_machines_info(token)}
+                'applications': get_applications_info(token), 'machines': get_machines_info(token), 'juju-gui-url': get_gui_url(token)}
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
