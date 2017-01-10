@@ -8,6 +8,7 @@ Assuming all your build charms are in the same directory, and you are in that di
 * `juju deploy ./sojobo-api`
 * `juju deploy ./controller-<type>` e.g. `juju deploy ./controller-aws`
 * `juju add-relation sojobo-api controller-<type>` e.g. `juju add-relation sojobo-api controller-aws`
+* `juju expose sojobo-api`
 
 # API
 The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
