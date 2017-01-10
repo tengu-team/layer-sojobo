@@ -535,7 +535,7 @@ def get_application_info(token, application):
         try:
             unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
         except KeyError:
-            unit = {'name': u, 'machine': 'Waiting', 'ip': 'Unknown', 'ports': 'Unknown'}
+            unit = {'name': u, 'machine': 'Waiting', 'instance-id': 'Unknown', 'ip': 'Unknown', 'ports': 'Unknown'}
         result['units'].append(unit)
     return result
 
