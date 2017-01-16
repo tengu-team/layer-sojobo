@@ -102,42 +102,42 @@ def apply_caching(response):
 
 @APP.errorhandler(400)
 def bad_request(error):
-    return create_response(400, {'message': error.description})
+    return create_response(400, error.description)
 
 
 @APP.errorhandler(401)
 def unauthorized(error):
-    return create_response(401, {'message': error.description})
+    return create_response(401, error.description)
 
 
 @APP.errorhandler(403)
 def forbidden(error):
-    return create_response(403, {'message': error.description})
+    return create_response(403, error.description)
 
 
 @APP.errorhandler(404)
 def not_found(error):
-    return create_response(404, {'message': error.description})
+    return create_response(404, error.description)
 
 
 @APP.errorhandler(405)
 def method_not_allowed(error):
-    return create_response(405, {'message': error.description})
+    return create_response(405, error.description)
 
 
 @APP.errorhandler(409)
 def conflict(error):
-    return create_response(409, {'message': error.description})
+    return create_response(409, error.description)
 ###############################################################################
 # ROUTES
 ###############################################################################
 @APP.route('/')
 def api_root():
-    return create_response(200, {'message': {'name': socket.gethostname(),
-                                             'version': "1.0.0",  # see http://semver.org/
-                                             'api_dir': get_api_dir(),
-                                             'used_apis': get_apis(),
-                                             'controllers': get_controllers()}})
+    return create_response(200, {'name': socket.gethostname(),
+                                 'version': "1.0.0",  # see http://semver.org/
+                                 'api_dir': get_api_dir(),
+                                 'used_apis': get_apis(),
+                                 'controllers': get_controllers()})
 
 
 @APP.route('/favicon.ico')
