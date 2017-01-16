@@ -214,7 +214,7 @@ def get_controllers_info(token):
 
 def get_controller_info(token):
     if token.c_access is not None:
-        return {'name': token.c_name, 'models': get_models_info(token), 'users': get_users_controller(token)}
+        return {'name': token.c_name, 'type': token.c_token.type, 'models': get_models_info(token), 'users': get_users_controller(token)}
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
