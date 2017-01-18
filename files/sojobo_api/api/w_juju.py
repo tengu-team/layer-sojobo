@@ -22,7 +22,6 @@ import json
 import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
 import requests
-# import tempfile
 import yaml
 from sojobo_api import get_api_dir
 from flask import abort
@@ -70,20 +69,6 @@ def cloud_supports_series(token, series):
     return series in get_controller_types()[token.c_token.type].get_supported_series()
 
 
-def parse_c_access(access):
-    if access in ['login', 'add-model', 'superuser']:
-        return access
-    else:
-        return 'login'
-
-
-def parse_m_access(access):
-    if access in ['read', 'write', 'admin']:
-        return access
-    else:
-        return 'read'
-
-
 def output_pass(commands, controller=None, model=None):
     if controller is not None and model is not None:
         commands.extend(['-m', '{}:{}'.format(controller, model)])
@@ -102,6 +87,23 @@ def output_pass(commands, controller=None, model=None):
     return result
 
 
+def check_login(auth):
+    if auth.username == get_user():
+        result = auth.password == get_password()
+    else:
+        check_call(['juju', 'logout'])
+        try:
+            check_output(['juju', 'login', auth.username, '-c', get_all_controllers()[0]],
+                         input=bytes('{}\n'.format(auth.password), 'utf-8'), stderr=STDOUT)
+            result = True
+            check_call(['juju', 'logout'])
+        except CalledProcessError as e:
+            result = 'invalid entity name or password (unauthorized access)' in e.output.decode('utf-8')
+        except (TypeError, IndexError):
+            result = False
+    return result
+
+
 class JuJu_Token(object):
     def __init__(self, auth):
         self.username = auth.username
@@ -116,13 +118,13 @@ class JuJu_Token(object):
     def set_controller(self, c_name):
         c_type, c_endpoint = controller_info(c_name)
         self.c_name = c_name
-        self.c_access = get_controller_access(self, c_name)
+        self.c_access = get_controller_access(self, self.username)
         self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, self.username, self.password)
         return self
 
     def set_model(self, modelname):
         self.m_name = modelname
-        self.m_access = get_model_access(self, modelname)
+        self.m_access = get_model_access(self, self.username)
         return self
 
     def m_shared_name(self):
@@ -135,7 +137,7 @@ class JuJu_Token(object):
 def authenticate(api_key, auth, controller=None, modelname=None):
     with open('{}/api-key'.format(get_api_dir()), 'r') as key:
         apikey = key.readlines()[0]
-    if api_key != apikey:
+    if api_key != apikey or not check_login(auth):
         error = errors.unauthorized()
         abort(error[0], error[1])
     token = JuJu_Token(auth)
@@ -165,7 +167,7 @@ def create_controller(c_type, name, region, credentials):
         if c_type == key:
             output = value.create_controller(name, region, credentials)
             pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
-            check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
+            check_output(['juju', 'change-user-password', get_user(), '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
             exists = True
             break
     if not exists:
@@ -199,51 +201,67 @@ def controller_exists(c_name):
     return c_name in get_all_controllers()
 
 
-def get_controller_access(token, controller):
-    users = json.loads(output_pass(['juju', 'users', '--format', 'json'], controller))
+def get_controller_access(token, username):
+    users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
     access = None
     for user in users:
-        if user['user-name'] == token.username:
+        if user['user-name'] == username:
             access = user['access']
     return access
 
 
 def get_controllers_info(token):
-    return [get_controller_info(token.set_controller(c)) for c in get_all_controllers()]
+    return [get_controller_info(token) for c in get_all_controllers() if token.set_controller(c).c_access is not None]
 
 
 def get_controller_info(token):
     if token.c_access is not None:
-        return {'name': token.c_name, 'type': token.c_token.type, 'models': get_models_info(token), 'users': get_users_controller(token)}
+        result = {'name': token.c_name, 'type': token.c_token.type, 'models': get_models_info(token),
+                  'users': get_users_controller(token)}
+    else:
+        result = None
+    return result
+
+
+def c_access_exists(access):
+    return access in ['login', 'add-model', 'superuser']
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
-def model_exists(c_name, m_name):
-    data = json.loads(output_pass(['juju', 'list-models', '--format', 'json'], c_name))
-    res = False
-    for model in data['models']:
-        if m_name == model['name']:
-            res = True
-            break
-    return res
+def get_all_models(controller):
+    data = json.loads(output_pass(['juju', 'list-models', '--format', 'json'], controller))
+    return [model['name'] for model in data['models']]
 
 
-def get_model_access(token, m_name):
-    check_call(['juju', 'switch', '{}:{}'.format(token.c_name, m_name)])
+def model_exists(controller, model):
+    return model in get_all_models(controller)
+
+
+def get_model_access(token, username):
+    check_call(['juju', 'switch', '{}:{}'.format(token.c_name, token.m_name)])
     model_info = json.loads(check_output(['juju', 'show-model', '--format', 'json']).decode('utf-8'))
     try:
-        access = model_info[m_name]['users'][token.username]['access']
+        access = model_info[token.m_name]['users'][username]['access']
     except KeyError:
         access = None
     return access
 
 
-def get_all_models(controller):
-    data = json.loads(output_pass(['juju', 'list-models', '--format', 'json'], controller))
-    models = []
-    for model in data['models']:
-        models.append(model['name'])
-    return models[1:]
+def m_access_exists(access):
+    return access in ['read', 'write', 'admin']
+
+
+def get_models_info(token):
+    return [get_model_info(token) for m in get_all_models(token.c_name) if token.set_model(m).m_access is not None]
+
+def get_model_info(token):
+    if token.m_access is not None:
+        result = {'name': token.m_name, 'users': get_users_model(token), 'ssh-keys': get_ssh_keys(token),
+                  'applications': get_applications_info(token), 'machines': get_machines_info(token),
+                  'juju-gui-url': get_gui_url(token)}
+    else:
+        result = None
+    return result
 
 
 def get_ssh_keys(token):
@@ -252,9 +270,19 @@ def get_ssh_keys(token):
 
 def get_applications_info(token):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    return [{'name': a, 'relations': ai['relations'],
-             'units': [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
-                       for u, ui in ai['units'].items()]} for a, ai in data['applications'].items()]
+    result = []
+    for name, info in data['applications'].items():
+        res1 = {'name': name, 'relations': info['relations']}
+        try:
+            units = info['units'].items()
+            res1['units'] = []
+            for unit, uinfo in units:
+                res1['units'].append({'name': unit, 'machine': uinfo['machine'], 'ip': uinfo['public-address'],
+                                      'ports': uinfo.get('open-ports', None)})
+        except KeyError:
+            pass
+        result.append(res1)
+    return result
 
 
 def get_units_info(token, application):
@@ -273,20 +301,11 @@ def get_machine_info(token, machine):
     try:
         containers = None
         if 'containers' in data.keys():
-            containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data.items()]
+            containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data['containers'].items()]
         result = {'name': machine, 'instance-id': data['instance-id'], 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
     except KeyError:
         result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
     return result
-
-
-def get_models(token):
-    models = {}
-    for model in get_all_models(token.c_name):
-        access = get_model_access(token, model)
-        if access is not None:
-            models[model] = access
-    return models
 
 
 def get_gui_url(token):
@@ -316,45 +335,32 @@ def remove_ssh_key(token, ssh_key):
     fp_plain = hashlib.md5(key).hexdigest()
     fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
     return output_pass(['juju', 'remove-ssh-key', fingerprint], token.c_name, token.m_name)
-
-
-def get_models_info(token):
-    return [get_model_info(token.set_model(m)) for m in get_all_models(token.c_name)]
-
-
-def get_model_info(token):
-    if token.m_access is not None:
-        return {'name': token.m_name, 'users': get_users_model(token), 'ssh-keys': get_ssh_keys(token),
-                'applications': get_applications_info(token), 'machines': get_machines_info(token), 'juju-gui-url': get_gui_url(token)}
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
 def create_user(username, password):
     for controller in get_all_controllers():
-        check_call(['juju', 'add-user', '-c', controller, username])
-        check_call(['juju', 'grant', '-c', controller, username, 'login'])
-        check_call(['juju', 'disable-user', '-c', controller, username])
-    change_password(username, password)
-    return 'The user {} has been created'.format(username)
+        output_pass(['juju', 'add-user', username], controller)
+        output_pass(['juju', 'revoke', username, 'login'], controller)
+    change_user_password(username, password)
+    return get_user_info(username)
 
 
 def delete_user(username):
     for controller in get_all_controllers():
-        for model in get_all_models(controller):
-            check_call(['juju', 'revoke', username, 'read', model, '-c', controller])
-        check_call(['juju', 'disable-user', '-c', controller, username])
-    return 'The user {} has been disabled'.format(username)
+        output_pass(['juju', 'remove-user', username, '-y'], controller)
+    return 'The user {} has been removed'.format(username)
 
 
-def change_password(username, password):
+def change_user_password(username, password):
     for controller in get_all_controllers():
-        check_output(['juju', 'change-user-password', '-c', controller, username],
-                     input="{}\n{}".format(password, password))
-    return '{} password has been changed'.format(username)
+        check_output(['juju', 'change-user-password', username, '-c', controller],
+                     input=bytes('{}\n{}\n'.format(password, password), 'utf-8'))
+    return get_user_info(username)
 
 
 def get_users(controller):
-    data = json.loads(output_pass(['juju', 'list-users', '--format', 'json'], controller))
+    data = json.loads(output_pass(['juju', 'users', '--format', 'json'], controller))
     return {u['user-name']: u['access'] for u in data}
 
 
@@ -381,74 +387,96 @@ def get_users_model(token):
     return users
 
 
-def get_admins():
-    result = set()
-    not_first = False
-    for controller in get_all_controllers():
-        users = get_users(controller)
-        for model in get_all_models(controller):
-            data = json.loads(output_pass(['juju', 'users', model, '--format', 'json']))
-            temp = set()
-            for key, value in data.items():
-                if value['access'] == 'admin' and users[key] == 'superuser':
-                    temp.add(key)
-            if not_first:
-                result = result.intersection(temp)
-            else:
-                result = temp
-                not_first = True
-    return list(result)
-
-
-def make_admin(username):
-    for controller in get_all_controllers():
-        output_pass(['juju', 'grant', username, 'superuser'], controller)
-        for model in get_all_models(controller):
-            check_call(['juju', 'grant', username, 'admin', model])
-    return '{} has been made an admin'.format(username)
-
-
-def add_superuser(username, controller):
-    return output_pass(['juju', 'grant', username, 'superuser'], controller)
-
-
 def add_to_controller(token, username, access):
-    check_call(['juju', 'enable-user', username])
-    return output_pass(['juju', 'grant', username, parse_c_access(access)], token.c_name)
+    current_access = get_controller_access(token, username)
+    if current_access == 'superuser':
+        if access == 'add-model':
+            output_pass(['juju', 'revoke', username, 'superuser'], token.c_name)
+        elif access == 'login':
+            output_pass(['juju', 'revoke', username, 'superuser'], token.c_name)
+            output_pass(['juju', 'revoke', username, 'add-model'], token.c_name)
+    elif current_access == 'add-model':
+        if access == 'superuser':
+            output_pass(['juju', 'grant', username, 'superuser'], token.c_name)
+        elif access == 'login':
+            output_pass(['juju', 'revoke', username, 'add-model'], token.c_name)
+    elif current_access == 'login':
+        if access != 'login':
+            output_pass(['juju', 'grant', username, access], token.c_name)
+    elif current_access is None:
+        output_pass(['juju', 'grant', username, access], token.c_name)
+    return get_user_info(username)
 
 
 def remove_from_controller(token, username):
-    return output_pass(['juju', 'disable-user', username], token.c_name)
+    current_access = get_controller_access(token, username)
+    if current_access == 'superuser':
+        output_pass(['juju', 'revoke', username, 'superuser'], token.c_name)
+        output_pass(['juju', 'revoke', username, 'add-model'], token.c_name)
+        output_pass(['juju', 'revoke', username, 'login'], token.c_name)
+    elif current_access == 'add-model':
+        output_pass(['juju', 'revoke', username, 'add-model'], token.c_name)
+        output_pass(['juju', 'revoke', username, 'login'], token.c_name)
+    elif current_access == 'login':
+        output_pass(['juju', 'revoke', username, 'login'], token.c_name)
+    return get_user_info(username)
 
 
 def add_to_model(token, username, access):
-    output_pass(['juju', 'enable-user', username], token.c_name)
-    return output_pass(['juju', 'grant', username, access, token.m_name], token.c_name)
+    if not c_access_exists(get_controller_access(token, username)):
+        add_to_controller(token, username, 'login')
+    current_access = get_model_access(token, username)
+    if current_access == 'admin':
+        if access == 'write':
+            output_pass(['juju', 'revoke', username, 'admin', token.m_name])
+        elif access == 'read':
+            output_pass(['juju', 'revoke', username, 'admin', token.m_name])
+            output_pass(['juju', 'revoke', username, 'write', token.m_name])
+    elif current_access == 'write':
+        if access == 'admin':
+            output_pass(['juju', 'grant', username, 'admin', token.m_name])
+        elif access == 'read':
+            output_pass(['juju', 'revoke', username, 'write', token.m_name])
+    elif current_access == 'login':
+        if access != 'login':
+            output_pass(['juju', 'grant', username, access, token.m_name])
+    elif current_access is None:
+        output_pass(['juju', 'grant', username, access, token.m_name])
+    return get_user_info(username)
 
 
 def remove_from_model(token, username):
-    return output_pass(['juju', 'revoke', username, token.m_name], token.c_name)
+    current_access = get_model_access(token, username)
+    if current_access == 'admin':
+        output_pass(['juju', 'revoke', username, 'admin', token.m_name], token.c_name)
+        output_pass(['juju', 'revoke', username, 'write', token.m_name], token.c_name)
+        output_pass(['juju', 'revoke', username, 'read', token.m_name], token.c_name)
+    elif current_access == 'write':
+        output_pass(['juju', 'revoke', username, 'write', token.m_name], token.c_name)
+        output_pass(['juju', 'revoke', username, 'read', token.m_name], token.c_name)
+    elif current_access == 'read':
+        output_pass(['juju', 'revoke', username, 'read', token.m_name], token.c_name)
+    return get_user_info(username)
 
 
 def user_exists(username):
-    exists = False
-    for user in json.loads(output_pass(['juju', 'users', '--format', 'json'])):
-        if username in user.values():
-            exists = True
-            break
-    return exists
+    return username == get_user() or username in get_all_users()
 
 
-def get_all_users(controller, model):
-    data = json.loads(output_pass(['juju', 'users', '-c', controller, model]))
-    return {key: value['access'] for key, value in data.items()}
+def get_all_users():
+    try:
+        users = json.loads(output_pass(['juju', 'users', '--all', '--format', 'json'], get_all_controllers()[0]))
+        result = [user['user-name'] for user in users]
+    except IndexError:
+        result = {get_user(): 'superuser'}
+    return result
 
 
 def get_users_info():
     controllers = {}
     for controller in get_all_controllers():
         users = json.loads(output_pass(['juju', 'users', '--format', 'json'], controller))
-        controllers[controller] = {u['user-name']: u['acces'] for u in users}
+        controllers[controller] = {u['user-name']: u['access'] for u in users}
     all_users = {}
     for controller, users in controllers.items():
         for user, access in users.items():
@@ -460,16 +488,18 @@ def get_users_info():
     for user in users:
         for controller in user['controllers']:
             models = json.loads(output_pass(['juju', 'models', '--format', 'json'], controller['name']))['models']
-            controller['models'] = [{'name': m['name'], 'access': m['users'][user]['access']} for m in models]
+            for m in models:
+                try:
+                    controller['models'] = {'name': m['name'], 'access': m['users'][user['name']]['access']}
+                except KeyError:
+                    pass
     return users
 
 
 def get_user_info(username):
     for user in get_users_info():
-        if user['name'] == username and username != get_user():
+        if user['name'] == username:
             return user
-
-
 #####################################################################################
 # APPLICATION FUNCTIONS
 #####################################################################################
