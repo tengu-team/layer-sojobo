@@ -142,13 +142,11 @@ def authenticate(api_key, auth, controller=None, modelname=None):
         abort(error[0], error[1])
     token = JuJu_Token(auth)
     if controller is not None and controller_exists(controller):
-        token.set_controller(controller)
-        if token.c_access is None:
+        if token.set_controller(controller).c_access is None:
             error = errors.no_access('controller')
             abort(error[0], error[1])
         if modelname is not None and model_exists(controller, modelname):
-            token.set_model(modelname)
-            if token.m_access is None:
+            if token.set_model(modelname).m_access is None and token.c_access != 'superuser':
                 error = errors.no_access('model')
                 abort(error[0], error[1])
         elif modelname is not None and not model_exists(controller, modelname):
