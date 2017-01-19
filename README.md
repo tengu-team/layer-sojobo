@@ -14,6 +14,16 @@ Assuming all your build charms are in the same directory, and you are in that di
 The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
 follow the naming rules and provide the required functions.
 
+## Error codes
+The API return the following error codes:
+- **400**: When the request does not contain the required data
+- **401**: When a user has no access to a certain resource
+- **403**: API-key mismatch
+- **404**: When a specific resource does not exists
+- **405**: When a user has access to the resource, but the operation is not permitted
+- **409**: When a resource already exists
+- **500**: When the Sojobo, despite all its wisdom and knowledge fails
+
 ## Tengu - api
 This api is used to control Juju controllers, models, applications, relations and machines. All it's calls are available under
 `http://host/tengu/<call>` and are protected with basic-Authentication. The username is `admin` and the password is set with

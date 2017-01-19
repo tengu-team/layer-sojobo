@@ -89,7 +89,7 @@ def delete_controller(controller):
     return create_response(code, response)
 
 
-@TENGU.route('/controllers/<controller>', methods=['PUT'])
+@TENGU.route('/controllers/<controller>/models', methods=['POST'])
 def create_model(controller):
     data = request.json
     try:
@@ -101,6 +101,16 @@ def create_model(controller):
             code, response = 200, juju.get_model_info(token.set_model(data['model']))
         else:
             code, response = errors.no_permission()
+    except KeyError:
+        code, response = errors.invalid_data()
+    return create_response(code, response)
+
+
+@TENGU.route('/controllers/<controller>/models', methods=['GET'])
+def get_models_info(controller):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization, controller)
+        code, response = 200, juju.get_models_info(token)
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, response)
@@ -129,14 +139,25 @@ def delete(controller, model):
     return create_response(code, response)
 
 
+@TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['GET'])
+def get_ssh_keys(controller, model):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
+        if token.m_access == 'admin' or token.c_access == 'superuser':
+            code, response = 200, juju.get_ssh_keys
+        else:
+            code, response = errors.no_permission()
+    except KeyError:
+        code, response = errors.invalid_data()
+    return create_response(code, response)
+
 @TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['POST'])
 def add_ssh_key(controller, model):
     data = request.json
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         if token.m_access == 'admin' or token.c_access == 'superuser':
-            juju.add_ssh_key(token, data['ssh_key'])
-            code, response = 200, 'The ssh-key has been added'
+            code, response = 200, juju.add_ssh_key(token, data['ssh-key'])
         else:
             code, response = errors.no_permission()
     except KeyError:
@@ -150,7 +171,7 @@ def remove_ssh_key(controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         if token.m_access == 'admin' or token.c_access == 'superuser':
-            juju.remove_ssh_key(token, data['ssh_key'])
+            juju.remove_ssh_key(token, data['ssh-key'])
             code, response = 200, 'The ssh-key has been removed'
         else:
             code, response = errors.no_permission()
@@ -159,14 +180,14 @@ def remove_ssh_key(controller, model):
     return create_response(code, response)
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['GET'])
-def get_application_info(controller, model, application):
+@TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['POST'])
+def get_applications_info(controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
-        if juju.app_exists(token, application):
-            code, response = 200, juju.get_application_info(token, application)
+        if token.m_access is not None or token.c_access == 'superuser':
+            code, response = 200, juju.get_applications_info(token)
         else:
-            code, response = errors.does_not_exist('application')
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, response)
@@ -205,6 +226,19 @@ def add_application(controller, model):
                     response = juju.get_application_info(token, data['application'])
             else:
                 code, response = errors.no_permission()
+    except KeyError:
+        code, response = errors.invalid_data()
+    return create_response(code, response)
+
+
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['GET'])
+def get_application_info(controller, model, application):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
+        if juju.app_exists(token, application):
+            code, response = 200, juju.get_application_info(token, application)
+        else:
+            code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, response)

@@ -122,7 +122,10 @@ class JuJu_Token(object):
 
     def set_model(self, modelname):
         self.m_name = modelname
-        self.m_access = get_model_access(self, self.username)
+        if self.c_access == 'superuser':
+            self.m_access = 'admin'
+        else:
+            self.m_access = get_model_access(self, self.username)
         return self
 
     def m_shared_name(self):
@@ -144,7 +147,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
             error = errors.no_access('controller')
             abort(error[0], error[1])
         if modelname is not None and model_exists(controller, modelname):
-            if token.set_model(modelname).m_access is None and token.c_access != 'superuser':
+            if token.set_model(modelname).m_access:
                 error = errors.no_access('model')
                 abort(error[0], error[1])
         elif modelname is not None and not model_exists(controller, modelname):
@@ -161,7 +164,7 @@ def create_controller(c_type, name, region, credentials):
     exists = False
     for key, value in get_controller_types().items():
         if c_type == key:
-            output = value.create_controller(name, region, credentials)
+            value.create_controller(name, region, credentials)
             pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
             check_output(['juju', 'change-user-password', get_user(), '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
             exists = True
@@ -180,7 +183,6 @@ def controller_info(c_name):
 def delete_controller(token):
     check_call(['juju', 'destroy-controller', token.c_name, '-y'])
     check_call(['juju', 'remove-credential', token.c_token.type, token.c_name])
-    # check_call(['juju', 'switch', get_all_controllers()[0]])
     return get_controllers_info(token)
 
 
@@ -199,11 +201,13 @@ def controller_exists(c_name):
 
 def get_controller_access(token, username):
     users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
-    access = None
+    result = None
     for user in users:
         if user['user-name'] == username:
             access = user['access']
-    return access
+            if c_access_exists(access):
+                result = access
+    return result
 
 
 def get_controllers_info(token):
@@ -326,7 +330,8 @@ def delete_model(token):
 
 def add_ssh_key(token, ssh_key):
     output_pass(['juju', 'add-ssh-key', '"{}"'.format(ssh_key)], token.c_name, token.m_name)
-    return get_model_info(token)
+    return get_ssh_keys(token)
+
 
 def remove_ssh_key(token, ssh_key):
     key = base64.b64decode(bytes(ssh_key.strip().split()[1].encode('ascii')))
@@ -363,7 +368,7 @@ def get_users(controller):
 
 
 def get_users_controller(token):
-    if token.c_access == 'superuser' or token.c_access == 'add-model':
+    if token.c_access == 'superuser':
         data = json.loads(output_pass(['juju', 'list-users', '--format', 'json'], token.c_name))
         users = [{'name': u['user-name'], 'access': u['access']} for u in data]
     elif token.c_access is not None:
@@ -474,7 +479,7 @@ def get_users_info():
     controllers = {}
     for controller in get_all_controllers():
         users = json.loads(output_pass(['juju', 'users', '--format', 'json'], controller))
-        controllers[controller] = {u['user-name']: u['access'] for u in users}
+        controllers[controller] = {u['user-name']: u['access'] for u in users if u['access'] != ''}
     all_users = {}
     for controller, users in controllers.items():
         for user, access in users.items():
