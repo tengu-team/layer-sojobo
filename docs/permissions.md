@@ -6,9 +6,11 @@
 | bootstrap controller          |      X      |           |           |       |       |       |      |           |
 | add/remove user to controller |      X      |     X     |           |       |       |       |      |           |
 | remove controller             |      X      |     X     |           |       |       |       |      |           |
-| add/remove model              |      X      |     X     |     X     |       |       |       |      |           |
+| add model                     |      X      |     X     |     X     |       |       |       |      |           |
 | get controller info           |      X      |     X     |     X     |   X   |       |       |      |           |
+| remove model                  |      X      |     X     |           |       |   X   |       |      |           |
 | add/remove user to model      |      X      |     X     |           |       |   X   |       |      |           |
+| add/remove ssh-key to model   |      X      |     X     |           |       |   X   |       |      |           |
 | add/remove application        |      X      |     X     |           |       |   X   |   X   |      |           |
 | add/remove machine            |      X      |     X     |           |       |   X   |   X   |      |           |
 | add/remove unit               |      X      |     X     |           |       |   X   |   X   |      |           |

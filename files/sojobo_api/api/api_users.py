@@ -143,7 +143,7 @@ def add_to_model(user, controller, model):
         u_exists = juju.user_exists(user)
         a_exists = juju.m_access_exists(access)
         if u_exists and a_exists:
-            if token.m_access == 'admin' and user != 'admin':
+            if (token.m_access == 'admin' or token.c_access == 'superuser') and user != 'admin':
                 code, response = 200, juju.add_to_model(token, user, request.json['access'])
             else:
                 code, response =  errors.no_permission()
@@ -163,7 +163,7 @@ def remove_from_model(user, controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         if juju.user_exists(user):
-            if token.m_access == 'admin' and user != 'admin':
+            if (token.m_access == 'admin' or token.c_access == 'superuser') and user != 'admin':
                 code, response = 200, juju.remove_from_model(token, user)
             else:
                 code, response = errors.no_permission()

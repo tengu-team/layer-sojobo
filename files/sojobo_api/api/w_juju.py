@@ -313,11 +313,11 @@ def get_gui_url(token):
 
 
 def create_model(token, model, ssh_key=None):
-    output = {}
-    output['add-model'] = output_pass(['juju', 'add-model', model], token.c_name)
+    output_pass(['juju', 'add-model', model], token.c_name)
     if ssh_key is not None:
-        output['ssh'] = add_ssh_key(token, ssh_key)
-    return output
+        add_ssh_key(token, ssh_key)
+    output_pass(['juju', 'grant', token.username, 'admin', model], token.c_name)
+    return get_model_info(token)
 
 
 def delete_model(token):
