@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401
-
 import base64
 import hashlib
 from importlib import import_module
@@ -25,7 +24,6 @@ import requests
 import yaml
 from sojobo_api import get_api_dir
 from flask import abort
-
 from api import w_errors as errors
 ################################################################################
 # TENGU FUNCTIONS
@@ -91,8 +89,8 @@ def check_login(auth):
     if auth.username == get_user():
         result = auth.password == get_password()
     else:
-        check_call(['juju', 'logout'])
         try:
+            check_output(['juju', 'logout'], stderr=STDOUT)
             check_output(['juju', 'login', auth.username, '-c', get_all_controllers()[0]],
                          input=bytes('{}\n'.format(auth.password), 'utf-8'), stderr=STDOUT)
             result = True
@@ -182,8 +180,8 @@ def controller_info(c_name):
 def delete_controller(token):
     check_call(['juju', 'destroy-controller', token.c_name, '-y'])
     check_call(['juju', 'remove-credential', token.c_token.type, token.c_name])
-    check_call(['juju', 'switch', get_all_controllers()[0]])
-    return '{} has been successfully removed'.format(token.c_name)
+    # check_call(['juju', 'switch', get_all_controllers()[0]])
+    return get_controllers_info(token)
 
 
 def get_all_controllers():
@@ -251,6 +249,7 @@ def m_access_exists(access):
 
 def get_models_info(token):
     return [get_model_info(token) for m in get_all_models(token.c_name) if token.set_model(m).m_access is not None]
+
 
 def get_model_info(token):
     if token.m_access is not None:
@@ -321,12 +320,13 @@ def create_model(token, model, ssh_key=None):
 
 
 def delete_model(token):
-    return output_pass(['juju', 'destroy-model', '-y', '{}:{}'.format(token.c_name, token.m_name)])
+    output_pass(['juju', 'destroy-model', '-y', '{}:{}'.format(token.c_name, token.m_name)])
+    return get_controller_info(token)
 
 
 def add_ssh_key(token, ssh_key):
-    return output_pass(['juju', 'add-ssh-key', '"{}"'.format(ssh_key)], token.c_name, token.m_name)
-
+    output_pass(['juju', 'add-ssh-key', '"{}"'.format(ssh_key)], token.c_name, token.m_name)
+    return get_model_info(token)
 
 def remove_ssh_key(token, ssh_key):
     key = base64.b64decode(bytes(ssh_key.strip().split()[1].encode('ascii')))

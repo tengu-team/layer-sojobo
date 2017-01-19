@@ -121,8 +121,7 @@ def delete(controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         if token.m_access == 'admin' or token.c_access == 'superuser':
-            juju.delete_model(token)
-            code, response = 200, 'The model has been destroyed'
+            code, response = 200, juju.delete_model(token)
         else:
             code, response = errors.no_permission()
     except KeyError:
