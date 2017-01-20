@@ -130,7 +130,7 @@ def get_model_info(controller, model):
 def delete(controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
-        if token.m_access == 'admin' or token.c_access == 'superuser':
+        if token.m_access == 'admin':
             code, response = 200, juju.delete_model(token)
         else:
             code, response = errors.no_permission()
@@ -143,7 +143,7 @@ def delete(controller, model):
 def get_ssh_keys(controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
-        if token.m_access == 'admin' or token.c_access == 'superuser':
+        if token.m_access == 'admin':
             code, response = 200, juju.get_ssh_keys
         else:
             code, response = errors.no_permission()
@@ -156,7 +156,7 @@ def add_ssh_key(controller, model):
     data = request.json
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
-        if token.m_access == 'admin' or token.c_access == 'superuser':
+        if token.m_access == 'admin':
             code, response = 200, juju.add_ssh_key(token, data['ssh-key'])
         else:
             code, response = errors.no_permission()
@@ -170,7 +170,7 @@ def remove_ssh_key(controller, model):
     data = request.json
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
-        if token.m_access == 'admin' or token.c_access == 'superuser':
+        if token.m_access == 'admin':
             juju.remove_ssh_key(token, data['ssh-key'])
             code, response = 200, 'The ssh-key has been removed'
         else:
@@ -184,7 +184,7 @@ def remove_ssh_key(controller, model):
 def get_applications_info(controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
-        if token.m_access is not None or token.c_access == 'superuser':
+        if token.m_access is not None:
             code, response = 200, juju.get_applications_info(token)
         else:
             code, response = errors.no_permission()
@@ -201,7 +201,7 @@ def add_application(controller, model):
         if juju.app_exists(token, data['application']):
             code, response = errors.already_exists('application')
         else:
-            if token.m_access == 'write' or token.m_access == 'admin' or token.c_access == 'superuser':
+            if token.m_access == 'write' or token.m_access == 'admin':
                 series = data.get('series', None)
                 machine = data.get('target', None)
                 if machine is None and series is None:
@@ -249,7 +249,7 @@ def remove_app(controller, model, application):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         if juju.app_exists(token, application):
-            if token.m_access == 'write' or token.m_access == 'admin' or token.c_access == 'superuser':
+            if token.m_access == 'write' or token.m_access == 'admin':
                 code, response = 200, juju.remove_app(token, application)
             else:
                 code, response = errors.no_permission()
@@ -264,7 +264,7 @@ def remove_app(controller, model, application):
 def add_bundle(controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
-        if token.m_access == 'write' or token.m_access == 'admin' or token.c_access == 'superuser':
+        if token.m_access == 'write' or token.m_access == 'admin':
             bundle = request.files['file']
             bundle.save('{}/files'.format(get_api_dir()), 'bundle.yaml')
             try:
@@ -306,7 +306,7 @@ def add_machine(controller, model):
     data = request.json
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
-        if token.m_access == 'write' or token.m_access == 'admin' or token.c_access == 'superuser':
+        if token.m_access == 'write' or token.m_access == 'admin':
             series = data.get('series', None)
             if series is None:
                 juju.add_machine(token)
@@ -328,7 +328,7 @@ def remove_machine(controller, model, machine):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         if juju.machine_exists(token, machine):
-            if token.m_access == 'write' or token.m_access == 'admin' or token.c_access == 'superuser':
+            if token.m_access == 'write' or token.m_access == 'admin':
                 juju.remove_machine(token, machine)
                 code, response = 200, 'The machine is being removed'
             else:
@@ -346,7 +346,7 @@ def add_unit(controller, model, application):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         if juju.app_exists(token, application):
-            if token.m_access == 'write' or token.m_access == 'admin' or token.c_access == 'superuser':
+            if token.m_access == 'write' or token.m_access == 'admin':
                 juju.add_unit(token, application, data.get('target', None))
                 code, response = 200, juju.get_application_info(token, application)
             else:
@@ -363,7 +363,7 @@ def remove_unit(controller, model, application, unitnumber):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         if juju.unit_exists(token, application, unitnumber):
-            if token.m_access == 'write' or token.m_access == 'admin' or token.c_access == 'superuser':
+            if token.m_access == 'write' or token.m_access == 'admin':
                 code, response = 200, juju.remove_unit(token, application, unitnumber)
             else:
                 code, response = errors.no_permission()
@@ -394,7 +394,7 @@ def add_relation(controller, model):
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         app1, app2 = data['app1'], data['app2']
         if juju.app_exists(token, app1) and juju.app_exists(token, app2):
-            if token.m_access == 'write' or token.m_access == 'admin' or token.c_access == 'superuser':
+            if token.m_access == 'write' or token.m_access == 'admin':
                 juju.add_relation(token, app1, app2)
                 code, response = 200, {'applications': [juju.get_application_info(token, app1),
                                                         juju.get_application_info(token, app2)]}
@@ -425,7 +425,7 @@ def remove_relation(controller, model, app1, app2):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
         if juju.app_exists(token, app1) and juju.app_exists(token, app2):
-            if token.m_access == 'write' or token.m_access == 'admin' or token.c_access == 'superuser':
+            if token.m_access == 'write' or token.m_access == 'admin':
                 juju.remove_relation(token, app1, app2)
                 code, response = 200, 'The relation is being removed'
             else:

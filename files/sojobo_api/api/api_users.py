@@ -144,7 +144,8 @@ def add_to_model(user, controller, model):
         a_exists = juju.m_access_exists(access)
         if u_exists and a_exists:
             if (token.m_access == 'admin' or token.c_access == 'superuser') and user != 'admin':
-                code, response = 200, juju.add_to_model(token, user, request.json['access'])
+                juju.add_to_model(token, user, request.json['access'])
+                code, response = 200, juju.get_user_info(user)
             else:
                 code, response =  errors.no_permission()
         elif u_exists:

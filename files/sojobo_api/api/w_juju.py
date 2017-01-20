@@ -122,10 +122,7 @@ class JuJu_Token(object):
 
     def set_model(self, modelname):
         self.m_name = modelname
-        if self.c_access == 'superuser':
-            self.m_access = 'admin'
-        else:
-            self.m_access = get_model_access(self, self.username)
+        self.m_access = get_model_access(self, self.username)
         return self
 
     def m_shared_name(self):
@@ -147,7 +144,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
             error = errors.no_access('controller')
             abort(error[0], error[1])
         if modelname is not None and model_exists(controller, modelname):
-            if token.set_model(modelname).m_access:
+            if token.set_model(modelname).m_access is None:
                 error = errors.no_access('model')
                 abort(error[0], error[1])
         elif modelname is not None and not model_exists(controller, modelname):
@@ -168,6 +165,7 @@ def create_controller(c_type, name, region, credentials):
             pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
             check_output(['juju', 'change-user-password', get_user(), '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
             exists = True
+            output = ''
             break
     if not exists:
         output = 'Incorrect controller type. Supported options are: {}'.format(get_controller_types().keys())
@@ -225,6 +223,11 @@ def get_controller_info(token):
 
 def c_access_exists(access):
     return access in ['login', 'add-model', 'superuser']
+
+
+def get_controller_superusers(token):
+    users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
+    return [u['user-name'] for u in users if u['access'] == 'superuser']
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
@@ -319,7 +322,9 @@ def create_model(token, model, ssh_key=None):
     output_pass(['juju', 'add-model', model], token.c_name)
     if ssh_key is not None:
         add_ssh_key(token, ssh_key)
-    output_pass(['juju', 'grant', token.username, 'admin', model], token.c_name)
+    add_to_model(token.set_model(model), token.username, 'admin')
+    for user in get_controller_superusers(token):
+        add_to_model(token, user, 'admin')
     return get_model_info(token)
 
 
@@ -401,13 +406,21 @@ def add_to_controller(token, username, access):
     elif current_access == 'add-model':
         if access == 'superuser':
             output_pass(['juju', 'grant', username, 'superuser'], token.c_name)
+            for model in get_all_models(token.c_name):
+                add_to_model(token.set_model(model), username, 'admin')
         elif access == 'login':
             output_pass(['juju', 'revoke', username, 'add-model'], token.c_name)
     elif current_access == 'login':
         if access != 'login':
             output_pass(['juju', 'grant', username, access], token.c_name)
+            if access == 'superuser':
+                for model in get_all_models(token.c_name):
+                    add_to_model(token.set_model(model), username, 'admin')
     elif current_access is None:
         output_pass(['juju', 'grant', username, access], token.c_name)
+        if access == 'superuser':
+            for model in get_all_models(token.c_name):
+                add_to_model(token.set_model(model), username, 'admin')
     return get_user_info(username)
 
 
@@ -445,7 +458,7 @@ def add_to_model(token, username, access):
             output_pass(['juju', 'grant', username, access, token.m_name])
     elif current_access is None:
         output_pass(['juju', 'grant', username, access, token.m_name])
-    return get_user_info(username)
+    return 'The user has been added'
 
 
 def remove_from_model(token, username):
@@ -490,10 +503,11 @@ def get_users_info():
     users = [{'name': u, 'controllers': c} for u, c in all_users.items()]
     for user in users:
         for controller in user['controllers']:
+            controller['models'] = []
             models = json.loads(output_pass(['juju', 'models', '--format', 'json'], controller['name']))['models']
             for m in models:
                 try:
-                    controller['models'] = {'name': m['name'], 'access': m['users'][user['name']]['access']}
+                    controller['models'].append({'name': m['name'], 'access': m['users'][user['name']]['access']})
                 except KeyError:
                     pass
     return users
