@@ -1,7 +1,3 @@
-# ToDo
-- Add url's:
-  - /users/user/controllers/controller/models/model, get, gives the access on this model
-
 # User-API Documentation
 
 The User-API provides user management over all controllers.
