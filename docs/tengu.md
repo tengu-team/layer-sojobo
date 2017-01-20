@@ -3,7 +3,7 @@
 - Cleanup some calls output
 - Make api code consistent in delivering output
 - Cleanup and refactor w_juju.py
-- Finish small ToDo's and testing mentioned below.
+- Finish small ToDo"s and testing mentioned below.
 
 # Tengu-API Documentation
 
@@ -38,31 +38,34 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'controller-name',
-                'type': 'controller-type',
-                'users': [{'name': 'username',
-                           'access': 'controller-access'}],
-                'models': [{'name': 'modelname',
-                            'ssh-keys': 'ssh-keys with access to all the machines in model',
-                            'juju-gui-url': 'Using the user login and password, the juju GUI can be used',
-                            'users': [{'name': 'username'},
-                                       'access': 'model-access'}],
-                            'machines': [{'name': 'machine-name',
-                                          'instance-id': 'juju-id',
-                                          'ip': 'ip-address',
-                                          'series': 'Ubuntu OS version name',
-                                          'containers': [{'name': 'container-name',
-                                                          'ip': 'ip-address',
-                                                          'series': 'Ubuntu OS version name'}]
-                                        }],
-                            'applications': [{'name': 'application name',
-                                              'units': [{'name': 'unit-name',
-                                                         'ip': 'ip-address',
-                                                         'port': 'used ports',
-                                                         'machine': 'machine name'}]
-                                            }]
-                          }]           
-              }]```
+  - message:
+  ```json
+  [{"name": "controller-name",
+    "type": "controller-type",
+    "users": [{"name": "username",
+               "access": "controller-access"}],
+    "models": [{"name": "modelname",
+                "ssh-keys": "ssh-keys with access to all the machines in model",
+                "juju-gui-url": "Using the user login and password, the juju GUI can be used",
+                "users": [{"name": "username",
+                           "access": "model-access"}],
+                "machines": [{"name": "machine-name",
+                              "instance-id": "juju-id",
+                              "ip": "ip-address",
+                              "series": "Ubuntu OS version name",
+                              "containers": [{"name": "container-name",
+                                              "ip": "ip-address",
+                                              "series": "Ubuntu OS version name"}]
+                            }],
+                "applications": [{"name": "application name",
+                                  "units": [{"name": "unit-name",
+                                             "ip": "ip-address",
+                                             "port": "used ports",
+                                             "machine": "machine name"}]
+                                }]
+              }]           
+  }]
+  ```
 * **description**:
   Returns all the information of all the controllers, models, applications, machines, units and users the user has access to.
 
@@ -76,31 +79,34 @@ excluding calls handling users.
   - credentials or file
 * **succesfull response**:
   - code: 200
-  - message: ```{'name': 'controller-name',
-               'type': 'controller-type',
-               'users': [{'name': 'username',
-                          'access': 'controller-access'}],
-               'models': [{'name': 'modelname',
-                           'ssh-keys': 'ssh-keys with access to all the machines in model',
-                           'juju-gui-url': 'Using the user login and password, the juju GUI can be used',
-                           'users': [{'name': 'username'},
-                                      'access': 'model-access'}],
-                           'machines': [{'name': 'machine-name',
-                                         'instance-id': 'juju-id',
-                                         'ip': 'ip-address',
-                                         'series': 'Ubuntu OS version name',
-                                         'containers': [{'name': 'container-name',
-                                                         'ip': 'ip-address',
-                                                         'series': 'Ubuntu OS version name'}]
-                                       }],
-                           'applications': [{'name': 'application name',
-                                             'units': [{'name': 'unit-name',
-                                                        'ip': 'ip-address',
-                                                        'port': 'used ports',
-                                                        'machine': 'machine name'}]
-                                           }]
-                         }]           
-              }```
+  - message:
+  ```json
+  {"name": "controller-name",
+   "type": "controller-type",
+   "users": [{"name": "username",
+              "access": "controller-access"}],
+   "models": [{"name": "modelname",
+               "ssh-keys": "ssh-keys with access to all the machines in model",
+               "juju-gui-url": "Using the user login and password, the juju GUI can be used",
+               "users": [{"name": "username",
+                          "access": "model-access"}],
+               "machines": [{"name": "machine-name",
+                             "instance-id": "juju-id",
+                             "ip": "ip-address",
+                             "series": "Ubuntu OS version name",
+                             "containers": [{"name": "container-name",
+                                             "ip": "ip-address",
+                                             "series": "Ubuntu OS version name"}]
+                           }],
+               "applications": [{"name": "application name",
+                                 "units": [{"name": "unit-name",
+                                            "ip": "ip-address",
+                                            "port": "used ports",
+                                            "machine": "machine name"}]
+                               }]
+             }]           
+  }
+  ```
 * **description**:
   - Bootstraps a new controller with the given name and in the given region.
   - The required credentials depend of the type of cloud. Some clouds use a file for credentials. This file must be send
@@ -115,31 +121,34 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```{'name': 'controller-name',
-               'type': 'controller-type',
-               'users': [{'name': 'username',
-                          'access': 'controller-access'}],
-               'models': [{'name': 'modelname',
-                           'ssh-keys': 'ssh-keys with access to all the machines in model',
-                           'juju-gui-url': 'Using the user login and password, the juju GUI can be used',
-                           'users': [{'name': 'username'},
-                                      'access': 'model-access'}],
-                           'machines': [{'name': 'machine-name',
-                                         'instance-id': 'juju-id',
-                                         'ip': 'ip-address',
-                                         'series': 'Ubuntu OS version name',
-                                         'containers': [{'name': 'container-name',
-                                                         'ip': 'ip-address',
-                                                         'series': 'Ubuntu OS version name'}]
-                                       }],
-                           'applications': [{'name': 'application name',
-                                             'units': [{'name': 'unit-name',
-                                                        'ip': 'ip-address',
-                                                        'port': 'used ports',
-                                                        'machine': 'machine name'}]
-                                           }]
-                         }]           
-              }```
+  - message:
+  ```json
+  {"name": "controller-name",
+   "type": "controller-type",
+   "users": [{"name": "username",
+              "access": "controller-access"}],
+   "models": [{"name": "modelname",
+               "ssh-keys": "ssh-keys with access to all the machines in model",
+               "juju-gui-url": "Using the user login and password, the juju GUI can be used",
+               "users": [{"name": "username",
+                          "access": "model-access"}],
+               "machines": [{"name": "machine-name",
+                             "instance-id": "juju-id",
+                             "ip": "ip-address",
+                             "series": "Ubuntu OS version name",
+                             "containers": [{"name": "container-name",
+                                             "ip": "ip-address",
+                                             "series": "Ubuntu OS version name"}]
+                           }],
+               "applications": [{"name": "application name",
+                                 "units": [{"name": "unit-name",
+                                            "ip": "ip-address",
+                                            "port": "used ports",
+                                            "machine": "machine name"}]
+                               }]
+             }]           
+  }
+  ```
 * **description**:
   Returns all the information of a controller (models, applications, machines, units and users) the user has access to.
 
@@ -151,31 +160,34 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'controller-name',
-                'type': 'controller-type',
-                'users': [{'name': 'username',
-                           'access': 'controller-access'}],
-                'models': [{'name': 'modelname',
-                            'ssh-keys': 'ssh-keys with access to all the machines in model',
-                            'juju-gui-url': 'Using the user login and password, the juju GUI can be used',
-                            'users': [{'name': 'username'},
-                                       'access': 'model-access'}],
-                            'machines': [{'name': 'machine-name',
-                                          'instance-id': 'juju-id',
-                                          'ip': 'ip-address',
-                                          'series': 'Ubuntu OS version name',
-                                          'containers': [{'name': 'container-name',
-                                                          'ip': 'ip-address',
-                                                          'series': 'Ubuntu OS version name'}]
-                                        }],
-                            'applications': [{'name': 'application name',
-                                              'units': [{'name': 'unit-name',
-                                                         'ip': 'ip-address',
-                                                         'port': 'used ports',
-                                                         'machine': 'machine name'}]
-                                            }]
-                          }]           
-              }]```
+  - message:
+  ```json
+  [{"name": "controller-name",
+    "type": "controller-type",
+    "users": [{"name": "username",
+               "access": "controller-access"}],
+    "models": [{"name": "modelname",
+                "ssh-keys": "ssh-keys with access to all the machines in model",
+                "juju-gui-url": "Using the user login and password, the juju GUI can be used",
+                "users": [{"name": "username",
+                           "access": "model-access"}],
+                "machines": [{"name": "machine-name",
+                              "instance-id": "juju-id",
+                              "ip": "ip-address",
+                              "series": "Ubuntu OS version name",
+                              "containers": [{"name": "container-name",
+                                              "ip": "ip-address",
+                                              "series": "Ubuntu OS version name"}]
+                            }],
+                "applications": [{"name": "application name",
+                                  "units": [{"name": "unit-name",
+                                             "ip": "ip-address",
+                                             "port": "used ports",
+                                             "machine": "machine name"}]
+                                }]
+              }]           
+  }]
+  ```
 * **description**:
   Removes the given controller
 
@@ -188,26 +200,29 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'modelname',
-                'ssh-keys': 'ssh-keys with access to all the machines in model',
-                            'juju-gui-url': 'Using the user login and password, the juju GUI can be used',
-                            'users': [{'name': 'username'},
-                                       'access': 'model-access'}],
-                'machines': [{'name': 'machine-name',
-                              'instance-id': 'juju-id',
-                              'ip': 'ip-address',
-                              'series': 'Ubuntu OS version name',
-                              'containers': [{'name': 'container-name',
-                                              'ip': 'ip-address',
-                                              'series': 'Ubuntu OS version name'}]
-                              }],
-                'applications': [{'name': 'application name',
-                                  'units': [{'name': 'unit-name',
-                                             'ip': 'ip-address',
-                                             'port': 'used ports',
-                                             'machine': 'machine name'}]
-                                }]
-                }]```
+  - message:
+  ```json
+  [{"name": "modelname",
+    "ssh-keys": "ssh-keys with access to all the machines in model",
+    "juju-gui-url": "Using the user login and password, the juju GUI can be used",
+    "users": [{"name": "username",
+               "access": "model-access"}],
+    "machines": [{"name": "machine-name",
+                  "instance-id": "juju-id",
+                  "ip": "ip-address",
+                  "series": "Ubuntu OS version name",
+                  "containers": [{"name": "container-name",
+                                  "ip": "ip-address",
+                                  "series": "Ubuntu OS version name"}]
+                }],
+    "applications": [{"name": "application name",
+                      "units": [{"name": "unit-name",
+                                 "ip": "ip-address",
+                                 "port": "used ports",
+                                 "machine": "machine name"}]
+                    }]
+  }]           
+  ```
 * **description**:
   - Returns all the information of all the models (applications, machines, units and users) on a controller if the user has access to this controller or models.
   - The api checks if the controller exists
@@ -220,26 +235,29 @@ excluding calls handling users.
   - model
 * **succesfull response**:
   - code: 200
-  - message: ```{'name': 'modelname',
-               'ssh-keys': 'ssh-keys with access to all the machines in model',
-               'juju-gui-url': 'Using the user login and password, the juju GUI can be used',
-               'users': [{'name': 'username'},
-                          'access': 'model-access'}],
-               'machines': [{'name': 'machine-name',
-                             'instance-id': 'juju-id',
-                             'ip': 'ip-address',
-                             'series': 'Ubuntu OS version name',
-                             'containers': [{'name': 'container-name',
-                                             'ip': 'ip-address',
-                                             'series': 'Ubuntu OS version name'}]
-                           }],
-               'applications': [{'name': 'application name',
-                                 'units': [{'name': 'unit-name',
-                                            'ip': 'ip-address',
-                                            'port': 'used ports',
-                                            'machine': 'machine name'}]
-                               }]
-              }```
+  - message:
+  ```json
+  {"name": "modelname",
+   "ssh-keys": "ssh-keys with access to all the machines in model",
+   "juju-gui-url": "Using the user login and password, the juju GUI can be used",
+   "users": [{"name": "username",
+              "access": "model-access"}],
+   "machines": [{"name": "machine-name",
+                 "instance-id": "juju-id",
+                 "ip": "ip-address",
+                 "series": "Ubuntu OS version name",
+                 "containers": [{"name": "container-name",
+                                 "ip": "ip-address",
+                                 "series": "Ubuntu OS version name"}]
+               }],
+   "applications": [{"name": "application name",
+                     "units": [{"name": "unit-name",
+                                "ip": "ip-address",
+                                "port": "used ports",
+                                "machine": "machine name"}]
+                   }]
+  }]           
+  ```
 * **description**:
   Creates a new model on a controller. It checks if the model already exists and if the user is allowed to create a model on
   the given controller
@@ -253,26 +271,29 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```{'name': 'modelname',
-               'ssh-keys': 'ssh-keys with access to all the machines in model',
-               'juju-gui-url': 'Using the user login and password, the juju GUI can be used',
-               'users': [{'name': 'username'},
-                          'access': 'model-access'}],
-               'machines': [{'name': 'machine-name',
-                             'instance-id': 'juju-id',
-                             'ip': 'ip-address',
-                             'series': 'Ubuntu OS version name',
-                             'containers': [{'name': 'container-name',
-                                             'ip': 'ip-address',
-                                             'series': 'Ubuntu OS version name'}]
-                           }],
-              'applications': [{'name': 'application name',
-                               'units': [{'name': 'unit-name',
-                                          'ip': 'ip-address',
-                                          'port': 'used ports',
-                                          'machine': 'machine name'}]
-                               }]
-              }```
+  - message:
+  ```json
+  {"name": "modelname",
+   "ssh-keys": "ssh-keys with access to all the machines in model",
+   "juju-gui-url": "Using the user login and password, the juju GUI can be used",
+   "users": [{"name": "username",
+              "access": "model-access"}],
+   "machines": [{"name": "machine-name",
+                 "instance-id": "juju-id",
+                 "ip": "ip-address",
+                 "series": "Ubuntu OS version name",
+                 "containers": [{"name": "container-name",
+                                 "ip": "ip-address",
+                                 "series": "Ubuntu OS version name"}]
+               }],
+   "applications": [{"name": "application name",
+                     "units": [{"name": "unit-name",
+                                "ip": "ip-address",
+                                "port": "used ports",
+                                "machine": "machine name"}]
+                   }]
+  }]           
+  ```
 * **description**:
   Returns all the information of a model (applications, machines, units and users) if the user has access.
 
@@ -284,29 +305,31 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```{'name': 'modelname',
-                         'ssh-keys': 'ssh-keys with access to all the machines in model',
-                         'juju-gui-url': 'Using the user login and password, the juju GUI can be used',
-                         'users': [{'name': 'username'},
-                                    'access': 'model-access'}],
-                         'machines': [{'name': 'machine-name',
-                                       'instance-id': 'juju-id',
-                                       'ip': 'ip-address',
-                                       'series': 'Ubuntu OS version name',
-                                       'containers': [{'name': 'container-name',
-                                                       'ip': 'ip-address',
-                                                       'series': 'Ubuntu OS version name'}]
-                                     }],
-                         'applications': [{'name': 'application name',
-                                           'units': [{'name': 'unit-name',
-                                                      'ip': 'ip-address',
-                                                      'port': 'used ports',
-                                                      'machine': 'machine name'}]
-                                         }]
-                  }```
+  - message:
+  ```json
+  [{"name": "modelname",
+    "ssh-keys": "ssh-keys with access to all the machines in model",
+    "juju-gui-url": "Using the user login and password, the juju GUI can be used",
+    "users": [{"name": "username",
+               "access": "model-access"}],
+    "machines": [{"name": "machine-name",
+                  "instance-id": "juju-id",
+                  "ip": "ip-address",
+                  "series": "Ubuntu OS version name",
+                  "containers": [{"name": "container-name",
+                                  "ip": "ip-address",
+                                  "series": "Ubuntu OS version name"}]
+                }],
+    "applications": [{"name": "application name",
+                      "units": [{"name": "unit-name",
+                                 "ip": "ip-address",
+                                 "port": "used ports",
+                                 "machine": "machine name"}]
+                    }]
+  }]           
+  ```
 * **description**:
-  Creates a new model on a controller. It checks if the model already exists and if the user is allowed to create a model on
-  the given controller
+  Destroys a model on the given controller, including all the deployes application and created machines.
 
 ## **/tengu/controllers/[controller]/models/[model]/sshkey** <a name="ssh-key"></a>
 #### **Request type**: GET
@@ -343,7 +366,7 @@ excluding calls handling users.
   - code: 200
   - message: `String containing every ssh-key per \n`
 * **description**:
-  Removes the given ssh-key from the model. The ssh-key must be given, not it's fingerprint
+  Removes the given ssh-key from the model. The ssh-key must be given, not it"s fingerprint
 
 ## **/tengu/controllers/[controller]/models/[model]/applications** <a name="applications"></a>
 #### **Request type**: GET
@@ -354,12 +377,15 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'application name',
-                  'units': [{'name': 'unit-name',
-                             'ip': 'ip-address',
-                             'port': 'used ports',
-                             'machine': 'machine name'}]
-                }]```
+  - message:
+  ```json
+  [{"name": "application name",
+    "units": [{"name": "unit-name",
+               "ip": "ip-address",
+               "port": "used ports",
+               "machine": "machine name"}]
+  }]
+  ```
 * **description**:
       Returns all the applications in a given model if the user has access.
 
@@ -374,12 +400,15 @@ excluding calls handling users.
   - target
 * **succesfull response**:
   - code: 200
-  - message: ```{'name': 'application name',
-                 'units': [{'name': 'unit-name',
-                            'ip': 'ip-address',
-                            'port': 'used ports',
-                            'machine': 'machine name'}]
-                }```
+  - message:
+  ```json
+  {"name": "application name",
+   "units": [{"name": "unit-name",
+              "ip": "ip-address",
+              "port": "used ports",
+              "machine": "machine name"}]
+  }
+  ```
 * **description**:
   - Deploys an application from the JuJu charm store to a model if the user has access. Checks if the application already exists in the model.
   - If the application name is preceeded with `local:` it will look for the charm in the local charm repo **Not Tested**
@@ -398,12 +427,15 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```{'name': 'application name',
-                 'units': [{'name': 'unit-name',
-                            'ip': 'ip-address',
-                            'port': 'used ports',
-                            'machine': 'machine name'}]
-                }```
+  - message:
+  ```json
+  {"name": "application name",
+   "units": [{"name": "unit-name",
+              "ip": "ip-address",
+              "port": "used ports",
+              "machine": "machine name"}]
+  }
+  ```
 * **description**:
   Returns the info of an application if the user has access.
 
@@ -415,12 +447,15 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'application name',
-                  'units': [{'name': 'unit-name',
-                             'ip': 'ip-address',
-                             'port': 'used ports',
-                             'machine': 'machine name'}]
-                }]```
+  - message:
+  ```json
+  [{"name": "application name",
+    "units": [{"name": "unit-name",
+               "ip": "ip-address",
+               "port": "used ports",
+               "machine": "machine name"}]
+  }]
+  ```
 * **description**:
   Removes an application. Checks if the application exists
 
@@ -433,11 +468,14 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'unit-name',
-                  'ip': 'ip-address',
-                  'port': 'used ports',
-                  'machine': 'machine name'}]
-                }]```
+  - message:
+  ```json
+  [{"name": "unit-name",
+    "ip": "ip-address",
+    "port": "used ports",
+    "machine": "machine name"}]
+  }]
+  ```
 * **description**:
   Returns the info of all the units of a given application.
 
@@ -449,11 +487,14 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'unit-name',
-                  'ip': 'ip-address',
-                  'port': 'used ports',
-                  'machine': 'machine name'}]
-                }]```
+  - message:
+  ```json
+  [{"name": "unit-name",
+    "ip": "ip-address",
+    "port": "used ports",
+    "machine": "machine name"}]
+  }]
+  ```
 * **description**:
   Adds a unit to a given application
 
@@ -466,11 +507,14 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```{'name': 'unit-name',
-                 'ip': 'ip-address',
-                 'port': 'used ports',
-                 'machine': 'machine name'}]
-                }```
+  - message:
+  ```json
+  {"name": "unit-name",
+   "ip": "ip-address",
+   "port": "used ports",
+   "machine": "machine name"}
+  }
+  ```
 * **description**:
   Returns the info of a single unit.
 
@@ -482,11 +526,14 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'unit-name',
-                  'ip': 'ip-address',
-                  'port': 'used ports',
-                  'machine': 'machine name'}]
-                }]```
+  - message:
+  ```json
+  [{"name": "unit-name",
+    "ip": "ip-address",
+    "port": "used ports",
+    "machine": "machine name"}]
+  }]
+  ```
 * **description**:
   Removes the unit.
 
@@ -499,14 +546,17 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'machine-name',
-                'instance-id': 'juju-id',
-                'ip': 'ip-address',
-                'series': 'Ubuntu OS version name',
-                'containers': [{'name': 'container-name',
-                                'ip': 'ip-address',
-                                'series': 'Ubuntu OS version name'}]
-                }]```
+  - message:
+  ```json
+  [{"name": "machine-name",
+    "instance-id": "juju-id",
+    "ip": "ip-address",
+    "series": "Ubuntu OS version name",
+    "containers": [{"name": "container-name",
+                    "ip": "ip-address",
+                    "series": "Ubuntu OS version name"}]
+  }]
+  ```
 * **description**:
   Return the info of all the machines of a given model.
 
@@ -520,11 +570,14 @@ excluding calls handling users.
   - series
 * **succesfull response**:
     - code: 200
-    - message: ```{'name': 'unit-name',
-                   'ip': 'ip-address',
-                   'port': 'used ports',
-                   'machine': 'machine name'}]
-                  }```
+    - message:
+    ```json
+    {"name": "unit-name",
+     "ip": "ip-address",
+     "port": "used ports",
+     "machine": "machine name"}]
+    }
+    ```
 * **description**:
   - Adds a machine
   - If a series is given, it will check if the cloud supports it **Not Tested**
@@ -538,14 +591,17 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```{'name': 'machine-name',
-                 'instance-id': 'juju-id',
-                 'ip': 'ip-address',
-                 'series': 'Ubuntu OS version name',
-                 'containers': [{'name': 'container-name',
-                                 'ip': 'ip-address',
-                                 'series': 'Ubuntu OS version name'}]
-                  }```
+  - message:
+  ```json
+  {"name": "machine-name",
+   "instance-id": "juju-id",
+   "ip": "ip-address",
+   "series": "Ubuntu OS version name",
+   "containers": [{"name": "container-name",
+                   "ip": "ip-address",
+                   "series": "Ubuntu OS version name"}]
+  }
+  ```
 * **description**:
   Return the info of a machine in a given model.
 
@@ -557,11 +613,14 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'unit-name',
-                  'ip': 'ip-address',
-                  'port': 'used ports',
-                  'machine': 'machine name'}]
-                }]```
+  - message:
+  ```json
+  [{"name": "unit-name",
+    "ip": "ip-address",
+    "port": "used ports",
+    "machine": "machine name"}]
+  }]
+  ```
 * **description**:
   Removes a machine
 
@@ -575,12 +634,15 @@ excluding calls handling users.
   - app2
 * **succesfull response**:
   - code: 200
-  - message: ```[{'name': 'application name',
-                  'units': [{'name': 'unit-name',
-                             'ip': 'ip-address',
-                             'port': 'used ports',
-                             'machine': 'machine name'}]
-                }]```
+  - message:
+  ```json
+  [{"name": "application name",
+    "units": [{"name": "unit-name",
+               "ip": "ip-address",
+               "port": "used ports",
+               "machine": "machine name"}]
+  }]
+  ```
 * **description**:
   - Adds a relation between the given application. Checks if the applications exist
   - Checks if the relation is possible between the applications **ToDo**
@@ -594,7 +656,7 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: ```[{'ToDo'}]```
+  - message: ```[{"ToDo"}]```
 * **description**:
   - Gets the relations of the given application
   - Output in a logical structure **ToDo**
@@ -608,7 +670,7 @@ excluding calls handling users.
 
 * **succesfull response**:
   - code: 200
-  - message: `'The relation is being removed'`
+  - message: `"The relation is being removed"`
 * **description**:
   Removes the relation between the 2 given applications. Checks if the applications exist>
 
