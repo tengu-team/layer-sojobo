@@ -340,6 +340,19 @@ def remove_machine(controller, model, machine):
     return create_response(code, response)
 
 
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['GET'])
+def get_units_info(controller, model, application):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
+        if juju.app_exists(token, application):
+            code, response = 200, juju.get_units_info(token, application)
+        else:
+            code, response = errors.does_not_exist('application')
+    except KeyError:
+        code, response = errors.invalid_data()
+    return create_response(code, response)
+
+
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['POST'])
 def add_unit(controller, model, application):
     data = request.json
