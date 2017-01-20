@@ -94,7 +94,7 @@ def create_model(controller):
     data = request.json
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, controller)
-        if juju.model_exists(controller, data['model']):
+        if juju.model_exists(token, data['model']):
             code, response = errors.already_exists('model')
         elif token.c_access == 'add-model' or token.c_access == 'superuser':
             juju.create_model(token, data['model'], data.get('ssh_key', None))

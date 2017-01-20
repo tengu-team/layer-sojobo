@@ -20,7 +20,7 @@ def get_users_info():
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization)
         if token.is_admin:
-            code, response = 200, juju.get_users_info()
+            code, response = 200, juju.get_users_info(token)
         else:
             code, response = errors.no_permission()
     except KeyError:
@@ -37,7 +37,7 @@ def create_user():
             if juju.user_exists(data['username']):
                 code, response = errors.already_exists('user')
             else:
-                code, response = 200, juju.create_user(data['username'], data['password'])
+                code, response = 200, juju.create_user(token, data['username'], data['password'])
         else:
             code, response = errors.no_permission()
     except KeyError:
@@ -51,7 +51,7 @@ def get_user_info(user):
         token = juju.authenticate(request.headers['api-key'], request.authorization)
         if juju.user_exists(user):
             if user == token.username or token.is_admin:
-                code, response = 200, juju.get_user_info(user)
+                code, response = 200, juju.get_user_info(token, user)
             else:
                 code, response = errors.no_permission()
         else:
@@ -67,7 +67,7 @@ def change_user_password(user):
         token = juju.authenticate(request.headers['api-key'], request.authorization)
         if juju.user_exists(user):
             if user == token.username or token.is_admin:
-                code, response = 200, juju.change_user_password(user, request.json['password'])
+                code, response = 200, juju.change_user_password(token, user, request.json['password'])
             else:
                 code, response = errors.no_permission()
         else:
@@ -80,11 +80,11 @@ def change_user_password(user):
 @USERS.route('/<user>', methods=['DELETE'])
 def delete(user):
     try:
-        token = juju.authenticate(request.headers['api_key'], request.authorization)
+        token = juju.authenticate(request.headers['api-key'], request.authorization)
         if token.is_admin:
             if juju.user_exists(user):
                 if user != 'admin':
-                    code, response = 200, juju.delete_user(user)
+                    code, response = 200, juju.delete_user(token, user)
                 else:
                     code, response = 403, 'This would remove the admin from the system!'
             else:
@@ -94,6 +94,38 @@ def delete(user):
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, response)
+
+
+@USERS.route('/<user>/controllers', methods=['GET'])
+def get_controllers_access(user):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization)
+        if juju.user_exists(user):
+            if token.is_admin or token.username == user:
+                code, response = 200, juju.get_controllers_access(token, user)
+            else:
+                code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
+    except KeyError:
+        code, response = errors.invalid_data()
+    return code, response
+
+
+@USERS.route('/<user>/controllers/<controller>', methods=['GET'])
+def get_ucontroller_access(user, controller):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization, controller)
+        if juju.user_exists(user):
+            if token.is_admin or token.username == user:
+                code, response = 200, juju.get_ucontroller_access(token, user)
+            else:
+                code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
+    except KeyError:
+        code, response = errors.invalid_data()
+    return code, response
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['PUT'])
@@ -135,6 +167,38 @@ def remove_from_controller(user, controller):
     return create_response(code, response)
 
 
+@USERS.route('<user>/controllers/<controller>/models', methods=['GET'])
+def get_models_access(user, controller):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization, controller)
+        if juju.user_exists(user):
+            if token.is_admin or token.username == user:
+                code, response = 200, juju.get_models_access(token, user)
+            else:
+                code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
+    except KeyError:
+        code, response = errors. invalid_data()
+    return code, response
+
+
+@USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['GET'])
+def get_model_access(user, controller, model):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization, controller, model)
+        if juju.user_exists(user):
+            if token.is_admin or token.username == user:
+                code, response = 200, juju.get_umodel_access(token, user)
+            else:
+                code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
+    except KeyError:
+        code, response = errors.invalid_data()
+    return code, response
+
+
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['PUT'])
 def add_to_model(user, controller, model):
     try:
@@ -144,8 +208,8 @@ def add_to_model(user, controller, model):
         a_exists = juju.m_access_exists(access)
         if u_exists and a_exists:
             if (token.m_access == 'admin' or token.c_access == 'superuser') and user != 'admin':
-                juju.add_to_model(token, user, request.json['access'])
-                code, response = 200, juju.get_user_info(user)
+                juju.add_to_model(token, user, access)
+                code, response = 200, access
             else:
                 code, response =  errors.no_permission()
         elif u_exists:
