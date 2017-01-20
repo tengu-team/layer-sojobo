@@ -36,7 +36,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -66,7 +66,7 @@ excluding calls handling users.
               }]           
   }]
   ```
-* **description**:
+* **Description**:
   Returns all the information of all the controllers, models, applications, machines, units and users the user has access to.
 
 #### **Request type**: POST
@@ -77,7 +77,7 @@ excluding calls handling users.
   - controller
   - region
   - credentials or file
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -107,7 +107,7 @@ excluding calls handling users.
              }]           
   }
   ```
-* **description**:
+* **Description**:
   - Bootstraps a new controller with the given name and in the given region.
   - The required credentials depend of the type of cloud. Some clouds use a file for credentials. This file must be send
   with the request under `file`, then `credentials` is not used
@@ -119,7 +119,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -149,7 +149,7 @@ excluding calls handling users.
              }]           
   }
   ```
-* **description**:
+* **Description**:
   Returns all the information of a controller (models, applications, machines, units and users) the user has access to.
 
 #### **Request type**: DELETE
@@ -158,7 +158,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -188,7 +188,7 @@ excluding calls handling users.
               }]           
   }]
   ```
-* **description**:
+* **Description**:
   Removes the given controller
 
 ## **/tengu/controllers/[controller]/models** <a name="models"></a>
@@ -198,7 +198,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -223,7 +223,7 @@ excluding calls handling users.
                     }]
   }]           
   ```
-* **description**:
+* **Description**:
   - Returns all the information of all the models (applications, machines, units and users) on a controller if the user has access to this controller or models.
   - The api checks if the controller exists
 
@@ -233,7 +233,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
   - model
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -258,7 +258,7 @@ excluding calls handling users.
                    }]
   }]           
   ```
-* **description**:
+* **Description**:
   Creates a new model on a controller. It checks if the model already exists and if the user is allowed to create a model on
   the given controller
 
@@ -269,7 +269,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -294,7 +294,7 @@ excluding calls handling users.
                    }]
   }]           
   ```
-* **description**:
+* **Description**:
   Returns all the information of a model (applications, machines, units and users) if the user has access.
 
 #### **Request type**: DELETE
@@ -303,7 +303,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -328,7 +328,7 @@ excluding calls handling users.
                     }]
   }]           
   ```
-* **description**:
+* **Description**:
   Destroys a model on the given controller, including all the deployes application and created machines.
 
 ## **/tengu/controllers/[controller]/models/[model]/sshkey** <a name="ssh-key"></a>
@@ -338,10 +338,10 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message: `String containing every ssh-key per \n`
-* **description**:
+* **Description**:
       Returns all the ssh-keys of a model if the user has access.
 
 #### **Request type**: POST
@@ -350,10 +350,10 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
   - ssh-key
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message: `String containing every ssh-key per \n`
-* **description**:
+* **Description**:
   Adds the given ssh-key to the model
 
 #### **Request type**: DELETE
@@ -362,10 +362,10 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
   - ssh-key
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message: `String containing every ssh-key per \n`
-* **description**:
+* **Description**:
   Removes the given ssh-key from the model. The ssh-key must be given, not it"s fingerprint
 
 ## **/tengu/controllers/[controller]/models/[model]/applications** <a name="applications"></a>
@@ -375,7 +375,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -386,7 +386,7 @@ excluding calls handling users.
                "machine": "machine name"}]
   }]
   ```
-* **description**:
+* **Description**:
       Returns all the applications in a given model if the user has access.
 
 #### **Request type**: POST
@@ -398,7 +398,7 @@ excluding calls handling users.
 * **Optional body**:
   - series
   - target
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -409,7 +409,7 @@ excluding calls handling users.
               "machine": "machine name"}]
   }
   ```
-* **description**:
+* **Description**:
   - Deploys an application from the JuJu charm store to a model if the user has access. Checks if the application already exists in the model.
   - If the application name is preceeded with `local:` it will look for the charm in the local charm repo **Not Tested**
   - If the application is preseeded with `github:[url]` it will look for the application in the given repo **ToDo**
@@ -425,7 +425,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -436,7 +436,7 @@ excluding calls handling users.
               "machine": "machine name"}]
   }
   ```
-* **description**:
+* **Description**:
   Returns the info of an application if the user has access.
 
 #### **Request type**: DELETE
@@ -445,7 +445,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -456,7 +456,7 @@ excluding calls handling users.
                "machine": "machine name"}]
   }]
   ```
-* **description**:
+* **Description**:
   Removes an application. Checks if the application exists
 
 ## **/tengu/controllers/[controller]/models/[model]/applications/[application]/units** <a name="units"></a>
@@ -466,7 +466,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -476,7 +476,7 @@ excluding calls handling users.
     "machine": "machine name"}]
   }]
   ```
-* **description**:
+* **Description**:
   Returns the info of all the units of a given application.
 
 #### **Request type**: POST
@@ -485,7 +485,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -495,7 +495,7 @@ excluding calls handling users.
     "machine": "machine name"}]
   }]
   ```
-* **description**:
+* **Description**:
   Adds a unit to a given application
 
 ## **/tengu/controllers/[controller]/models/[model]/applications/[application]/units/[unitnumber]** <a name="unit"></a>
@@ -505,7 +505,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -515,7 +515,7 @@ excluding calls handling users.
    "machine": "machine name"}
   }
   ```
-* **description**:
+* **Description**:
   Returns the info of a single unit.
 
 #### **Request type**: DELETE
@@ -524,7 +524,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -534,7 +534,7 @@ excluding calls handling users.
     "machine": "machine name"}]
   }]
   ```
-* **description**:
+* **Description**:
   Removes the unit.
 
 ## **/tengu/controllers/[controller]/models/[model]/machines/** <a name="machines"></a>
@@ -544,7 +544,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -557,7 +557,7 @@ excluding calls handling users.
                     "series": "Ubuntu OS version name"}]
   }]
   ```
-* **description**:
+* **Description**:
   Return the info of all the machines of a given model.
 
 #### **Request type**: POST
@@ -568,7 +568,7 @@ excluding calls handling users.
 
 * **Optional body**:
   - series
-* **succesfull response**:
+* **Succesful response**:
     - code: 200
     - message:
     ```json
@@ -578,7 +578,7 @@ excluding calls handling users.
      "machine": "machine name"}]
     }
     ```
-* **description**:
+* **Description**:
   - Adds a machine
   - If a series is given, it will check if the cloud supports it **Not Tested**
 
@@ -589,7 +589,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -602,7 +602,7 @@ excluding calls handling users.
                    "series": "Ubuntu OS version name"}]
   }
   ```
-* **description**:
+* **Description**:
   Return the info of a machine in a given model.
 
 #### **Request type**: DELETE
@@ -611,7 +611,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -621,7 +621,7 @@ excluding calls handling users.
     "machine": "machine name"}]
   }]
   ```
-* **description**:
+* **Description**:
   Removes a machine
 
 ## **/tengu/controllers/[controller]/models/[model]/relations** <a name="relations"></a>
@@ -632,7 +632,7 @@ excluding calls handling users.
 * **Required body**:
   - app1
   - app2
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message:
   ```json
@@ -643,7 +643,7 @@ excluding calls handling users.
                "machine": "machine name"}]
   }]
   ```
-* **description**:
+* **Description**:
   - Adds a relation between the given application. Checks if the applications exist
   - Checks if the relation is possible between the applications **ToDo**
 
@@ -654,10 +654,10 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message: ```[{"ToDo"}]```
-* **description**:
+* **Description**:
   - Gets the relations of the given application
   - Output in a logical structure **ToDo**
 
@@ -668,10 +668,10 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message: `"The relation is being removed"`
-* **description**:
+* **Description**:
   Removes the relation between the 2 given applications. Checks if the applications exist>
 
 ## **/tengu/backup** <a name="backup"></a>
@@ -681,8 +681,8 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **succesfull response**:
+* **Succesful response**:
   - code: 200
   - message: Zipfile
-* **description**:
+* **Description**:
   Backups the currently configured clouds, credentials and bootstrapped controllers. **This is just a backup for the Sojobo-setup, not the actual configured models, machines or applications!**
