@@ -283,7 +283,9 @@ def get_applications_info(token):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
     result = []
     for name, info in data['applications'].items():
-        res1 = {'name': name, 'relations': info['relations']}
+        res1 = {'name': name}
+        for interface, rels in info['relations']:
+            res1['relations'] = [{'interface': interface, 'with': rel} for rel in rels]
         try:
             units = info['units'].items()
             res1['units'] = []
@@ -414,9 +416,11 @@ def remove_machine(token, machine):
 
 
 def get_application_info(token, application):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    result = {'name': application, 'relations': data['applications'][application]['relations'], 'units': []}
-    for u, ui in data['applications'][application]['units'].items():
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))['applications']
+    result = {'name': application, 'units': []}
+    for interface, rels in data[application]['relations']:
+        result['relations'] = [{'interface': interface, 'with': rel} for rel in rels]
+    for u, ui in data[application]['units'].items():
         try:
             unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
         except KeyError:
@@ -448,16 +452,17 @@ def remove_unit(token, application, unit_number):
     return output_pass(['juju', 'remove-unit', '{}/{}'.format(application, unit_number)], token.c_name, token.m_name)
 
 
+def get_relations_info(token):
+    data = get_applications_info(token)
+    return [{'name': a['name'], 'relations': a['relations']} for a in data]
+
+
 def add_relation(token, app1, app2):
     return output_pass(['juju', 'add-relation', app1, app2], token.c_name, token.m_name)
 
 
 def remove_relation(token, app1, app2):
     return output_pass(['juju', 'remove-relation', app1, app2], token.c_name, token.m_name)
-
-
-def get_app_info(token, app_name):
-    return json.loads(output_pass(['juju', 'status'], token.c_name, token.m_name))['applications'][app_name]
 
 
 def app_supports_series(app_name, series):

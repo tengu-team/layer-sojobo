@@ -432,6 +432,17 @@ def get_unit_info(controller, model, application, unitnumber):
     return create_response(code, response)
 
 
+@TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['GET'])
+def get_relations_info(controller, model):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization,
+                                  juju.check_input(controller), juju.check_input(model))
+        code, response = 200, juju.get_relations_info(token)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return create_response(code, response)
+
+
 @TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['PUT'])
 def add_relation(controller, model):
     data = request.json

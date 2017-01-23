@@ -382,7 +382,9 @@ excluding calls handling users.
     "units": [{"name": "unit-name",
                "ip": "ip-address",
                "port": "used ports",
-               "machine": "machine name"}]
+               "machine": "machine name"}],
+    "relations": [{"interface": "interface-name",
+                   "with": "name of the other application"}]
   }]
   ```
 * **Description**:
@@ -405,7 +407,9 @@ excluding calls handling users.
    "units": [{"name": "unit-name",
               "ip": "ip-address",
               "port": "used ports",
-              "machine": "machine name"}]
+              "machine": "machine name"}],
+   "relations": [{"interface": "interface-name",
+                  "with": "name of the other application"}]
   }
   ```
 * **Description**:
@@ -432,7 +436,9 @@ excluding calls handling users.
    "units": [{"name": "unit-name",
               "ip": "ip-address",
               "port": "used ports",
-              "machine": "machine name"}]
+   "machine": "machine name"}],
+   "relations": [{"interface": "interface-name",
+                  "with": "name of the other application"}]
   }
   ```
 * **Description**:
@@ -452,7 +458,9 @@ excluding calls handling users.
     "units": [{"name": "unit-name",
                "ip": "ip-address",
                "port": "used ports",
-               "machine": "machine name"}]
+               "machine": "machine name"}],
+    "relations": [{"interface": "interface-name",
+                   "with": "name of the other application"}]
   }]
   ```
 * **Description**:
@@ -624,6 +632,24 @@ excluding calls handling users.
   Removes a machine
 
 ## **/tengu/controllers/[controller]/models/[model]/relations** <a name="relations"></a>
+#### **Request type**: GET
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+
+* **Succesful response**:
+  - code: 200
+  - message:
+  ```json
+  [{"name": "application name",
+    "relations": [{"interface": "interface-name",
+                   "with": "name of the other application"}]
+  }]
+  ```
+* **Description**:
+  Shows all the relations of a given model
+
 #### **Request type**: PUT
 * **Required headers**:
   - api-key
@@ -639,7 +665,9 @@ excluding calls handling users.
     "units": [{"name": "unit-name",
                "ip": "ip-address",
                "port": "used ports",
-               "machine": "machine name"}]
+               "machine": "machine name"}],
+    "relations": [{"interface": "interface-name",
+                   "with": "name of the other application"}]
   }]
   ```
 * **Description**:
@@ -655,10 +683,13 @@ excluding calls handling users.
 
 * **Succesful response**:
   - code: 200
-  - message: ```[{"ToDo"}]```
+  - message:
+  ```json
+  [{"interface": "interface-name",
+    "with": "name of the other application"}]
+  ```
 * **Description**:
   - Gets the relations of the given application
-  - Output in a logical structure **ToDo**
 
 ## **/tengu/controllers/[controller]/models/[model]/relations/[app1]/[app2]** <a name="relation-del"></a>
 #### **Request type**: DELETE
