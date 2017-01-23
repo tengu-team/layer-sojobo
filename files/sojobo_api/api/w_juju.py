@@ -25,6 +25,7 @@ import yaml
 from sojobo_api import get_api_dir
 from flask import abort
 from api import w_errors as errors
+from git import Repo
 ################################################################################
 # TENGU FUNCTIONS
 ################################################################################
@@ -76,16 +77,20 @@ def check_login(auth):
 
 
 def check_input(data):
-    items = data.split(':', 1)
-    if len(items) > 1 and items[0].lower() not in ['local', 'github', 'lxd', 'kvm']:
-        error = errors.invalid_option(items[0])
-        abort(error[0], error[1])
+    if data is not None:
+        items = data.split(':', 1)
+        if len(items) > 1 and items[0].lower() not in ['local', 'github', 'lxd', 'kvm']:
+            error = errors.invalid_option(items[0])
+            abort(error[0], error[1])
+        else:
+            for item in items:
+                if not all(x.isalpha() or x.isdigit() or x == '-' for x in item):
+                    error = errors.invalid_input()
+                    abort(error[0], error[1])
+            result = data.lower()
     else:
-        for item in items:
-            if not all(x.isalpha() or x.isdigit() or x == '-' for x in item):
-                error = errors.invalid_input()
-                abort(error[0], error[1])
-        return data.lower()
+        result = None
+    return result
 
 
 def check_access(access):
@@ -365,17 +370,21 @@ def app_exists(token, app_name):
 
 
 def deploy_app(token, app_name, series=None, target=None):
+    if 'local:' in app_name:
+        app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
+    elif 'github:' in app_name:
+        Repo.clone(app_name.split(':', 1)[1], get_charm_dir())
+        app_name = '{}/{}'.format(get_charm_dir(), app_name.split('/')[-1])
     if target is None and series is None:
         result = output_pass(['juju', 'deploy', app_name], token.c_name, token.m_name)
     elif target is None:
         result = output_pass(['juju', 'deploy', app_name, '--series', series], token.c_name, token.m_name)
+    elif series is None:
+        result = output_pass(['juju', 'deploy', app_name, '--to', target], token.c_name, token.m_name)
     else:
         if not token.c_token.supportlxd and 'lxd:' in target:
             result = '{} doesn\'t support lxd-containers'.format(token.c_token.c_type.upper())
-        else:
-            if 'local:' in app_name:
-                app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
-            result = output_pass(['juju', 'deploy', app_name, '--series', series, '--to', target], token.c_name, token.m_name)
+        result = output_pass(['juju', 'deploy', app_name, '--series', series, '--to', target], token.c_name, token.m_name)
     return result
 
 

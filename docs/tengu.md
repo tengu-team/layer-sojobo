@@ -415,7 +415,7 @@ excluding calls handling users.
 * **Description**:
   - Deploys an application from the JuJu charm store to a model if the user has access. Checks if the application already exists in the model.
   - If the application name is preceeded with `local:` it will look for the charm in the local charm repo **Not Tested**
-  - If the application is preseeded with `github:[url]` it will look for the application in the given repo **ToDo**
+  - If the application is preseeded with `github:[url]` it will look for the application in the given repo. Only public repos are possible **Not Tested** **Expand: to allow private repos**
   - A specific series can be chosen for an application. It will check if the application is available in that series **Not Tested**
   - A specific machine can be chosen to deploy to. It will check if the machine exists. If the machine is preceeded with `lxd:`
   it will deploy the application in an lxd container. It will check if the controller supports lxd containers. **Not Tested**
