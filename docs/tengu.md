@@ -1,8 +1,7 @@
 # ToDo
 - Cleanup some calls output
 - Make api code consistent in delivering output
-- Cleanup and refactor w_juju.py
-- Finish small ToDo"s and testing mentioned below.
+- Finish small ToDo's and testing mentioned below.
 
 # Tengu-API Documentation
 

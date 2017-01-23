@@ -360,10 +360,6 @@ def remove_ssh_key(token, ssh_key):
 #####################################################################################
 # APPLICATION FUNCTIONS
 #####################################################################################
-def config(token, app_name):
-    return json.loads(output_pass(['juju', 'config', app_name, '--format', 'json'], token.c_name, token.m_name))
-
-
 def app_exists(token, app_name):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
     return app_name in data['applications'].keys()
@@ -508,11 +504,6 @@ def change_user_password(token, username, password):
         check_output(['juju', 'change-user-password', username, '-c', controller],
                      input=bytes('{}\n{}\n'.format(password, password), 'utf-8'))
     return get_user_info(token, username)
-
-
-def get_users(controller):
-    data = json.loads(output_pass(['juju', 'users', '--format', 'json'], controller))
-    return {u['user-name']: u['access'] for u in data}
 
 
 def get_users_controller(token):
