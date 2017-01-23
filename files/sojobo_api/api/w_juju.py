@@ -40,33 +40,6 @@ def get_charm_dir():
     return os.environ.get('LOCAL_CHARM_DIR')
 
 
-def get_controller_types():
-    c_list = {}
-    for f_path in os.listdir('{}/controllers'.format(get_api_dir())):
-        if 'controller_' in f_path and '.pyc' not in f_path:
-            name = f_path.split('.')[0]
-            c_list[name.split('_')[1]] = import_module('controllers.{}'.format(name))
-    return c_list
-
-
-def app_supports_series(app_name, series):
-    if 'local:' in app_name:
-        with open('{}/{}/metadata.yaml'.format(get_charm_dir(), app_name.split(':')[1])) as data:
-            supports = series in yaml.load(data)['series']
-    else:
-        supports = False
-        data = requests.get('https://api.jujucharms.com/v4/{}/expand-id'.format(app_name))
-        for value in json.loads(data.text):
-            if series in value['Id']:
-                supports = True
-                break
-    return supports
-
-
-def cloud_supports_series(token, series):
-    return series in get_controller_types()[token.c_token.type].get_supported_series()
-
-
 def output_pass(commands, controller=None, model=None):
     if controller is not None and model is not None:
         commands.extend(['-m', '{}:{}'.format(controller, model)])
@@ -100,6 +73,28 @@ def check_login(auth):
         except (TypeError, IndexError):
             result = False
     return result
+
+
+def check_input(data):
+    items = data.split(':', 1)
+    if len(items) > 1 and items[0].lower() not in ['local', 'github', 'lxd', 'kvm']:
+        error = errors.invalid_option(items[0])
+        abort(error[0], error[1])
+    else:
+        for item in items:
+            if not all(x.isalpha() or x.isdigit() or x == '-' for x in item):
+                error = errors.invalid_input()
+                abort(error[0], error[1])
+        return data.lower()
+
+
+def check_access(access):
+    acc = access.lower()
+    if c_access_exists(acc) or m_access_exists(acc):
+        return acc
+    else:
+        error = errors.invalid_access('access')
+        abort(error[0], error[1])
 
 
 class JuJu_Token(object):
@@ -157,6 +152,19 @@ def authenticate(api_key, auth, controller=None, modelname=None):
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
+def get_controller_types():
+    c_list = {}
+    for f_path in os.listdir('{}/controllers'.format(get_api_dir())):
+        if 'controller_' in f_path and '.pyc' not in f_path:
+            name = f_path.split('.')[0]
+            c_list[name.split('_')[1]] = import_module('controllers.{}'.format(name))
+    return c_list
+
+
+def cloud_supports_series(token, series):
+    return series in get_controller_types()[token.c_token.type].get_supported_series()
+
+
 def create_controller(c_type, name, region, credentials):
     exists = False
     for key, value in get_controller_types().items():
@@ -342,6 +350,128 @@ def remove_ssh_key(token, ssh_key):
     fp_plain = hashlib.md5(key).hexdigest()
     fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
     return output_pass(['juju', 'remove-ssh-key', fingerprint], token.c_name, token.m_name)
+#####################################################################################
+# APPLICATION FUNCTIONS
+#####################################################################################
+def config(token, app_name):
+    return json.loads(output_pass(['juju', 'config', app_name, '--format', 'json'], token.c_name, token.m_name))
+
+
+def app_exists(token, app_name):
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+    return app_name in data['applications'].keys()
+
+
+def deploy_app(token, app_name, series=None, target=None):
+    if target is None and series is None:
+        result = output_pass(['juju', 'deploy', app_name], token.c_name, token.m_name)
+    elif target is None:
+        result = output_pass(['juju', 'deploy', app_name, '--series', series], token.c_name, token.m_name)
+    else:
+        if not token.c_token.supportlxd and 'lxd:' in target:
+            result = '{} doesn\'t support lxd-containers'.format(token.c_token.c_type.upper())
+        else:
+            if 'local:' in app_name:
+                app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
+            result = output_pass(['juju', 'deploy', app_name, '--series', series, '--to', target], token.c_name, token.m_name)
+    return result
+
+
+def remove_app(token, app_name):
+    return output_pass(['juju', 'remove-application', app_name], token.c_name, token.m_name)
+
+
+def add_machine(token, series=None):
+    if series is None:
+        result = output_pass(['juju', 'add-machine'], token.c_name, token.m_name)
+    else:
+        result = output_pass(['juju', 'add-machine', '--series', series], token.c_name, token.m_name)
+    return result
+
+
+def machine_exists(token, machine):
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+    if 'lxd' in machine:
+        return machine in data['machines'][machine.split('/')[0]]['containers'].keys()
+    else:
+        return machine in data['machines'].keys()
+
+
+def get_machine_series(token, machine):
+    data = json.loads(output_pass(['juju', 'list-machines', '--format', 'json'], token.c_name, token.m_name))
+    if 'lxd' in machine:
+        return data['machines'][machine.split('/')[0]]['containers'][machine]['series']
+    else:
+        return data['machines'][machine]['series']
+
+
+def machine_matches_series(token, machine, series):
+    return series == get_machine_series(token, machine)
+
+
+def remove_machine(token, machine):
+    return output_pass(['juju', 'remove-machine', '--force', machine], token.c_name, token.m_name)
+
+
+def get_application_info(token, application):
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+    result = {'name': application, 'relations': data['applications'][application]['relations'], 'units': []}
+    for u, ui in data['applications'][application]['units'].items():
+        try:
+            unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
+        except KeyError:
+            unit = {'name': u, 'machine': 'Waiting', 'instance-id': 'Unknown', 'ip': 'Unknown', 'ports': 'Unknown'}
+        result['units'].append(unit)
+    return result
+
+
+def get_unit_info(token, application, unitnumber):
+    data = get_application_info(token, application)
+    for u in data['units']:
+        if u['name'] == '{}/{}'.format(application, unitnumber):
+            return u
+
+
+def unit_exists(token, application, unitnumber):
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))['applications'][application]
+    return '{}/{}'.format(application, unitnumber) in data['units'].keys()
+
+
+def add_unit(token, app_name, target=None):
+    if target is None:
+        return output_pass(['juju', 'add-unit', app_name], token.c_name, token.m_name)
+    else:
+        return output_pass(['juju', 'add-unit', app_name, '--to', target])
+
+
+def remove_unit(token, application, unit_number):
+    return output_pass(['juju', 'remove-unit', '{}/{}'.format(application, unit_number)], token.c_name, token.m_name)
+
+
+def add_relation(token, app1, app2):
+    return output_pass(['juju', 'add-relation', app1, app2], token.c_name, token.m_name)
+
+
+def remove_relation(token, app1, app2):
+    return output_pass(['juju', 'remove-relation', app1, app2], token.c_name, token.m_name)
+
+
+def get_app_info(token, app_name):
+    return json.loads(output_pass(['juju', 'status'], token.c_name, token.m_name))['applications'][app_name]
+
+
+def app_supports_series(app_name, series):
+    if 'local:' in app_name:
+        with open('{}/{}/metadata.yaml'.format(get_charm_dir(), app_name.split(':')[1])) as data:
+            supports = series in yaml.load(data)['series']
+    else:
+        supports = False
+        data = requests.get('https://api.jujucharms.com/v4/{}/expand-id'.format(app_name))
+        for value in json.loads(data.text):
+            if series in value['Id']:
+                supports = True
+                break
+    return supports
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
@@ -515,111 +645,3 @@ def get_models_access(token, username):
 
 def get_umodel_access(token, username):
     return {'name': token.m_name, 'access': get_model_access(token, username)}
-#####################################################################################
-# APPLICATION FUNCTIONS
-#####################################################################################
-def config(token, app_name):
-    return json.loads(output_pass(['juju', 'config', app_name, '--format', 'json'], token.c_name, token.m_name))
-
-
-def app_exists(token, app_name):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    return app_name in data['applications'].keys()
-
-
-def deploy_app(token, app_name, series=None, target=None):
-    if target is None and series is None:
-        result = output_pass(['juju', 'deploy', app_name], token.c_name, token.m_name)
-    elif target is None:
-        result = output_pass(['juju', 'deploy', app_name, '--series', series], token.c_name, token.m_name)
-    else:
-        if not token.c_token.supportlxd and 'lxd' in target:
-            result = '{} doesn\'t support lxd-containers'.format(token.c_token.c_type.upper())
-        else:
-            if 'local:' in app_name:
-                app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
-            result = output_pass(['juju', 'deploy', app_name, '--series', series, '--to', target], token.c_name, token.m_name)
-    return result
-
-
-def remove_app(token, app_name):
-    return output_pass(['juju', 'remove-application', app_name], token.c_name, token.m_name)
-
-
-def add_machine(token, series=None):
-    if series is None:
-        result = output_pass(['juju', 'add-machine'], token.c_name, token.m_name)
-    else:
-        result = output_pass(['juju', 'add-machine', '--series', series], token.c_name, token.m_name)
-    return result
-
-
-def machine_exists(token, machine):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    if 'lxd' in machine:
-        return machine in data['machines'][machine.split('/')[0]]['containers'].keys()
-    else:
-        return machine in data['machines'].keys()
-
-
-def get_machine_series(token, machine):
-    data = json.loads(output_pass(['juju', 'list-machines', '--format', 'json'], token.c_name, token.m_name))
-    if 'lxd' in machine:
-        return data['machines'][machine.split('/')[0]]['containers'][machine]['series']
-    else:
-        return data['machines'][machine]['series']
-
-
-def machine_matches_series(token, machine, series):
-    return series == get_machine_series(token, machine)
-
-
-def remove_machine(token, machine):
-    return output_pass(['juju', 'remove-machine', '--force', machine], token.c_name, token.m_name)
-
-
-def get_application_info(token, application):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    result = {'name': application, 'relations': data['applications'][application]['relations'], 'units': []}
-    for u, ui in data['applications'][application]['units'].items():
-        try:
-            unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
-        except KeyError:
-            unit = {'name': u, 'machine': 'Waiting', 'instance-id': 'Unknown', 'ip': 'Unknown', 'ports': 'Unknown'}
-        result['units'].append(unit)
-    return result
-
-
-def get_unit_info(token, application, unitnumber):
-    data = get_application_info(token, application)
-    for u in data['units']:
-        if u['name'] == '{}/{}'.format(application, unitnumber):
-            return u
-
-
-def unit_exists(token, application, unitnumber):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))['applications'][application]
-    return '{}/{}'.format(application, unitnumber) in data['units'].keys()
-
-
-def add_unit(token, app_name, target=None):
-    if target is None:
-        return output_pass(['juju', 'add-unit', app_name], token.c_name, token.m_name)
-    else:
-        return output_pass(['juju', 'add-unit', app_name, '--to', target])
-
-
-def remove_unit(token, application, unit_number):
-    return output_pass(['juju', 'remove-unit', '{}/{}'.format(application, unit_number)], token.c_name, token.m_name)
-
-
-def add_relation(token, app1, app2):
-    return output_pass(['juju', 'add-relation', app1, app2], token.c_name, token.m_name)
-
-
-def remove_relation(token, app1, app2):
-    return output_pass(['juju', 'remove-relation', app1, app2], token.c_name, token.m_name)
-
-
-def get_app_info(token, app_name):
-    return json.loads(output_pass(['juju', 'status'], token.c_name, token.m_name))['applications'][app_name]

@@ -1,5 +1,4 @@
 # ToDo
-- Checking user input for forbidden characters
 - Cleanup some calls output
 - Make api code consistent in delivering output
 - Cleanup and refactor w_juju.py

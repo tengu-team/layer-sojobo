@@ -16,7 +16,7 @@ follow the naming rules and provide the required functions.
 
 ## Error codes
 The API return the following error codes:
-- **400**: When the request does not contain the required data
+- **400**: When the request does not contain the required data, has forbidden characters or the provided option/access-level does not exist
 - **401**: When a user has no access to a certain resource
 - **403**: API-key mismatch
 - **404**: When a specific resource does not exists
