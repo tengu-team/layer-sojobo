@@ -33,6 +33,10 @@ def invalid_option(option):
     return 400, 'Invalid option given, {} does not exist'.format(option)
 
 
+def invalid_controller(controller):
+    return 400, 'This type of controller is not supported -- {}. Contact Qrama for support'.format(controller)
+
+
 def no_access(item):
     return 401, 'You do not have access to this {}'.format(item)
 

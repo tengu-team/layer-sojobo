@@ -170,19 +170,18 @@ def cloud_supports_series(token, series):
     return series in get_controller_types()[token.c_token.type].get_supported_series()
 
 
+def check_c_type(c_type):
+    if check_input(c_type) in get_controller_types().keys():
+        return c_type.lower()
+    else:
+        error = errors.invalid_controller(c_type)
+        abort(error[0], error[1])
+
+
 def create_controller(c_type, name, region, credentials):
-    exists = False
-    for key, value in get_controller_types().items():
-        if c_type == key:
-            value.create_controller(name, region, credentials)
-            pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
-            check_output(['juju', 'change-user-password', get_user(), '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
-            exists = True
-            output = ''
-            break
-    if not exists:
-        output = 'Incorrect controller type. Supported options are: {}'.format(get_controller_types().keys())
-    return output
+    get_controller_types()[c_type].create_controller(name, region, credentials)
+    pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
+    check_output(['juju', 'change-user-password', get_user(), '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
 
 
 def controller_info(c_name):
@@ -192,9 +191,8 @@ def controller_info(c_name):
 
 
 def delete_controller(token):
-    check_call(['juju', 'destroy-controller', token.c_name, '-y'])
-    check_call(['juju', 'remove-credential', token.c_token.type, token.c_name])
-    return get_controllers_info(token)
+    output_pass(['juju', 'destroy-controller', '-y'], token.c_name)
+    output_pass(['juju', 'remove-credential', token.c_token.type, token.c_name])
 
 
 def get_all_controllers():
@@ -339,24 +337,21 @@ def create_model(token, model, ssh_key=None):
     add_to_model(token.set_model(model), token.username, 'admin')
     for user in get_controller_superusers(token):
         add_to_model(token, user, 'admin')
-    return get_model_info(token)
 
 
 def delete_model(token):
     output_pass(['juju', 'destroy-model', '-y', '{}:{}'.format(token.c_name, token.m_name)])
-    return get_controller_info(token)
 
 
 def add_ssh_key(token, ssh_key):
     output_pass(['juju', 'add-ssh-key', '"{}"'.format(ssh_key)], token.c_name, token.m_name)
-    return get_ssh_keys(token)
 
 
 def remove_ssh_key(token, ssh_key):
     key = base64.b64decode(bytes(ssh_key.strip().split()[1].encode('ascii')))
     fp_plain = hashlib.md5(key).hexdigest()
     fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
-    return output_pass(['juju', 'remove-ssh-key', fingerprint], token.c_name, token.m_name)
+    output_pass(['juju', 'remove-ssh-key', fingerprint], token.c_name, token.m_name)
 #####################################################################################
 # APPLICATION FUNCTIONS
 #####################################################################################
@@ -372,20 +367,17 @@ def deploy_app(token, app_name, series=None, target=None):
         Repo.clone(app_name.split(':', 1)[1], get_charm_dir())
         app_name = '{}/{}'.format(get_charm_dir(), app_name.split('/')[-1])
     if target is None and series is None:
-        result = output_pass(['juju', 'deploy', app_name], token.c_name, token.m_name)
+        output_pass(['juju', 'deploy', app_name], token.c_name, token.m_name)
     elif target is None:
-        result = output_pass(['juju', 'deploy', app_name, '--series', series], token.c_name, token.m_name)
+        output_pass(['juju', 'deploy', app_name, '--series', series], token.c_name, token.m_name)
     elif series is None:
-        result = output_pass(['juju', 'deploy', app_name, '--to', target], token.c_name, token.m_name)
+        output_pass(['juju', 'deploy', app_name, '--to', target], token.c_name, token.m_name)
     else:
-        if not token.c_token.supportlxd and 'lxd:' in target:
-            result = '{} doesn\'t support lxd-containers'.format(token.c_token.c_type.upper())
-        result = output_pass(['juju', 'deploy', app_name, '--series', series, '--to', target], token.c_name, token.m_name)
-    return result
+        output_pass(['juju', 'deploy', app_name, '--series', series, '--to', target], token.c_name, token.m_name)
 
 
 def remove_app(token, app_name):
-    return output_pass(['juju', 'remove-application', app_name], token.c_name, token.m_name)
+    output_pass(['juju', 'remove-application', app_name], token.c_name, token.m_name)
 
 
 def add_machine(token, series=None):
@@ -413,11 +405,14 @@ def get_machine_series(token, machine):
 
 
 def machine_matches_series(token, machine, series):
-    return series == get_machine_series(token, machine)
+    if machine is None or series is None:
+        return True
+    else:
+        return series == get_machine_series(token, machine)
 
 
 def remove_machine(token, machine):
-    return output_pass(['juju', 'remove-machine', '--force', machine], token.c_name, token.m_name)
+    output_pass(['juju', 'remove-machine', '--force', machine], token.c_name, token.m_name)
 
 
 def get_application_info(token, application):
@@ -463,15 +458,17 @@ def get_relations_info(token):
 
 
 def add_relation(token, app1, app2):
-    return output_pass(['juju', 'add-relation', app1, app2], token.c_name, token.m_name)
+    output_pass(['juju', 'add-relation', app1, app2], token.c_name, token.m_name)
 
 
 def remove_relation(token, app1, app2):
-    return output_pass(['juju', 'remove-relation', app1, app2], token.c_name, token.m_name)
+    output_pass(['juju', 'remove-relation', app1, app2], token.c_name, token.m_name)
 
 
 def app_supports_series(app_name, series):
-    if 'local:' in app_name:
+    if series is None:
+        supports = True
+    elif 'local:' in app_name:
         with open('{}/{}/metadata.yaml'.format(get_charm_dir(), app_name.split(':')[1])) as data:
             supports = series in yaml.load(data)['series']
     else:
@@ -485,25 +482,22 @@ def app_supports_series(app_name, series):
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
-def create_user(token, username, password):
+def create_user(username, password):
     for controller in get_all_controllers():
         output_pass(['juju', 'add-user', username], controller)
         output_pass(['juju', 'revoke', username, 'login'], controller)
-    change_user_password(token, username, password)
-    return get_user_info(token, username)
+    change_user_password(username, password)
 
 
-def delete_user(token, username):
+def delete_user(username):
     for controller in get_all_controllers():
         output_pass(['juju', 'remove-user', username, '-y'], controller)
-    return get_users_info(token)
 
 
-def change_user_password(token, username, password):
+def change_user_password(username, password):
     for controller in get_all_controllers():
         check_output(['juju', 'change-user-password', username, '-c', controller],
                      input=bytes('{}\n{}\n'.format(password, password), 'utf-8'))
-    return get_user_info(token, username)
 
 
 def get_users_controller(token):
@@ -548,7 +542,6 @@ def add_to_controller(token, username, access):
             output_pass(['juju', 'revoke', username, 'add-model'], token.c_name)
         else:
             output_pass(['juju', 'grant', username, 'superuser'], token.c_name)
-    return get_ucontroller_access(token, username)
 
 
 def remove_from_controller(token, username):
@@ -562,7 +555,6 @@ def remove_from_controller(token, username):
         output_pass(['juju', 'revoke', username, 'login'], token.c_name)
     elif current_access == 'login':
         output_pass(['juju', 'revoke', username, 'login'], token.c_name)
-    return get_controllers_access(token, username)
 
 
 def add_to_model(token, username, access):
@@ -585,7 +577,6 @@ def add_to_model(token, username, access):
             output_pass(['juju', 'grant', username, access, token.m_name])
     elif current_access is None:
         output_pass(['juju', 'grant', username, access, token.m_name])
-    return 'The user has been added'
 
 
 def remove_from_model(token, username):
@@ -599,7 +590,6 @@ def remove_from_model(token, username):
         output_pass(['juju', 'revoke', username, 'read', token.m_name], token.c_name)
     elif current_access == 'read':
         output_pass(['juju', 'revoke', username, 'read', token.m_name], token.c_name)
-    return get_models_access(token, username)
 
 
 def user_exists(username):

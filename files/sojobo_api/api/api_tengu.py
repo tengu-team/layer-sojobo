@@ -48,18 +48,18 @@ def create_controller():
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization)
         controller = juju.check_input(data['controller'])
+        c_type = juju.check_c_type(data['type'])
         if token.is_admin:
             if juju.controller_exists(controller):
                 code, response = errors.already_exists('controller')
             elif 'file' in request.files:
                 path = '{}/files/google-{}.json'.format(get_api_dir(), controller)
                 request.files['file'].save(path)
-                juju.create_controller(data['type'], controller, data['region'], path)
-                response = juju.get_controller_info(token.set_controller(data['controller']))
+                juju.create_controller(c_type, controller, data['region'], path)
+                code, response = 200, juju.get_controller_info(token.set_controller(data['controller']))
             else:
-                juju.create_controller(data['type'], controller, data['region'], data['credentials'])
-                response = juju.get_controller_info(token.set_controller(controller))
-            code = 200
+                juju.create_controller(c_type, controller, data['region'], data['credentials'])
+                code, response = 200, juju.get_controller_info(token.set_controller(controller))
         else:
             code, response = errors.no_permission()
     except KeyError:
@@ -82,7 +82,8 @@ def delete_controller(controller):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization, juju.check_input(controller))
         if token.c_access == 'superuser':
-            code, response = 200, juju.delete_controller(token)
+            juju.delete_controller(token)
+            code, response = 200, juju.get_controllers_info(token)
         else:
             code, response = errors.no_permission()
     except KeyError:
@@ -135,7 +136,8 @@ def delete(controller, model):
         token = juju.authenticate(request.headers['api-key'], request.authorization,
                                   juju.check_input(controller), juju.check_input(model))
         if token.m_access == 'admin':
-            code, response = 200, juju.delete_model(token)
+            juju.delete_model(token)
+            code, response = 200, juju.get_models_info(token)
         else:
             code, response = errors.no_permission()
     except KeyError:
@@ -164,7 +166,8 @@ def add_ssh_key(controller, model):
         token = juju.authenticate(request.headers['api-key'], request.authorization,
                                   juju.check_input(controller), juju.check_input(model))
         if token.m_access == 'admin':
-            code, response = 200, juju.add_ssh_key(token, data['ssh-key'])
+            juju.add_ssh_key(token, data['ssh-key'])
+            code, response = 200, juju.get_ssh_keys(token)
         else:
             code, response = errors.no_permission()
     except KeyError:
@@ -180,7 +183,7 @@ def remove_ssh_key(controller, model):
                                   juju.check_input(controller), juju.check_input(model))
         if token.m_access == 'admin':
             juju.remove_ssh_key(token, data['ssh-key'])
-            code, response = 200, 'The ssh-key has been removed'
+            code, response = 200, juju.get_ssh_keys(token)
         else:
             code, response = errors.no_permission()
     except KeyError:
@@ -188,7 +191,7 @@ def remove_ssh_key(controller, model):
     return create_response(code, response)
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['POST'])
+@TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['GET'])
 def get_applications_info(controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization,
@@ -215,26 +218,15 @@ def add_application(controller, model):
                 series = juju.check_input(data.get('series', None))
                 machine = juju.check_input(data.get('target', None))
                 app = juju.check_input(data['application'])
-                if machine is None and series is None:
-                    juju.deploy_app(token, app)
-                    code = 200
-                elif machine is None and juju.app_supports_series(app, series):
-                    juju.deploy_app(token, app, series)
-                    code = 200
-                elif juju.machine_matches_series(token, machine, series) and series is None:
-                    juju.deploy_app(token, app, None, series)
-                    code = 200
-                elif juju.machine_matches_series(token, machine, series) and juju.app_supports_series(app, series):
+                if juju.app_supports_series(app, series) and juju.cloud_supports_series(token, series) and juju.machine_matches_series(token, machine, series):
                     juju.deploy_app(token, app, series, machine)
-                    code = 200
-                elif juju.machine_matches_series(token, machine, series):
-                    code, response = 400, 'The application does not support this version of Ubuntu'
-                elif juju.app_supports_series(app, series):
-                    code, response = 400, 'Target and application have a different version of Ubuntu'
+                    code, response = 200, juju.get_application_info(app)
+                elif juju.app_supports_series(app, series) and juju.cloud_supports_series(token, series):
+                    code, response = 400, 'Target machine and application series mismatch'
+                elif juju.cloud_supports_series(token, series) and juju.machine_matches_series(token, machine, series):
+                    code, response = 400, 'The application does not support this series'
                 else:
-                    code, response = 400, 'Target and application have a different Ubuntu version, the application is not available in this version'
-                if code == 200:
-                    response = juju.get_application_info(token, data['application'])
+                    code, response = 400, 'The cloud does not support this series, nor does the application'
             else:
                 code, response = errors.no_permission()
     except KeyError:
@@ -265,7 +257,8 @@ def remove_app(controller, model, application):
         app = juju.check_input(application)
         if juju.app_exists(token, app):
             if token.m_access == 'write' or token.m_access == 'admin':
-                code, response = 200, juju.remove_app(token, app)
+                juju.remove_app(token, app)
+                code, response = 200, juju.get_applications_info(token)
             else:
                 code, response = errors.no_permission()
         else:
@@ -328,12 +321,9 @@ def add_machine(controller, model):
                                   juju.check_input(controller), juju.check_input(model))
         if token.m_access == 'write' or token.m_access == 'admin':
             series = juju.check_input(data.get('series', None))
-            if series is None:
-                juju.add_machine(token)
-                code, response = 200, 'The machine is being created'
-            elif juju.cloud_supports_series(token, series):
+            if juju.cloud_supports_series(token, series):
                 juju.add_machine(token, series)
-                code, response = 200, 'The machine is being created'
+                code, response = 200, juju.get_machines_info(token)
             else:
                 code, response = 400, 'This cloud does not support this version of Ubuntu'
         else:
@@ -352,7 +342,7 @@ def remove_machine(controller, model, machine):
         if juju.machine_exists(token, mach):
             if token.m_access == 'write' or token.m_access == 'admin':
                 juju.remove_machine(token, mach)
-                code, response = 200, 'The machine is being removed'
+                code, response = 200, juju.get_machines_info(token)
             else:
                 code, response = errors.no_permission()
         else:
@@ -387,7 +377,7 @@ def add_unit(controller, model, application):
         if juju.app_exists(token, app):
             if token.m_access == 'write' or token.m_access == 'admin':
                 juju.add_unit(token, application, data.get('target', None))
-                code, response = 200, juju.get_application_info(token, app)
+                code, response = 200, juju.get_units_info(token, app)
             else:
                 code, response = errors.no_permission()
         else:
@@ -406,7 +396,8 @@ def remove_unit(controller, model, application, unitnumber):
         unum = juju.check_input(unitnumber)
         if juju.unit_exists(token, app, unum):
             if token.m_access == 'write' or token.m_access == 'admin':
-                code, response = 200, juju.remove_unit(token, app, unum)
+                juju.remove_unit(token, app, unum)
+                code, response = 200, juju.get_units_info(token, app)
             else:
                 code, response = errors.no_permission()
         else:
@@ -453,8 +444,7 @@ def add_relation(controller, model):
         if juju.app_exists(token, app1) and juju.app_exists(token, app2):
             if token.m_access == 'write' or token.m_access == 'admin':
                 juju.add_relation(token, app1, app2)
-                code, response = 200, {'applications': [juju.get_application_info(token, app1),
-                                                        juju.get_application_info(token, app2)]}
+                code, response = 200, juju.get_relations_info(token)
             else:
                 code, response = errors.no_permission()
         else:
@@ -488,7 +478,7 @@ def remove_relation(controller, model, app1, app2):
         if juju.app_exists(token, appl1) and juju.app_exists(token, appl2):
             if token.m_access == 'write' or token.m_access == 'admin':
                 juju.remove_relation(token, appl1, appl2)
-                code, response = 200, 'The relation is being removed'
+                code, response = 200, juju.get_relations_info(token)
             else:
                 code, response = errors.no_permission()
         else:

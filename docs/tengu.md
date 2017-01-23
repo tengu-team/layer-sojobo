@@ -1,7 +1,6 @@
 # ToDo
-- Cleanup some calls output
-- Make api code consistent in delivering output
 - Finish small ToDo's and testing mentioned below.
+- Fix SSH-key output
 
 # Tengu-API Documentation
 
