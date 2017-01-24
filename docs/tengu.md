@@ -28,6 +28,8 @@ excluding calls handling users.
 
 ## **/tengu/controllers** <a name="controllers"></a>
 #### **Request type**: GET
+* **Description**:
+  Returns all the information of all the controllers, models, applications, machines, units and users the user has access to.
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -63,8 +65,6 @@ excluding calls handling users.
               }]           
   }]
   ```
-* **Description**:
-  Returns all the information of all the controllers, models, applications, machines, units and users the user has access to.
 
 #### **Request type**: POST
 * **Required headers**:
