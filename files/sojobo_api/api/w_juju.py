@@ -167,7 +167,10 @@ def get_controller_types():
 
 
 def cloud_supports_series(token, series):
-    return series in get_controller_types()[token.c_token.type].get_supported_series()
+    if series is None:
+        return True
+    else:
+        return series in get_controller_types()[token.c_token.type].get_supported_series()
 
 
 def check_c_type(c_type):
@@ -287,12 +290,11 @@ def get_applications_info(token):
     result = []
     for name, info in data['applications'].items():
         res1 = {'name': name}
-        for interface, rels in info['relations']:
+        for interface, rels in info['relations'].items():
             res1['relations'] = [{'interface': interface, 'with': rel} for rel in rels]
         try:
-            units = info['units'].items()
             res1['units'] = []
-            for unit, uinfo in units:
+            for unit, uinfo in info['units'].items():
                 res1['units'].append({'name': unit, 'machine': uinfo['machine'], 'ip': uinfo['public-address'],
                                       'ports': uinfo.get('open-ports', None)})
         except KeyError:
@@ -416,13 +418,13 @@ def remove_machine(token, machine):
 
 
 def get_application_info(token, application):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))['applications']
+    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
     result = {'name': application, 'units': []}
-    for interface, rels in data[application]['relations']:
+    for interface, rels in data['applications'][application]['relations'].items():
         result['relations'] = [{'interface': interface, 'with': rel} for rel in rels]
-    for u, ui in data[application]['units'].items():
+    for u, ui in data['applications'][application]['units'].items():
         try:
-            unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui['open-ports']}
+            unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui.get('open-ports', None)}
         except KeyError:
             unit = {'name': u, 'machine': 'Waiting', 'instance-id': 'Unknown', 'ip': 'Unknown', 'ports': 'Unknown'}
         result['units'].append(unit)
