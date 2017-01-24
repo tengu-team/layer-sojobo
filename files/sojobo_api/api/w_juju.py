@@ -362,6 +362,23 @@ def app_exists(token, app_name):
     return app_name in data['applications'].keys()
 
 
+def deploy_bundle(token, jsondata):
+    data = json.loads(jsondata)
+    if 'machines' in data.keys():
+        for machine, config in data['machines']:
+            l_con = config['constraints'].split(' ') if 'constraints' in config.keys() else None
+            rewrite = add_machine(token, config.get('series', None), l_con).split(' ')[-1]
+            for service in data['services']:
+                for to in service['to']:
+                    check = to.split(':')
+                    if check[-1] == machine:
+                        check[-1] = rewrite
+                    to = ''.join(check)
+    with open('/opt/sojobo_api/data.yml', 'w') as outfile:
+        yaml.dump(data, outfile, default_flow_style=True)
+    output_pass(['juju', 'deploy', '/opt/sojobo_api/data.yml'], token.c_name, token.m_name)
+
+
 def deploy_app(token, app_name, series=None, target=None):
     if 'local:' in app_name:
         app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
@@ -382,11 +399,15 @@ def remove_app(token, app_name):
     output_pass(['juju', 'remove-application', app_name], token.c_name, token.m_name)
 
 
-def add_machine(token, series=None):
-    if series is None:
+def add_machine(token, series=None, constraints=None):
+    if series is None and constraints is None:
         result = output_pass(['juju', 'add-machine'], token.c_name, token.m_name)
-    else:
+    elif series is None:
+        result = output_pass(['juju', 'add-machine', '--constraints'].extend(constraints), token.c_name, token.m_name)
+    elif constraints is None:
         result = output_pass(['juju', 'add-machine', '--series', series], token.c_name, token.m_name)
+    else:
+        result = output_pass(['juju', 'add-machine', '--series', series, '--constraints'].extend(constraints), token.c_name, token.m_name)
     return result
 
 
