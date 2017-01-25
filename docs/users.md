@@ -27,6 +27,7 @@ The User-API provides user management over all controllers.
   ```json
   [{"name": "username",
     "controllers": [{"name": "controller-name",
+                     "type": "controller-type",
                      "access": "controller access",
                      "models": [{"name": "model-name",
                                  "access": "model access"}]
@@ -49,6 +50,7 @@ The User-API provides user management over all controllers.
   ```json
   {"name": "username",
    "controllers": [{"name": "controller-name",
+                    "type": "controller-type",
                     "access": "controller access",
                     "models": [{"name": "model-name",
                                 "access": "model access"}]
@@ -71,6 +73,7 @@ The User-API provides user management over all controllers.
   ```json
   {"name": "username",
    "controllers": [{"name": "controller-name",
+                    "type": "controller-type",
                     "access": "controller access",
                     "models": [{"name": "model-name",
                                 "access": "model access"}]
@@ -92,6 +95,7 @@ The User-API provides user management over all controllers.
   ```json
   {"name": "username",
    "controllers": [{"name": "controller-name",
+                    "type": "controller-type",
                     "access": "controller access",
                     "models": [{"name": "model-name",
                                 "access": "model access"}]
@@ -113,6 +117,7 @@ The User-API provides user management over all controllers.
   ```json
   [{"name": "username",
     "controllers": [{"name": "controller-name",
+                     "type": "controller-type",
                      "access": "controller access",
                      "models": [{"name": "model-name",
                                  "access": "model access"}]
@@ -134,6 +139,7 @@ The User-API provides user management over all controllers.
   - message:
   ```json
   [{"name": "controller-name",
+    "type": "controller-type",
     "access": "controller access",
     "models": [{"name": "model-name",
                 "access": "model access"}]
@@ -154,6 +160,7 @@ The User-API provides user management over all controllers.
   - message:
   ```json
   {"name": "controller-name",
+   "type": "controller-type",
    "access": "controller access",
    "models": [{"name": "model-name",
                "access": "model access"}]
@@ -173,6 +180,7 @@ The User-API provides user management over all controllers.
   - message:
   ```json
   {"name": "controller-name",
+   "type": "controller-type",
    "access": "controller access",
    "models": [{"name": "model-name",
                "access": "model access"}]
@@ -193,6 +201,7 @@ The User-API provides user management over all controllers.
   ```json
   [{"name": "username",
     "controllers": [{"name": "controller-name",
+                     "type": "controller-type",
                      "access": "controller access",
                      "models": [{"name": "model-name",
                                  "access": "model access"}]

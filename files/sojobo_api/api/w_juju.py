@@ -641,7 +641,7 @@ def get_controllers_access(token, username):
     for controller in get_all_controllers():
         access = get_controller_access(token.set_controller(controller), username)
         if access is not None:
-            controllers.append({'name': controller, 'access': access,
+            controllers.append({'name': controller, 'type': token.c_type.type, 'access': access,
                                 'models': get_models_access(token, username)})
     return controllers
 
