@@ -295,6 +295,40 @@ excluding calls handling users.
                    }]
   }]           
   ```
+#### **Request type**: POST
+* **Description**:
+  - Deploys a bundle to a model.
+  - The bundle should be given in a jsonformat, using the JuJu bundle syntax
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+  - bundle
+* **Succesful response**:
+  - code: 200
+  - message:
+  ```json
+  {"name": "modelname",
+   "ssh-keys": "ssh-keys with access to all the machines in model",
+   "juju-gui-url": "Using the user login and password, the juju GUI can be used",
+   "users": [{"name": "username",
+              "access": "model-access"}],
+   "machines": [{"name": "machine-name",
+                 "instance-id": "juju-id",
+                 "ip": "ip-address",
+                 "series": "Ubuntu OS version name",
+                 "containers": [{"name": "container-name",
+                                 "ip": "ip-address",
+                                 "series": "Ubuntu OS version name"}]
+               }],
+   "applications": [{"name": "application name",
+                     "units": [{"name": "unit-name",
+                                "ip": "ip-address",
+                                "port": "used ports",
+                                "machine": "machine name"}]
+                   }]
+  }]           
+  ```
 
 #### **Request type**: DELETE
 * **Description**:

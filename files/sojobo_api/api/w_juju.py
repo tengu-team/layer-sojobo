@@ -362,21 +362,10 @@ def app_exists(token, app_name):
     return app_name in data['applications'].keys()
 
 
-def deploy_bundle(token, jsondata):
-    data = json.loads(jsondata)
-    if 'machines' in data.keys():
-        for machine, config in data['machines']:
-            l_con = config['constraints'].split(' ') if 'constraints' in config.keys() else None
-            rewrite = add_machine(token, config.get('series', None), l_con).split(' ')[-1]
-            for service in data['services']:
-                for to in service['to']:
-                    check = to.split(':')
-                    if check[-1] == machine:
-                        check[-1] = rewrite
-                    to = ''.join(check)
-    with open('/opt/sojobo_api/data.yml', 'w') as outfile:
-        yaml.dump(data, outfile, default_flow_style=True)
-    output_pass(['juju', 'deploy', '/opt/sojobo_api/data.yml'], token.c_name, token.m_name)
+def deploy_bundle(token, jsonbundle):
+    with open('/opt/sojobo_api/files/data.yml', 'w+') as outfile:
+        yaml.dump(jsonbundle, outfile, default_flow_style=True)
+    output_pass(['juju', 'deploy', '/opt/sojobo_api/files/data.yml'], token.c_name, token.m_name)
 
 
 def deploy_app(token, app_name, series=None, target=None):
@@ -403,11 +392,15 @@ def add_machine(token, series=None, constraints=None):
     if series is None and constraints is None:
         result = output_pass(['juju', 'add-machine'], token.c_name, token.m_name)
     elif series is None:
-        result = output_pass(['juju', 'add-machine', '--constraints'].extend(constraints), token.c_name, token.m_name)
+        commands = ['juju', 'add-machine', '--constraints']
+        commands.extend(constraints)
+        result = output_pass(commands, token.c_name, token.m_name)
     elif constraints is None:
         result = output_pass(['juju', 'add-machine', '--series', series], token.c_name, token.m_name)
     else:
-        result = output_pass(['juju', 'add-machine', '--series', series, '--constraints'].extend(constraints), token.c_name, token.m_name)
+        commands = ['juju', 'add-machine', '--series', series, '--constraints']
+        commands.extend(constraints)
+        result = output_pass(commands, token.c_name, token.m_name)
     return result
 
 
@@ -641,7 +634,7 @@ def get_controllers_access(token, username):
     for controller in get_all_controllers():
         access = get_controller_access(token.set_controller(controller), username)
         if access is not None:
-            controllers.append({'name': controller, 'type': token.c_type.type, 'access': access,
+            controllers.append({'name': controller, 'type': token.c_token.type, 'access': access,
                                 'models': get_models_access(token, username)})
     return controllers
 
