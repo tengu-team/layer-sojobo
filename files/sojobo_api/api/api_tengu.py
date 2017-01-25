@@ -98,7 +98,7 @@ def create_model(controller):
         if juju.model_exists(token, model):
             code, response = errors.already_exists('model')
         elif token.c_access == 'add-model' or token.c_access == 'superuser':
-            juju.create_model(token, model, data.get('ssh_key', None))
+            juju.create_model(token, model, data.get('ssh-key', None))
             code, response = 200, juju.get_model_info(token.set_model(model))
         else:
             code, response = errors.no_permission()

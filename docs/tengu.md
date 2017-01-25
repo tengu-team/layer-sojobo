@@ -233,6 +233,8 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
   - model
+* **Optional body**:
+  - ssh-key
 * **Succesful response**:
   - code: 200
   - message:
