@@ -289,9 +289,9 @@ def get_applications_info(token):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
     result = []
     for name, info in data['applications'].items():
-        res1 = {'name': name}
+        res1 = {'name': name, 'relations': []}
         for interface, rels in info['relations'].items():
-            res1['relations'] = [{'interface': interface, 'with': rel} for rel in rels]
+            res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
         try:
             res1['units'] = []
             for unit, uinfo in info['units'].items():
@@ -433,9 +433,9 @@ def remove_machine(token, machine):
 
 def get_application_info(token, application):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    result = {'name': application, 'units': []}
+    result = {'name': application, 'units': [], 'relations': []}
     for interface, rels in data['applications'][application]['relations'].items():
-        result['relations'] = [{'interface': interface, 'with': rel} for rel in rels]
+        result['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
     for u, ui in data['applications'][application]['units'].items():
         try:
             unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui.get('open-ports', None)}
