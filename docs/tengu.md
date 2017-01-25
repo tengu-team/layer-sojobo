@@ -60,7 +60,12 @@ excluding calls handling users.
                                   "units": [{"name": "unit-name",
                                              "ip": "ip-address",
                                              "port": "used ports",
-                                             "machine": "machine name"}]
+                                             "machine": "machine name"}],
+                                  "relations": [{"interface": "interface-name",
+                                                 "with": "name of the other application"}],
+                                  "charm-name": "Name of the charm build",
+                                  "exposed": "Whether or not the application is publicly accessible",
+                                  "series": "Ubuntu series of the application"
                                 }]
               }]           
   }]
@@ -103,7 +108,12 @@ excluding calls handling users.
                                  "units": [{"name": "unit-name",
                                             "ip": "ip-address",
                                             "port": "used ports",
-                                            "machine": "machine name"}]
+                                            "machine": "machine name"}],
+                                 "relations": [{"interface": "interface-name",
+                                                "with": "name of the other application"}],
+                                 "charm-name": "Name of the charm build",
+                                 "exposed": "Whether or not the application is publicly accessible",
+                                 "series": "Ubuntu series of the application"
                                }]
              }]           
   }
@@ -143,7 +153,12 @@ excluding calls handling users.
                                  "units": [{"name": "unit-name",
                                             "ip": "ip-address",
                                             "port": "used ports",
-                                            "machine": "machine name"}]
+                                            "machine": "machine name"}],
+                                 "relations": [{"interface": "interface-name",
+                                                "with": "name of the other application"}],
+                                 "charm-name": "Name of the charm build",
+                                 "exposed": "Whether or not the application is publicly accessible",
+                                 "series": "Ubuntu series of the application"
                                }]
              }]           
   }
@@ -182,7 +197,12 @@ excluding calls handling users.
                                   "units": [{"name": "unit-name",
                                              "ip": "ip-address",
                                              "port": "used ports",
-                                             "machine": "machine name"}]
+                                             "machine": "machine name"}],
+                                  "relations": [{"interface": "interface-name",
+                                                 "with": "name of the other application"}],
+                                  "charm-name": "Name of the charm build",
+                                  "exposed": "Whether or not the application is publicly accessible",
+                                  "series": "Ubuntu series of the application"
                                 }]
               }]           
   }]
@@ -219,7 +239,12 @@ excluding calls handling users.
                       "units": [{"name": "unit-name",
                                  "ip": "ip-address",
                                  "port": "used ports",
-                                 "machine": "machine name"}]
+                                 "machine": "machine name"}],
+                      "relations": [{"interface": "interface-name",
+                                     "with": "name of the other application"}],
+                      "charm-name": "Name of the charm build",
+                      "exposed": "Whether or not the application is publicly accessible",
+                      "series": "Ubuntu series of the application"
                     }]
   }]           
   ```
@@ -256,7 +281,12 @@ excluding calls handling users.
                      "units": [{"name": "unit-name",
                                 "ip": "ip-address",
                                 "port": "used ports",
-                                "machine": "machine name"}]
+                                "machine": "machine name"}],
+                     "relations": [{"interface": "interface-name",
+                                    "with": "name of the other application"}],
+                     "charm-name": "Name of the charm build",
+                     "exposed": "Whether or not the application is publicly accessible",
+                     "series": "Ubuntu series of the application"
                    }]
   }]           
   ```
@@ -291,7 +321,12 @@ excluding calls handling users.
                      "units": [{"name": "unit-name",
                                 "ip": "ip-address",
                                 "port": "used ports",
-                                "machine": "machine name"}]
+                                "machine": "machine name"}],
+                     "relations": [{"interface": "interface-name",
+                                    "with": "name of the other application"}],
+                     "charm-name": "Name of the charm build",
+                     "exposed": "Whether or not the application is publicly accessible",
+                     "series": "Ubuntu series of the application"
                    }]
   }]           
   ```
@@ -325,7 +360,12 @@ excluding calls handling users.
                      "units": [{"name": "unit-name",
                                 "ip": "ip-address",
                                 "port": "used ports",
-                                "machine": "machine name"}]
+                                "machine": "machine name"}],
+                     "relations": [{"interface": "interface-name",
+                                    "with": "name of the other application"}],
+                     "charm-name": "Name of the charm build",
+                     "exposed": "Whether or not the application is publicly accessible",
+                     "series": "Ubuntu series of the application"
                    }]
   }]           
   ```
@@ -359,7 +399,12 @@ excluding calls handling users.
                       "units": [{"name": "unit-name",
                                  "ip": "ip-address",
                                  "port": "used ports",
-                                 "machine": "machine name"}]
+                                 "machine": "machine name"}],
+                      "relations": [{"interface": "interface-name",
+                                     "with": "name of the other application"}],
+                      "charm-name": "Name of the charm build",
+                      "exposed": "Whether or not the application is publicly accessible",
+                      "series": "Ubuntu series of the application"
                     }]
   }]           
   ```
@@ -420,7 +465,10 @@ excluding calls handling users.
                "port": "used ports",
                "machine": "machine name"}],
     "relations": [{"interface": "interface-name",
-                   "with": "name of the other application"}]
+                   "with": "name of the other application"}],
+    "charm-name": "Name of the charm build",
+    "exposed": "Whether or not the application is publicly accessible",
+    "series": "Ubuntu series of the application"
   }]
   ```
 
@@ -451,7 +499,10 @@ excluding calls handling users.
               "port": "used ports",
               "machine": "machine name"}],
    "relations": [{"interface": "interface-name",
-                  "with": "name of the other application"}]
+                  "with": "name of the other application"}],
+   "charm-name": "Name of the charm build",
+   "exposed": "Whether or not the application is publicly accessible",
+   "series": "Ubuntu series of the application"
   }
   ```
 
@@ -474,7 +525,10 @@ excluding calls handling users.
               "port": "used ports",
    "machine": "machine name"}],
    "relations": [{"interface": "interface-name",
-                  "with": "name of the other application"}]
+                  "with": "name of the other application"}],
+   "charm-name": "Name of the charm build",
+   "exposed": "Whether or not the application is publicly accessible",
+   "series": "Ubuntu series of the application"
   }
   ```
 
@@ -496,7 +550,10 @@ excluding calls handling users.
                "port": "used ports",
                "machine": "machine name"}],
     "relations": [{"interface": "interface-name",
-                   "with": "name of the other application"}]
+                   "with": "name of the other application"}],
+    "charm-name": "Name of the charm build",
+    "exposed": "Whether or not the application is publicly accessible",
+    "series": "Ubuntu series of the application"
   }]
   ```
 
@@ -704,7 +761,10 @@ excluding calls handling users.
                "port": "used ports",
                "machine": "machine name"}],
     "relations": [{"interface": "interface-name",
-                   "with": "name of the other application"}]
+                   "with": "name of the other application"}],
+    "charm-name": "Name of the charm build",
+    "exposed": "Whether or not the application is publicly accessible",
+    "series": "Ubuntu series of the application"
   }]
   ```
 

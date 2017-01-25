@@ -289,7 +289,8 @@ def get_applications_info(token):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
     result = []
     for name, info in data['applications'].items():
-        res1 = {'name': name, 'relations': []}
+        res1 = {'name': name, 'relations': [], 'charm-name': info['charm-name'], 'exposed': info['exposed'],
+                'series': info['series']}
         for interface, rels in info['relations'].items():
             res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
         try:
@@ -433,7 +434,10 @@ def remove_machine(token, machine):
 
 def get_application_info(token, application):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    result = {'name': application, 'units': [], 'relations': []}
+    result = {'name': application, 'units': [], 'relations': [],
+              'charm-name': data['applications'][application]['charm-name'],
+              'exposed': data['applications'][application]['exposed'],
+              'series': data['applications'][application]['series']}
     for interface, rels in data['applications'][application]['relations'].items():
         result['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
     for u, ui in data['applications'][application]['units'].items():
