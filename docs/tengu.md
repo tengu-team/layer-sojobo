@@ -1,6 +1,8 @@
 # ToDo
 - Finish small ToDo's and testing mentioned below.
 - Output charm name/info with application info
+- Prevent KeyErrors in w_juju.py to ensure correct html status codes
+- Proper json output: no longer output empty keys
 
 # Tengu-API Documentation
 

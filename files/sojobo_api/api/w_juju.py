@@ -288,10 +288,10 @@ def get_ssh_keys(token):
 def get_applications_info(token):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
     result = []
-    for name, info in data['applications'].items():
+    for name, info in data.get['applications'].items():
         res1 = {'name': name, 'relations': [], 'charm-name': info['charm-name'], 'exposed': info['exposed'],
                 'series': info['series']}
-        for interface, rels in info['relations'].items():
+        for interface, rels in info.get('relations', {}).items():
             res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
         try:
             res1['units'] = []
@@ -438,7 +438,7 @@ def get_application_info(token, application):
               'charm-name': data['applications'][application]['charm-name'],
               'exposed': data['applications'][application]['exposed'],
               'series': data['applications'][application]['series']}
-    for interface, rels in data['applications'][application]['relations'].items():
+    for interface, rels in data['applications'][application].get('relations', {}).items():
         result['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
     for u, ui in data['applications'][application]['units'].items():
         try:
