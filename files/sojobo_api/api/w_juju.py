@@ -41,6 +41,16 @@ def get_charm_dir():
     return os.environ.get('LOCAL_CHARM_DIR')
 
 
+def get_ip():
+    return os.environ.get('SOJOBO_IP')
+
+
+def get_api_key():
+    with open('{}/api-key'.format(get_api_dir()), 'r') as key:
+        apikey = key.readlines()[0]
+    return apikey
+
+
 def output_pass(commands, controller=None, model=None):
     if controller is not None and model is not None:
         commands.extend(['-m', '{}:{}'.format(controller, model)])
@@ -133,9 +143,7 @@ class JuJu_Token(object):
 
 
 def authenticate(api_key, auth, controller=None, modelname=None):
-    with open('{}/api-key'.format(get_api_dir()), 'r') as key:
-        apikey = key.readlines()[0]
-    if api_key != apikey or not check_login(auth):
+    if api_key != get_api_key() or not check_login(auth):
         error = errors.unauthorized()
         abort(error[0], error[1])
     token = JuJu_Token(auth)
@@ -363,9 +371,9 @@ def app_exists(token, app_name):
     return app_name in data['applications'].keys()
 
 
-def deploy_bundle(token, jsonbundle):
-    with open('/opt/sojobo_api/files/data.yml', 'w+') as outfile:
-        yaml.dump(jsonbundle, outfile, default_flow_style=True)
+def deploy_bundle(token, bundle):
+    with open('{}/files/data.yml'.format(get_api_dir()), 'w+') as outfile:
+        yaml.dump(bundle, outfile, default_flow_style=True)
     output_pass(['juju', 'deploy', '/opt/sojobo_api/files/data.yml'], token.c_name, token.m_name)
 
 

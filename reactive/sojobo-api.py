@@ -30,7 +30,8 @@ from charmhelpers.core.hookenv import (
     log,
     config,
     open_port,
-    close_port
+    close_port,
+    unit_public_ip
 )
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charmhelpers.contrib.python.packages import pip_install
@@ -95,6 +96,7 @@ def render_api_systemd_template():
         "SOJOBO_API_DIR={}".format(API_DIR),
         "SOJOBO_API_PORT={}".format(PORT),
         "LOCAL_CHARM_DIR={}".format(appconf['charm-dir']),
+        "SOJOBO_IP={}".format(unit_public_ip()),
         "PYTHONPATH={}".format(API_DIR)
     ]
     flags = appconf['feature-flags'].replace(' ', '')
