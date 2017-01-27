@@ -411,7 +411,7 @@ excluding calls handling users.
   }]           
   ```
 
-## **/tengu/controllers/[controller]/models/[model]/sshkey** <a name="ssh-key"></a>
+## **/tengu/controllers/[controller]/models/[model]/sshkey** <a name="sshkey"></a>
 #### **Request type**: GET
 * **Description**:
       Returns all the ssh-keys of a model if the user has access.

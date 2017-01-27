@@ -296,14 +296,14 @@ def get_ssh_keys(token):
 def get_applications_info(token):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
     result = []
-    for name, info in data.get['applications'].items():
+    for name, info in data['applications'].items():
         res1 = {'name': name, 'relations': [], 'charm-name': info['charm-name'], 'exposed': info['exposed'],
                 'series': info['series']}
         for interface, rels in info.get('relations', {}).items():
             res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
         try:
             res1['units'] = []
-            for unit, uinfo in info['units'].items():
+            for unit, uinfo in info.get('units', {}).items():
                 res1['units'].append({'name': unit, 'machine': uinfo['machine'], 'ip': uinfo['public-address'],
                                       'ports': uinfo.get('open-ports', None)})
         except KeyError:
@@ -373,7 +373,7 @@ def app_exists(token, app_name):
 
 def deploy_bundle(token, bundle):
     with open('{}/files/data.yml'.format(get_api_dir()), 'w+') as outfile:
-        yaml.dump(bundle, outfile, default_flow_style=True)
+        yaml.dump(bundle, outfile, default_flow_style=False)
     output_pass(['juju', 'deploy', '/opt/sojobo_api/files/data.yml'], token.c_name, token.m_name)
 
 
@@ -448,7 +448,7 @@ def get_application_info(token, application):
               'series': data['applications'][application]['series']}
     for interface, rels in data['applications'][application].get('relations', {}).items():
         result['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
-    for u, ui in data['applications'][application]['units'].items():
+    for u, ui in data['applications'][application].get('units', {}).items():
         try:
             unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui.get('open-ports', None)}
         except KeyError:
