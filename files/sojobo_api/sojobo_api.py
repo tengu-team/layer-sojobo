@@ -150,4 +150,10 @@ if __name__ == '__main__':
     for api in get_apis():
         module = import_module('api.{}'.format(api))
         APP.register_blueprint(getattr(module, 'get')(), url_prefix='/{}'.format(api.split('_')[1]))
+    for c_type in get_controllers():
+        try:
+            module = import_module('metering.metering_{}'.format(c_type.split('_')[1]))
+            APP.register_blueprint(getattr(module, 'get')(), url_prefix='/metering/{}'.format(c_type.split('_')[1]))
+        except ImportError:
+            pass
     APP.run(host='0.0.0.0', port=int(os.environ.get('SOJOBO_API_PORT')), threaded=True)
