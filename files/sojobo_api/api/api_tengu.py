@@ -17,7 +17,6 @@
 import shutil
 from flask import send_file, request, Blueprint
 from api import w_errors as errors, w_juju as juju
-from sojobo_api import create_response, get_api_dir
 
 
 TENGU = Blueprint('tengu', __name__)
@@ -34,7 +33,7 @@ def get_all_info():
         code, response = 200, juju.get_controllers_info(token)
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers', methods=['POST'])
@@ -51,7 +50,7 @@ def create_controller():
             if juju.controller_exists(controller):
                 code, response = errors.already_exists('controller')
             elif 'file' in request.files:
-                path = '{}/files/google-{}.json'.format(get_api_dir(), controller)
+                path = '{}/files/google-{}.json'.format(juju.get_api_dir(), controller)
                 request.files['file'].save(path)
                 juju.create_controller(c_type, controller, data['region'], path)
                 code, response = 200, juju.get_controller_info(token.set_controller(data['controller']))
@@ -62,7 +61,7 @@ def create_controller():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>', methods=['GET'])
@@ -72,7 +71,7 @@ def get_controller_info(controller):
         code, response = 200, juju.get_controller_info(token)
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>', methods=['DELETE'])
@@ -86,7 +85,7 @@ def delete_controller(controller):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models', methods=['POST'])
@@ -104,7 +103,7 @@ def create_model(controller):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models', methods=['GET'])
@@ -114,7 +113,7 @@ def get_models_info(controller):
         code, response = 200, juju.get_models_info(token)
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['GET'])
@@ -125,7 +124,7 @@ def get_model_info(controller, model):
         code, response = 200, juju.get_model_info(token)
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['POST'])
@@ -140,11 +139,11 @@ def add_bundle(controller, model):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['DELETE'])
-def delete(controller, model):
+def delete_model(controller, model):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization,
                                   juju.check_input(controller), juju.check_input(model))
@@ -155,7 +154,7 @@ def delete(controller, model):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['GET'])
@@ -169,7 +168,7 @@ def get_ssh_keys(controller, model):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['POST'])
@@ -185,7 +184,7 @@ def add_ssh_key(controller, model):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['DELETE'])
@@ -201,7 +200,7 @@ def remove_ssh_key(controller, model):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['GET'])
@@ -215,7 +214,7 @@ def get_applications_info(controller, model):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['POST'])
@@ -244,7 +243,7 @@ def add_application(controller, model):
                 code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['GET'])
@@ -259,7 +258,7 @@ def get_application_info(controller, model, application):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['DELETE'])
@@ -278,7 +277,7 @@ def remove_app(controller, model, application):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/machines/', methods=['GET'])
@@ -289,7 +288,7 @@ def get_machines_info(controller, model):
         code, response = 200, juju.get_machines_info(token)
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['GET'])
@@ -304,7 +303,7 @@ def get_machine_info(controller, model, machine):
             code, response = errors.does_not_exist('machine')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/machines', methods=['POST'])
@@ -324,7 +323,7 @@ def add_machine(controller, model):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['DELETE'])
@@ -343,7 +342,7 @@ def remove_machine(controller, model, machine):
             code, response = errors.does_not_exist('machine')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['GET'])
@@ -358,7 +357,7 @@ def get_units_info(controller, model, application):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['POST'])
@@ -378,7 +377,7 @@ def add_unit(controller, model, application):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['DELETE'])
@@ -398,7 +397,7 @@ def remove_unit(controller, model, application, unitnumber):
             code, response = errors.does_not_exist('unit')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['GET'])
@@ -414,7 +413,7 @@ def get_unit_info(controller, model, application, unitnumber):
             code, response = errors.does_not_exist('unit')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['GET'])
@@ -425,7 +424,7 @@ def get_relations_info(controller, model):
         code, response = 200, juju.get_relations_info(token)
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['PUT'])
@@ -445,7 +444,7 @@ def add_relation(controller, model):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/relations/<application>', methods=['GET'])
@@ -460,7 +459,7 @@ def get_relations(controller, model, application):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/relations/<app1>/<app2>', methods=['DELETE'])
@@ -479,7 +478,7 @@ def remove_relation(controller, model, app1, app2):
             code, response = errors.no_app()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/backup', methods=['GET'])
@@ -487,7 +486,7 @@ def backup_controllers():
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization)
         if token.is_admin:
-            apidir = get_api_dir()
+            apidir = juju.get_api_dir()
             homedir = '/home/ubuntu/.local/share/juju'
             shutil.copy2('{}/install_credentials.py'.format(apidir), '{}/backup/install_credentials.py'.format(apidir))
             shutil.copy2('{}/clouds.yaml'.format(homedir), '{}/backup/clouds.yaml'.format(apidir))
@@ -499,4 +498,4 @@ def backup_controllers():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)

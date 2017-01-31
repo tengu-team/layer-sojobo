@@ -5,12 +5,9 @@
 from flask import request, Blueprint
 
 from api import w_errors as errors, w_juju as juju
-from sojobo_api import create_response
 
 
 USERS = Blueprint('users', __name__)
-
-
 def get():
     return USERS
 
@@ -25,7 +22,7 @@ def get_users_info():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @USERS.route('/', methods=['POST'])
@@ -44,7 +41,7 @@ def create_user():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>', methods=['GET'])
@@ -61,7 +58,7 @@ def get_user_info(user):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>', methods=['PUT'])
@@ -79,11 +76,11 @@ def change_user_password(user):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>', methods=['DELETE'])
-def delete(user):
+def delete_user(user):
     try:
         token = juju.authenticate(request.headers['api-key'], request.authorization)
         usr = juju.check_input(user)
@@ -100,7 +97,7 @@ def delete(user):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers', methods=['GET'])
@@ -154,7 +151,7 @@ def add_to_controller(user, controller):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['DELETE'])
@@ -172,7 +169,7 @@ def remove_from_controller(user, controller):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @USERS.route('<user>/controllers/<controller>/models', methods=['GET'])
@@ -228,7 +225,7 @@ def add_to_model(user, controller, model):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['DELETE'])
@@ -247,4 +244,4 @@ def remove_from_model(user, controller, model):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
-    return create_response(code, response)
+    return juju.create_response(code, response)

@@ -22,13 +22,24 @@ import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
 import requests
 import yaml
-from sojobo_api import get_api_dir
-from flask import abort
+from flask import abort, Response
 from api import w_errors as errors
 from git import Repo
 ################################################################################
 # TENGU FUNCTIONS
 ################################################################################
+def create_response(http_code, return_object):
+    return Response(
+        json.dumps(return_object),
+        status=http_code,
+        mimetype='application/json',
+    )
+
+
+def get_api_dir():
+    return os.environ.get('SOJOBO_API_DIR')
+
+
 def get_user():
     return os.environ.get('JUJU_ADMIN_USER')
 
