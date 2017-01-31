@@ -15,8 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,w0406,e0401
 import shutil
-from subprocess import CalledProcessError
-
 from flask import send_file, request, Blueprint
 from api import w_errors as errors, w_juju as juju
 from sojobo_api import create_response, get_api_dir
@@ -100,7 +98,7 @@ def create_model(controller):
         if juju.model_exists(token, model):
             code, response = errors.already_exists('model')
         elif token.c_access == 'add-model' or token.c_access == 'superuser':
-            juju.create_model(token, model, data.get('ssh_key', None))
+            juju.create_model(token, model, data.get('ssh-key', None))
             code, response = 200, juju.get_model_info(token.set_model(model))
         else:
             code, response = errors.no_permission()
@@ -125,6 +123,21 @@ def get_model_info(controller, model):
         token = juju.authenticate(request.headers['api-key'], request.authorization,
                                   juju.check_input(controller), juju.check_input(model))
         code, response = 200, juju.get_model_info(token)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return create_response(code, response)
+
+
+@TENGU.route('/controllers/<controller>/models/<model>', methods=['POST'])
+def add_bundle(controller, model):
+    try:
+        token = juju.authenticate(request.headers['api-key'], request.authorization,
+                                  juju.check_input(controller), juju.check_input(model))
+        if token.m_access == 'admin' or token.m_access == 'write':
+            juju.deploy_bundle(token, request.json['bundle'])
+            code, response = 200, juju.get_model_info(token)
+        else:
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, response)
@@ -263,25 +276,6 @@ def remove_app(controller, model, application):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('application')
-    except KeyError:
-        code, response = errors.invalid_data()
-    return create_response(code, response)
-
-
-@TENGU.route('/controllers/<controller>/models/<model>/bundles/', methods=['POST'])
-def add_bundle(controller, model):
-    try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        if token.m_access == 'write' or token.m_access == 'admin':
-            bundle = request.files['file']
-            bundle.save('{}/files'.format(get_api_dir()), 'bundle.yaml')
-            try:
-                code, response = 200, juju.deploy_app(token, '{}/files/bundle.yaml'.format(get_api_dir()))
-            except CalledProcessError:
-                code, response = 409, 'Something is wrong with the provided bundle!'
-        else:
-            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return create_response(code, response)

@@ -41,6 +41,16 @@ def get_charm_dir():
     return os.environ.get('LOCAL_CHARM_DIR')
 
 
+def get_ip():
+    return os.environ.get('SOJOBO_IP')
+
+
+def get_api_key():
+    with open('{}/api-key'.format(get_api_dir()), 'r') as key:
+        apikey = key.readlines()[0]
+    return apikey
+
+
 def output_pass(commands, controller=None, model=None):
     if controller is not None and model is not None:
         commands.extend(['-m', '{}:{}'.format(controller, model)])
@@ -133,9 +143,7 @@ class JuJu_Token(object):
 
 
 def authenticate(api_key, auth, controller=None, modelname=None):
-    with open('{}/api-key'.format(get_api_dir()), 'r') as key:
-        apikey = key.readlines()[0]
-    if api_key != apikey or not check_login(auth):
+    if api_key != get_api_key() or not check_login(auth):
         error = errors.unauthorized()
         abort(error[0], error[1])
     token = JuJu_Token(auth)
@@ -289,12 +297,13 @@ def get_applications_info(token):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
     result = []
     for name, info in data['applications'].items():
-        res1 = {'name': name}
-        for interface, rels in info['relations'].items():
-            res1['relations'] = [{'interface': interface, 'with': rel} for rel in rels]
+        res1 = {'name': name, 'relations': [], 'charm-name': info['charm-name'], 'exposed': info['exposed'],
+                'series': info['series']}
+        for interface, rels in info.get('relations', {}).items():
+            res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
         try:
             res1['units'] = []
-            for unit, uinfo in info['units'].items():
+            for unit, uinfo in info.get('units', {}).items():
                 res1['units'].append({'name': unit, 'machine': uinfo['machine'], 'ip': uinfo['public-address'],
                                       'ports': uinfo.get('open-ports', None)})
         except KeyError:
@@ -362,6 +371,12 @@ def app_exists(token, app_name):
     return app_name in data['applications'].keys()
 
 
+def deploy_bundle(token, bundle):
+    with open('{}/files/data.yml'.format(get_api_dir()), 'w+') as outfile:
+        yaml.dump(bundle, outfile, default_flow_style=False)
+    output_pass(['juju', 'deploy', '/opt/sojobo_api/files/data.yml'], token.c_name, token.m_name)
+
+
 def deploy_app(token, app_name, series=None, target=None):
     if 'local:' in app_name:
         app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
@@ -382,11 +397,19 @@ def remove_app(token, app_name):
     output_pass(['juju', 'remove-application', app_name], token.c_name, token.m_name)
 
 
-def add_machine(token, series=None):
-    if series is None:
+def add_machine(token, series=None, constraints=None):
+    if series is None and constraints is None:
         result = output_pass(['juju', 'add-machine'], token.c_name, token.m_name)
-    else:
+    elif series is None:
+        commands = ['juju', 'add-machine', '--constraints']
+        commands.extend(constraints)
+        result = output_pass(commands, token.c_name, token.m_name)
+    elif constraints is None:
         result = output_pass(['juju', 'add-machine', '--series', series], token.c_name, token.m_name)
+    else:
+        commands = ['juju', 'add-machine', '--series', series, '--constraints']
+        commands.extend(constraints)
+        result = output_pass(commands, token.c_name, token.m_name)
     return result
 
 
@@ -419,10 +442,13 @@ def remove_machine(token, machine):
 
 def get_application_info(token, application):
     data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    result = {'name': application, 'units': []}
-    for interface, rels in data['applications'][application]['relations'].items():
-        result['relations'] = [{'interface': interface, 'with': rel} for rel in rels]
-    for u, ui in data['applications'][application]['units'].items():
+    result = {'name': application, 'units': [], 'relations': [],
+              'charm-name': data['applications'][application]['charm-name'],
+              'exposed': data['applications'][application]['exposed'],
+              'series': data['applications'][application]['series']}
+    for interface, rels in data['applications'][application].get('relations', {}).items():
+        result['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
+    for u, ui in data['applications'][application].get('units', {}).items():
         try:
             unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui.get('open-ports', None)}
         except KeyError:
@@ -620,7 +646,7 @@ def get_controllers_access(token, username):
     for controller in get_all_controllers():
         access = get_controller_access(token.set_controller(controller), username)
         if access is not None:
-            controllers.append({'name': controller, 'access': access,
+            controllers.append({'name': controller, 'type': token.c_token.type, 'access': access,
                                 'models': get_models_access(token, username)})
     return controllers
 

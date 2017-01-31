@@ -14,6 +14,8 @@ The User-API provides user management over all controllers.
 
 ## **/users** <a name="users"></a>
 #### **Request type**: GET
+* **Description**:
+  Returns all of the information of all the users (with all their controller access and model access)
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -25,16 +27,17 @@ The User-API provides user management over all controllers.
   ```json
   [{"name": "username",
     "controllers": [{"name": "controller-name",
+                     "type": "controller-type",
                      "access": "controller access",
                      "models": [{"name": "model-name",
                                  "access": "model access"}]
                    }]
   }]
   ```
-* **Description**:
-  Returns all of the information of all the users (with all their controller access and model access)
 
 #### **Request type**: POST
+* **Description**:
+  Creates a new user. Checks if the user exists.
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -47,17 +50,18 @@ The User-API provides user management over all controllers.
   ```json
   {"name": "username",
    "controllers": [{"name": "controller-name",
+                    "type": "controller-type",
                     "access": "controller access",
                     "models": [{"name": "model-name",
                                 "access": "model access"}]
                   }]
   }
   ```
-* **Description**:
-  Creates a new user. Checks if the user exists.
 
 ## **/users/[user]** <a name="user"></a>
 #### **Request type**: GET
+* **Description**:
+  Gets the info of a user. Checks if the user exists.
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -69,16 +73,17 @@ The User-API provides user management over all controllers.
   ```json
   {"name": "username",
    "controllers": [{"name": "controller-name",
+                    "type": "controller-type",
                     "access": "controller access",
                     "models": [{"name": "model-name",
                                 "access": "model access"}]
                   }]
   }
   ```
-* **Description**:
-  Gets the info of a user. Checks if the user exists.
 
 #### **Request type**: PUT
+* **Description**:
+  Changes the user password.
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -90,16 +95,17 @@ The User-API provides user management over all controllers.
   ```json
   {"name": "username",
    "controllers": [{"name": "controller-name",
+                    "type": "controller-type",
                     "access": "controller access",
                     "models": [{"name": "model-name",
                                 "access": "model access"}]
                   }]
   }
   ```
-* **Description**:
-  Changes the user password.
 
 #### **Request type**: DELETE
+* **Description**:
+  Removes the user.
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -111,17 +117,18 @@ The User-API provides user management over all controllers.
   ```json
   [{"name": "username",
     "controllers": [{"name": "controller-name",
+                     "type": "controller-type",
                      "access": "controller access",
                      "models": [{"name": "model-name",
                                  "access": "model access"}]
                    }]
   }]
   ```
-* **Description**:
-  Removes the user.
 
 ## **/users/[user]/controllers** <a name="controllers"></a>
 #### **Request type**: GET
+* **Description**:
+  Gives all the controllers the user has access to, with the access level
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -132,16 +139,17 @@ The User-API provides user management over all controllers.
   - message:
   ```json
   [{"name": "controller-name",
+    "type": "controller-type",
     "access": "controller access",
     "models": [{"name": "model-name",
                 "access": "model access"}]
   }]
   ```
-* **Description**:
-  Gives all the controllers the user has access to, with the access level
 
 ## **/users/[user]/controllers/[controller]** <a name="controller"></a>
 #### **Request type**: GET
+* **Description**:
+  Gives the users access to this controller and it's models it has access to
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -152,15 +160,16 @@ The User-API provides user management over all controllers.
   - message:
   ```json
   {"name": "controller-name",
+   "type": "controller-type",
    "access": "controller access",
    "models": [{"name": "model-name",
                "access": "model access"}]
   }
   ```
-* **Description**:
-  Gives the users access to this controller and it's models it has access to
 
 #### **Request type**: PUT
+* **Description**:
+  Gives a user the given access to a controller
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -171,15 +180,16 @@ The User-API provides user management over all controllers.
   - message:
   ```json
   {"name": "controller-name",
+   "type": "controller-type",
    "access": "controller access",
    "models": [{"name": "model-name",
                "access": "model access"}]
   }
   ```
-* **Description**:
-  Gives a user the given access to a controller
 
 #### **Request type**: DELETE
+* **Description**:
+  Removes the user from the controller.
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -191,17 +201,18 @@ The User-API provides user management over all controllers.
   ```json
   [{"name": "username",
     "controllers": [{"name": "controller-name",
+                     "type": "controller-type",
                      "access": "controller access",
                      "models": [{"name": "model-name",
                                  "access": "model access"}]
                    }]
   }]
   ```
-* **Description**:
-  Removes the user from the controller.
 
 ## **/users/[user]/controllers/[controller]/models** <a name="models"></a>
 #### **Request type**: GET
+* **Description**:
+  Shows the models a user has access to with his access level
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -215,11 +226,11 @@ The User-API provides user management over all controllers.
     "access": "model access"}]
   }]
   ```
-* **Description**:
-  Shows the models a user has access to with his access level
 
 ## **/users/[user]/controllers/[controller]/models/[model]** <a name="model"></a>
 #### **Request type**: GET
+* **Description**:
+  Gets the access of the user to the model
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -232,10 +243,10 @@ The User-API provides user management over all controllers.
   {"name": "model-name",
    "access": "model access"}
   ```
-* **Description**:
-  Gets the access of the user to the model
 
 #### **Request type**: PUT
+* **Description**:
+    Gives a user the given access to a model
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -248,10 +259,10 @@ The User-API provides user management over all controllers.
   {"name": "model-name",
    "access": "model access"}
   ```
-* **Description**:
-    Gives a user the given access to a model
 
 #### **Request type**: DELETE
+* **Description**:
+  Removes the user from the model.
 * **Required headers**:
   - api-key
   - Content-Type:application/json
@@ -264,5 +275,3 @@ The User-API provides user management over all controllers.
   [{"name": "model-name",
     "access": "model access"}]
   ```
-* **Description**:
-  Removes the user from the model.

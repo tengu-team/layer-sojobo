@@ -29,6 +29,10 @@ def invalid_access(access):
     return 400, 'This access level does not exist: {}'.format(access)
 
 
+def invalid_series():
+    return 400, 'The series is not supported'
+
+
 def invalid_option(option):
     return 400, 'Invalid option given, {} does not exist'.format(option)
 
