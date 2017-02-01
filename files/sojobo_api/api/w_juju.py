@@ -23,7 +23,8 @@ from subprocess import check_call, check_output, STDOUT, CalledProcessError
 import requests
 import yaml
 from flask import abort, Response
-from api import w_errors as errors
+from sojobo_api.api import w_errors as errors
+from sojobo_api import settings
 from git import Repo
 ################################################################################
 # TENGU FUNCTIONS
@@ -36,28 +37,8 @@ def create_response(http_code, return_object):
     )
 
 
-def get_api_dir():
-    return os.environ.get('SOJOBO_API_DIR')
-
-
-def get_user():
-    return os.environ.get('JUJU_ADMIN_USER')
-
-
-def get_password():
-    return os.environ.get('JUJU_ADMIN_PASSWORD')
-
-
-def get_charm_dir():
-    return os.environ.get('LOCAL_CHARM_DIR')
-
-
-def get_ip():
-    return os.environ.get('SOJOBO_IP')
-
-
 def get_api_key():
-    with open('{}/api-key'.format(get_api_dir()), 'r') as key:
+    with open('{}/api-key'.format(settings.SOJOBO_API_DIR), 'r') as key:
         apikey = key.readlines()[0]
     return apikey
 
@@ -68,11 +49,11 @@ def output_pass(commands, controller=None, model=None):
     elif controller is not None:
         commands.extend(['-c', controller])
     try:
-        result = check_output(commands, input=bytes('{}\n'.format(get_password()), 'utf-8'), stderr=STDOUT).decode('utf-8')
+        result = check_output(commands, input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'), stderr=STDOUT).decode('utf-8')
     except CalledProcessError as e:
         msg = e.output.decode('utf-8')
         if 'no credentials provided' in msg:
-            check_output(['juju', 'login', get_user()], input=bytes('{}\n'.format(get_password()), 'utf-8'))
+            check_output(['juju', 'login', settings.JUJU_ADMIN_USER], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
             result = output_pass(commands)
         else:
             error = errors.cmd_error(msg)
@@ -81,8 +62,8 @@ def output_pass(commands, controller=None, model=None):
 
 
 def check_login(auth):
-    if auth.username == get_user():
-        result = auth.password == get_password()
+    if auth.username == settings.JUJU_ADMIN_USER:
+        result = auth.password == settings.JUJU_ADMIN_PASSWORD
     else:
         try:
             check_output(['juju', 'logout'], stderr=STDOUT)
@@ -147,10 +128,10 @@ class JuJu_Token(object):
         return self
 
     def m_shared_name(self):
-        return "{}/{}".format(get_user(), self.m_name)
+        return "{}/{}".format(settings.JUJU_ADMIN_USER, self.m_name)
 
     def set_admin(self):
-        return self.username == get_user() and self.password == get_password()
+        return self.username == settings.JUJU_ADMIN_USER and self.password == settings.JUJU_ADMIN_PASSWORD
 
 
 def authenticate(api_key, auth, controller=None, modelname=None):
@@ -178,7 +159,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
 ###############################################################################
 def get_controller_types():
     c_list = {}
-    for f_path in os.listdir('{}/controllers'.format(get_api_dir())):
+    for f_path in os.listdir('{}/controllers'.format(settings.SOJOBO_API_DIR)):
         if 'controller_' in f_path and '.pyc' not in f_path:
             name = f_path.split('.')[0]
             c_list[name.split('_')[1]] = import_module('controllers.{}'.format(name))
@@ -203,7 +184,7 @@ def check_c_type(c_type):
 def create_controller(c_type, name, region, credentials):
     get_controller_types()[c_type].create_controller(name, region, credentials)
     pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
-    check_output(['juju', 'change-user-password', get_user(), '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
+    check_output(['juju', 'change-user-password', settings.JUJU_ADMIN_USER, '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
 
 
 def controller_info(c_name):
@@ -383,17 +364,17 @@ def app_exists(token, app_name):
 
 
 def deploy_bundle(token, bundle):
-    with open('{}/files/data.yml'.format(get_api_dir()), 'w+') as outfile:
+    with open('{}/files/data.yml'.format(settings.SOJOBO_API_DIR), 'w+') as outfile:
         yaml.dump(bundle, outfile, default_flow_style=False)
     output_pass(['juju', 'deploy', '/opt/sojobo_api/files/data.yml'], token.c_name, token.m_name)
 
 
 def deploy_app(token, app_name, series=None, target=None):
     if 'local:' in app_name:
-        app_name = app_name.replace('local:', '{}/'.format(get_charm_dir()))
+        app_name = app_name.replace('local:', '{}/'.format(settings.LOCAL_CHARM_DIR))
     elif 'github:' in app_name:
-        Repo.clone(app_name.split(':', 1)[1], get_charm_dir())
-        app_name = '{}/{}'.format(get_charm_dir(), app_name.split('/')[-1])
+        Repo.clone(app_name.split(':', 1)[1], settings.LOCAL_CHARM_DIR)
+        app_name = '{}/{}'.format(settings.LOCAL_CHARM_DIR, app_name.split('/')[-1])
     if target is None and series is None:
         output_pass(['juju', 'deploy', app_name], token.c_name, token.m_name)
     elif target is None:
@@ -508,7 +489,7 @@ def app_supports_series(app_name, series):
     if series is None:
         supports = True
     elif 'local:' in app_name:
-        with open('{}/{}/metadata.yaml'.format(get_charm_dir(), app_name.split(':')[1])) as data:
+        with open('{}/{}/metadata.yaml'.format(settings.LOCAL_CHARM_DIR, app_name.split(':')[1])) as data:
             supports = series in yaml.load(data)['series']
     else:
         supports = False
@@ -632,7 +613,7 @@ def remove_from_model(token, username):
 
 
 def user_exists(username):
-    return username == get_user() or username in get_all_users()
+    return username == settings.JUJU_ADMIN_USER or username in get_all_users()
 
 
 def get_all_users():
@@ -640,7 +621,7 @@ def get_all_users():
         users = json.loads(output_pass(['juju', 'users', '--all', '--format', 'json'], get_all_controllers()[0]))
         result = [user['user-name'] for user in users]
     except IndexError:
-        result = [get_user()]
+        result = [settings.JUJU_ADMIN_USER]
     return result
 
 

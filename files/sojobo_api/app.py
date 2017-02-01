@@ -18,13 +18,14 @@ import logging
 import os
 import socket
 from flask import Flask, redirect
-from api.w_juju import get_api_dir, create_response
+from sojobo_api.api.w_juju import create_response
 ########################################################################################################################
 # INIT FLASK
 ########################################################################################################################
 APP = Flask(__name__)
 APP.url_map.strict_slashes = False
 APP.debug = True
+APP.config.from_object('sojobo_api.settings')
 ########################################################################################################################
 # SETUP LOGGING
 ########################################################################################################################
@@ -36,7 +37,7 @@ logging.basicConfig(filename='/home/ubuntu/flask-sojobo-api.log', level=logging.
 def index():
     return create_response(200, {'name': socket.gethostname(),
                                  'version': "1.0.0",  # see http://semver.org/
-                                 'api_dir': get_api_dir(),
+                                 'api_dir': APP.config['SOJOBO_API_DIR'],
                                  'used_apis': get_apis(),
                                  'controllers': get_controllers()})
 
@@ -49,7 +50,7 @@ def api_icon():
 ########################################################################################################################
 def get_apis():
     api_list = []
-    for f_path in os.listdir('{}/api'.format(get_api_dir())):
+    for f_path in os.listdir('{}/api'.format(APP.config['SOJOBO_API_DIR'])):
         if 'api_' in f_path and '.pyc' not in f_path:
             api_list.append(f_path.split('.')[0])
     return api_list
@@ -57,18 +58,12 @@ def get_apis():
 
 def get_controllers():
     c_list = []
-    for f_path in os.listdir('{}/controllers'.format(get_api_dir())):
+    for f_path in os.listdir('{}/controllers'.format(APP.config['SOJOBO_API_DIR'])):
         if 'controller_' in f_path and '.pyc' not in f_path:
             c_list.append(f_path.split('.')[0])
     return c_list
 
 
 for api in get_apis():
-    module = import_module('api.{}'.format(api))
+    module = import_module('sojobo_api.api.{}'.format(api))
     APP.register_blueprint(getattr(module, 'get')(), url_prefix='/{}'.format(api.split('_')[1]))
-for c_type in get_controllers():
-    try:
-        module = import_module('metering.metering_{}'.format(c_type.split('_')[1]))
-        APP.register_blueprint(getattr(module, 'get')(), url_prefix='/metering/{}'.format(c_type.split('_')[1]))
-    except ImportError:
-        pass

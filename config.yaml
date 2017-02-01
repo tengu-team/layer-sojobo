@@ -1,23 +1,35 @@
 options:
-  feature-flags:
+  api-dir:
     type: string
-    default: ''
+    default: '/opt/sojobo_api'
     description: |
-      Comma-delimited list of feature flags to be used. Each feature flag specified is set to 'True'. Example: 'DEBUG,FEATURE_FLAG_AUTH'. (non-conclusive) List of supported flags:
-        - DEBUG: run h_api in debug mode
-        - FEATURE_FLAG_AUTH: Turn on authentication on h_api
+      The location where the api will be installed
+  api-user:
+    type: string
+    default: 'sojobo'
+    description: |
+      The linux user that will be created to run the api
+  nginx-group:
+    type: string
+    default: 'www-data'
+    description: |
+      The linux group of which nginx is a member
   juju-admin-password:
     type: string
     default: 'admin'
     description: |
-      MUST NOT BE LEFT BLANK
-  port:
-    type: string
-    default: '5000'
-    description: |
-      The port on which the API will be listening.
+      MUST BE CHANGED
   charm-dir:
     type: string
     default: '/home/ubuntu/local_charms'
     description: |
       The location where the api will search for local charms, when the app_name is prefixed with "local:<app_name>"
+  port:
+    type: int
+    default: 80
+    description: |
+      NGINX listen port
+  host:
+    type: string
+    default: "127.0.0.1"
+    description: listen address

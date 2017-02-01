@@ -1,5 +1,5 @@
-includes: ['layer:basic', 'layer:apt', 'layer:juju2-client', 'interface:sojobo']
-repo: git@github.com:IBCNServices/tengu-charms.git
+includes: ['layer:basic', 'layer:apt', 'layer:juju2-client', 'layer:nginx-passenger', 'interface:sojobo']
+repo: git@github.com:Qrama/Sojobo-api.git
 options:
   apt:
     packages: ['maas-cli', 'python3-lxml']

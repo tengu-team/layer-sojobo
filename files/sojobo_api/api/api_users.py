@@ -4,7 +4,7 @@
 ###############################################################################
 from flask import request, Blueprint
 
-from api import w_errors as errors, w_juju as juju
+from sojobo_api.api import w_errors as errors, w_juju as juju
 
 
 USERS = Blueprint('users', __name__)

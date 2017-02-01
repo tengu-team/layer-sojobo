@@ -17,35 +17,21 @@
 
 from hashlib import sha256
 import os
-from os.path import expanduser
 import shutil
-import tempfile
 import subprocess
-from time import sleep
-
 # Charm pip dependencies
-from charmhelpers.core import templating
-from charmhelpers.core.hookenv import (
-    status_set,
-    log,
-    config,
-    open_port,
-    close_port,
-    unit_public_ip
-)
+from charmhelpers.core.templating import render
+from charmhelpers.core.hookenv import status_set, log, config, open_port, close_port, unit_public_ip
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charmhelpers.contrib.python.packages import pip_install
 
 from charms.reactive import hook, when, when_not, set_state
 
-
-API_DIR = '/opt/sojobo_api'
-USER = 'ubuntu'
-HOME = expanduser('~{}'.format(USER))
-SSH_DIR = HOME + '/.ssh'
-PORT = config()['port']
-
-
+API_DIR = config()['api-dir']
+USER = config()['api-user']
+GROUP = config()['nginx-group']
+PORT = 443 if config()['port'] == 443 else 80
+HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_public_ip()
 ###############################################################################
 # INSTALLATION AND UPGRADES
 ###############################################################################
@@ -64,72 +50,53 @@ def upgrade_charm():
     set_state('api.installed')
 
 
+@when('api.installed', 'nginx.passenger.available')
+def configure_webapp():
+    if PORT == 443:
+        render_https()
+    else:
+        render_http()
+    restart_api()
+    status_set('active', 'The Sojobo-api is running')
+
+
 def install_api():
     # Install pip pkgs
     for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython']:
         pip_install(pkg)
-    # Install The Sojobo API. Existing /etc files don't get overwritten.
-    if os.path.isdir(API_DIR + '/etc'):
-        t_etc_dir = tempfile.mkdtemp()
-        mergecopytree(API_DIR + '/etc', t_etc_dir)
-        mergecopytree('files/sojobo_api', API_DIR)
-        mergecopytree(t_etc_dir, API_DIR + '/etc')
-    else:
-        mergecopytree('files/sojobo_api', API_DIR)
+    mergecopytree('files/sojobo_api', API_DIR)
     os.mkdir('{}/files'.format(API_DIR))
-    render_api_systemd_template()
-    # USER should get all access rights.
+    render('settings.py', '{}/settings.py'.format(API_DIR), {'JUJU_ADMIN_USER': 'admin',
+                                                             'JUJU_ADMIN_PASSWORD': config()['juju-admin-password'],
+                                                             'SOJOBO_API_DIR': API_DIR,
+                                                             'LOCAL_CHARM_DIR': config()['charm-dir'],
+                                                             'SOJOBO_IP': HOST})
     adduser(USER)
-    chownr(API_DIR, USER, USER, chowntopdir=True)
-    subprocess.check_call([u'systemctl', 'enable', 'sojobo-api'])
+    chownr(API_DIR, USER, GROUP, chowntopdir=True)
     generate_api_key()
-    restart_api()
-    status_set('active', 'Sojobo API is running')
+    status_set('active', 'The Sojobo-api is installed')
 
 
-# Creates the service file required to run the api as a service
-def render_api_systemd_template():
-    appconf = config()
-    env_vars = [
-        "JUJU_ADMIN_USER=admin",
-        "JUJU_ADMIN_PASSWORD={}".format(appconf['juju-admin-password']),
-        "SOJOBO_API_DIR={}".format(API_DIR),
-        "SOJOBO_API_PORT={}".format(PORT),
-        "LOCAL_CHARM_DIR={}".format(appconf['charm-dir']),
-        "SOJOBO_IP={}".format(unit_public_ip()),
-        "PYTHONPATH={}".format(API_DIR)
-    ]
-    flags = appconf['feature-flags'].replace(' ', '')
-    flags = [x for x in flags.split(',') if x != '']
-    templating.render(
-        source='flask-app.service',
-        target='/etc/systemd/system/sojobo-api.service',
-        context={
-            'description': "The Sojobo API",
-            'application_dir': API_DIR,
-            'application_path': "{}/sojobo_api.py".format(API_DIR),
-            'user': USER,
-            'flags': flags,
-            'env_vars': env_vars,
-        }
-    )
-    subprocess.check_call(['systemctl', 'daemon-reload'])
+def render_http():
+    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
+    render('sojobo-http-80.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+
+
+def render_https():
+    return None
 
 
 def restart_api():
     close_port(PORT)
-    service_restart('sojobo-api')
-    # Following is to make sure charm crashes when service fails to get up
-    sleep(5)
-    subprocess.check_call(['systemctl', 'is-active', 'sojobo-api'])
+    service_restart('nginx')
+    subprocess.check_call(['service', 'nginx', 'status'])
     open_port(PORT)
 
 
 # Handeling changed configs
-@when('api.installed')
-@when('config.changed.feature-flags')
+@when('api.installed', 'config.changed')
 def feature_flags_changed():
-    render_api_systemd_template()
+    configure_webapp()
     restart_api()
 
 

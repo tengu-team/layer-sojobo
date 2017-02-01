@@ -16,7 +16,7 @@
 # pylint: disable=c0111,c0301,c0325,w0406,e0401
 import shutil
 from flask import send_file, request, Blueprint
-from api import w_errors as errors, w_juju as juju
+from sojobo_api.api import w_errors as errors, w_juju as juju
 
 
 TENGU = Blueprint('tengu', __name__)
