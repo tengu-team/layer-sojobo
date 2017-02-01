@@ -162,7 +162,7 @@ def get_controller_types():
     for f_path in os.listdir('{}/controllers'.format(settings.SOJOBO_API_DIR)):
         if 'controller_' in f_path and '.pyc' not in f_path:
             name = f_path.split('.')[0]
-            c_list[name.split('_')[1]] = import_module('controllers.{}'.format(name))
+            c_list[name.split('_')[1]] = import_module('sojobo_api.controllers.{}'.format(name))
     return c_list
 
 
