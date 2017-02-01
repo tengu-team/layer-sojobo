@@ -24,11 +24,11 @@ options:
     default: '/home/ubuntu/local_charms'
     description: |
       The location where the api will search for local charms, when the app_name is prefixed with "local:<app_name>"
-  port:
-    type: int
-    default: 80
+  https:
+    type: boolean
+    default: false
     description: |
-      NGINX listen port
+      If the Sojobo should run over https or http. Https is highly recommended!!
   host:
     type: string
     default: "127.0.0.1"

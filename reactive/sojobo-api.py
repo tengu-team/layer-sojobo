@@ -30,7 +30,7 @@ from charms.reactive import hook, when, when_not, set_state
 API_DIR = config()['api-dir']
 USER = config()['api-user']
 GROUP = config()['nginx-group']
-PORT = 443 if config()['port'] == 443 else 80
+PORT = 443 if config()['https'] else 80
 HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_public_ip()
 ###############################################################################
 # INSTALLATION AND UPGRADES
