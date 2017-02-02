@@ -17,8 +17,9 @@ from importlib import import_module
 import logging
 import os
 import socket
-from flask import Flask, redirect
-from sojobo_api.api.w_juju import create_response
+from flask import Flask, redirect, request
+from sojobo_api.api.w_juju import create_response, authenticate
+from sojobo_api.api.w_errors import invalid_data
 ########################################################################################################################
 # INIT FLASK
 ########################################################################################################################
@@ -35,11 +36,16 @@ logging.basicConfig(filename='/home/ubuntu/flask-sojobo-api.log', level=logging.
 ########################################################################################################################
 @APP.route('/')
 def index():
-    return create_response(200, {'name': socket.gethostname(),
-                                 'version': "1.0.0",  # see http://semver.org/
-                                 'api_dir': APP.config['SOJOBO_API_DIR'],
-                                 'used_apis': get_apis(),
-                                 'controllers': get_controllers()})
+    try:
+        authenticate(request.headers['api-key'], request.authorization)
+        code, response = 200, {'name': socket.gethostname(),
+                               'version': "1.0.0",  # see http://semver.org/
+                               'api_dir': APP.config['SOJOBO_API_DIR'],
+                               'used_apis': get_apis(),
+                               'controllers': get_controllers()}
+    except KeyError:
+        code, response = invalid_data()
+    return create_response(code, response)
 
 
 @APP.route('/favicon.ico')
