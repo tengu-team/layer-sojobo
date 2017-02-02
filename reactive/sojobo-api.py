@@ -72,6 +72,8 @@ def install_api():
                                                              'LOCAL_CHARM_DIR': config()['charm-dir'],
                                                              'SOJOBO_IP': HOST})
     adduser(USER)
+    os.mkdir('/home/{}'.format(USER))
+    chownr('/home/{}'.format(USER), USER, USER, chowntopdir=True)
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
     generate_api_key()
     status_set('active', 'The Sojobo-api is installed')
