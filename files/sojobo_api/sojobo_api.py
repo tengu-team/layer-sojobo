@@ -16,7 +16,7 @@
 # pylint: disable=c0111,c0301,c0325,c0103
 import os
 
-from sojobo_api.app import APP, create_response
+from sojobo_api.app import APP, create_response, redirect
 ########################################################################################################################
 # HEADERS SETUP
 ########################################################################################################################
@@ -43,7 +43,7 @@ def unauthorized(error):
 
 @APP.errorhandler(403)
 def forbidden(error):
-    return create_response(403, error.description)
+    return redirect("http://qrama.io", code=302)
 
 
 @APP.errorhandler(404)
