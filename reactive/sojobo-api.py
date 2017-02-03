@@ -145,11 +145,11 @@ def feature_flags_changed():
 @when('sojobo.available')
 def configure(sojobo):
     if SETUP == 'httpsclient':
-        port = 443
+        url = 'https://{}'.format(HOST)
     else:
-        port = 80
+        url = 'https://{}'.format(HOST)
     with open("/{}/api-key".format(API_DIR), "r") as key:
-        sojobo.configure(port, key)
+        sojobo.configure(url, API_DIR, key.readline())
 ###############################################################################
 # UTILS
 ###############################################################################
