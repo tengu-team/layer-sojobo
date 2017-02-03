@@ -2,13 +2,29 @@
 This is the api for the Tengu platform. Besides providing all the necessary Tengu - commands, it also introduces
 JuJu - wide users (instead of users on a controller-level) and the principle of an admin-user.
 # Installation
-In order to use the api, at least one controller must be installed alongside the sojobo-api.
+There are 3 different setup options that can be specified in the config:
+- http
+- httpsletsencrypt (default)
+- httpsclient
+## http
+This installs the Sojobo api running on http. **This is highly discouraged!!!**
 
-Assuming all your build charms are in the same directory, and you are in that directory, the installation process is:
-* `juju deploy ./sojobo-api`
-* `juju deploy ./controller-<type>` e.g. `juju deploy ./controller-aws`
-* `juju add-relation sojobo-api controller-<type>` e.g. `juju add-relation sojobo-api controller-aws`
-* `juju expose sojobo-api`
+## httpsletsencrypt
+This is the default value. This means the client does not have it's own SSL certificates and free ones will be created with
+LetsEncrypt. It setups the required nginx config to allow generation of the keys, and installs letsencrypt. Actual generating
+of the certificates requires that the Sojobo-API is exposed and accessable on it's FQDN (Full Qualified Domain Name). If this is the case, the certificates can be generated with the following command `sudo letsencrypt certonly -a webroot --webroot-path=/var/www/html -d fqdn`. More info of the process can be found <a href="https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-16-04">here</a>.
+**Setting up the cronjob for automatic renewal of the certificates must also be done manually (see above url)!**
+When the certificates are generated, one can continue setting up https by running the command `juju config setup=httpsclient`.
+
+## httpsclient
+This option is used if the client already has its own SSL certifcates, or if they have been generated using LetsEncrypt.
+
+It also requires manual execution of `sudo openssl -out /etc/nginx/ssl/dhparam.pem 4096` to create a DH-group for extra security. At the time of writing, 4096 is sufficient enough, but as time goes by, this number should be increased.
+The output location can be changed, but then this must be passed to the config accordingly in the dhparam value. The charm itself will set the required permissions of the file.
+### Own SSL certificates
+For this the correct path for fullchain and privatekey must be provided in the config and the Nginx-user (www-data) must have read access to them.
+### LetsEncrypt
+After the config option setup=httpsletsencrypt and manually generating the key, setup=httpsclient can be used, with fullchain and privatekey left to its default value (empty). The charm will then set the correct permissions and uses the default letsencrypt locations of the key.
 
 # API
 The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they

@@ -24,11 +24,28 @@ options:
     default: '/home/ubuntu/local_charms'
     description: |
       The location where the api will search for local charms, when the app_name is prefixed with "local:<app_name>"
-  https:
-    type: boolean
-    default: false
+  setup:
+    type: string
+    default: httpsletsencrypt
     description: |
-      If the Sojobo should run over https or http. Https is highly recommended!!
+      Choose the type of install: http [http], https [httpsclient] with client certificates, https [httpsletsencrypt] with
+      letsencrypt setup. If an option is entered which does not match [http, httpsclient, httpsletsencrypt], defaults to http.
+      the setup and config for letsencrypt is a manual process, which is documented in the readme.
+  fullchain:
+    type: string
+    default: ''
+    description: |
+      Specify the location of the ssl fullchain. Leave blank if you want the charm to setup a letsencrypt certificate
+  privatekey:
+    type: string
+    default: ''
+    description: |
+      Specify the location of the ssl privatekey. Leave blank if you want the charm to setup a letsencrypt certificate
+  dhparam:
+    type: string
+    default: /etc/nginx/ssl/dhparam.pem
+    description: |
+      Location of the DH.pem file
   host:
     type: string
     default: "127.0.0.1"

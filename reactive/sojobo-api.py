@@ -30,8 +30,8 @@ from charms.reactive import hook, when, when_not, set_state
 API_DIR = config()['api-dir']
 USER = config()['api-user']
 GROUP = config()['nginx-group']
-PORT = 443 if config()['https'] else 80
 HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_public_ip()
+SETUP = config()['setup']
 ###############################################################################
 # INSTALLATION AND UPGRADES
 ###############################################################################
@@ -52,10 +52,22 @@ def upgrade_charm():
 
 @when('api.installed', 'nginx.passenger.available')
 def configure_webapp():
-    if PORT == 443:
-        render_https()
+    if SETUP == 'httpsclient':
+        close_port(80)
+        close_port(443)
+        render_httpsclient()
+        open_port(443)
+        open_port(80)
+    elif SETUP == 'httpsletsencrypt':
+        close_port(80)
+        close_port(443)
+        render_httpsletsencrypt()
+        open_port(80)
     else:
+        close_port(80)
+        close_port(443)
         render_http()
+        open_port(80)
     restart_api()
     status_set('active', 'The Sojobo-api is running')
 
@@ -81,18 +93,46 @@ def install_api():
 
 def render_http():
     context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
-    render('sojobo-http-80.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+    render('sojobo-http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
 
 
-def render_https():
-    return None
+def render_httpsclient():
+    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR, 'dhparam': config()['dhparam']}
+    chownr(context['dhparam'], GROUP, 'root')
+    if config()['fullchain'] == '' and config()['privatekey'] == '':
+        chownr('/etc/letsencrypt/live/{}'.format(HOST), GROUP, 'root', chowntopdir=True)
+        context['fullchain'] = '/etc/letsencrypt/live/{}/fullchain.pem'.format(HOST)
+        context['privatekey'] = '/etc/letsencrypt/live/{}/privkey.pem'.format(HOST)
+        render('sojobo-httpsclient.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+    elif config()['fullchain'] != '' and config()['privatekey'] != '':
+        context['fullchain'] = config()['fullchain']
+        context['privatekey'] = config()['privatekey']
+        render('sojobo-httpsclient.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+    else:
+        status_set('blocked', 'Invalid fullchain and privatekey config')
+
+
+def render_httpsletsencrypt():
+    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
+    if not os.path.isdir('{}/.well-known'.format(API_DIR)):
+        os.mkdir('{}/.well-known'.format(API_DIR))
+    chownr('{}/.well-known'.format(API_DIR), USER, GROUP, chowntopdir=True)
+    render('sojobo-httpsletsencrypt.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
 
 
 def restart_api():
-    close_port(PORT)
     service_restart('nginx')
     subprocess.check_call(['service', 'nginx', 'status'])
-    open_port(PORT)
+
+
+def dhparam(size):
+    if not os.path.isdir('/etc/nginx/ssl'):
+        os.mkdir('/etc/nginx/ssl')
+    if not os.path.isdir('/etc/nginx/ssl/{}'.format(HOST)):
+        os.mkdir('/etc/nginx/ssl/{}'.format(HOST))
+    chownr('/etc/nginx/ssl/{}'.format(HOST), GROUP, 'root', chowntopdir=True)
+    subprocess.check_call(['openssl', 'dhparam', '-out', '/etc/nignx/ssl/{}/dhparam.pem'.format(HOST), str(size)])
+    return '/etc/nignx/ssl/{}/dhparam.pem'.format(HOST)
 
 
 # Handeling changed configs
@@ -104,8 +144,12 @@ def feature_flags_changed():
 
 @when('sojobo.available')
 def configure(sojobo):
+    if SETUP == 'httpsclient':
+        port = 443
+    else:
+        port = 80
     with open("/{}/api-key".format(API_DIR), "r") as key:
-        sojobo.configure(PORT, key)
+        sojobo.configure(port, key)
 ###############################################################################
 # UTILS
 ###############################################################################

@@ -2,4 +2,4 @@ includes: ['layer:basic', 'layer:apt', 'layer:juju2-client', 'layer:nginx-passen
 repo: git@github.com:Qrama/Sojobo-api.git
 options:
   apt:
-    packages: ['maas-cli', 'python3-lxml']
+    packages: ['maas-cli', 'python3-lxml', 'letsencrypt']
