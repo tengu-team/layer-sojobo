@@ -147,9 +147,9 @@ def configure(sojobo):
     if SETUP == 'httpsclient':
         url = 'https://{}'.format(HOST)
     else:
-        url = 'https://{}'.format(HOST)
+        url = 'http://{}'.format(HOST)
     with open("/{}/api-key".format(API_DIR), "r") as key:
-        sojobo.configure(url, API_DIR, key.readline())
+        sojobo.configure(url, API_DIR, key.readline(), config()['api-user'])
 ###############################################################################
 # UTILS
 ###############################################################################
