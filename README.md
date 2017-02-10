@@ -18,7 +18,7 @@ This installs the Sojobo api running on http. **This is highly discouraged!!!**
 ## httpsletsencrypt
 This is the default value. This means the client does not have it's own SSL certificates and free ones will be created with
 LetsEncrypt. It setups the required nginx config to allow generation of the keys, and installs letsencrypt. Actual generating
-of the certificates **requires that the Sojobo-API is exposed and accessable on it's FQDN (Full Qualified Domain Name)**. If this is the case, the certificates can be generated with the following command `sudo letsencrypt certonly -a webroot --webroot-path=[path_to_api] -d fqdn`, with `fqdn` being the domain name. More info of the process can be found <a href="https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-16-04">here</a>.
+of the certificates **requires that the Sojobo-API is exposed and accessable on it's FQDN (Full Qualified Domain Name)**. If this is the case, the certificates can be generated with the following command `sudo letsencrypt certonly -a webroot --webroot-path=[path_to_api] -d fqdn --rsa-key-size 4096`, with `fqdn` being the domain name. More info of the process can be found <a href="https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-16-04">here</a>.
 **Setting up the cronjob for automatic renewal of the certificates must also be done manually (see above url)!**
 When the certificates are generated, one can continue setting up https by running the command `juju config setup=httpsclient`.
 
