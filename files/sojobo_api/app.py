@@ -16,10 +16,9 @@
 from importlib import import_module
 import logging
 import os
-import socket
-from flask import Flask, redirect, request
-from sojobo_api.api.w_juju import create_response, authenticate
-from sojobo_api.api.w_errors import invalid_data
+from flask import Flask, redirect, request, abort
+from sojobo_api.api.w_juju import create_response, get_api_key
+from sojobo_api.api.w_errors import invalid_data, unauthorized
 ########################################################################################################################
 # INIT FLASK
 ########################################################################################################################
@@ -37,12 +36,13 @@ logging.basicConfig(filename='/home/ubuntu/flask-sojobo-api.log', level=logging.
 @APP.route('/')
 def index():
     try:
-        authenticate(request.headers['api-key'], request.authorization)
-        code, response = 200, {'name': socket.gethostname(),
-                               'version': "1.0.0",  # see http://semver.org/
-                               'api_dir': APP.config['SOJOBO_API_DIR'],
-                               'used_apis': get_apis(),
-                               'controllers': get_controllers()}
+        if request.headers['api-key'] == get_api_key():
+            code, response = 200, {'version': "1.0.0",  # see http://semver.org/
+                                   'used_apis': get_apis(),
+                                   'controllers': get_controllers()}
+        else:
+            error = unauthorized()
+            abort(error[0], error[1])
     except KeyError:
         code, response = invalid_data()
     return create_response(code, response)
