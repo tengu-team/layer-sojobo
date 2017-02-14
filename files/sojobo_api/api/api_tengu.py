@@ -232,7 +232,7 @@ def add_application(controller, model):
                 app = juju.check_input(data['application'])
                 if juju.app_supports_series(app, series) and juju.cloud_supports_series(token, series) and juju.machine_matches_series(token, machine, series):
                     juju.deploy_app(token, app, series, machine)
-                    code, response = 200, juju.get_application_info(app)
+                    code, response = 200, juju.get_application_info(token, app)
                 elif juju.app_supports_series(app, series) and juju.cloud_supports_series(token, series):
                     code, response = 400, 'Target machine and application series mismatch'
                 elif juju.cloud_supports_series(token, series) and juju.machine_matches_series(token, machine, series):

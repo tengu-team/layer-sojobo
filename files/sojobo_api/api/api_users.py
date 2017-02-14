@@ -228,7 +228,7 @@ def add_to_model(user, controller, model):
         token = juju.authenticate(request.headers['api-key'], request.authorization,
                                   juju.check_input(controller), juju.check_input(model))
         access = juju.check_access(request.json['access'])
-        usr = juju.user_exists(user)
+        usr = juju.check_input(user)
         u_exists = juju.user_exists(user)
         if u_exists:
             if (token.m_access == 'admin' or token.c_access == 'superuser') and user != 'admin':

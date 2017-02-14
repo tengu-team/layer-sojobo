@@ -561,7 +561,7 @@ def add_to_controller(token, username, access):
         elif current_access == 'add-model':
             output_pass(['juju', 'revoke', username, 'add-model'], token.c_name)
         else:
-            output_pass(['juju', 'grant', username, 'superuser'], token.c_name)
+            output_pass(['juju', 'grant', username, 'login'], token.c_name)
 
 
 def remove_from_controller(token, username):
@@ -583,20 +583,20 @@ def add_to_model(token, username, access):
     current_access = get_model_access(token, username)
     if current_access == 'admin':
         if access == 'write':
-            output_pass(['juju', 'revoke', username, 'admin', token.m_name])
+            output_pass(['juju', 'revoke', username, 'admin', token.m_name], token.c_name)
         elif access == 'read':
-            output_pass(['juju', 'revoke', username, 'admin', token.m_name])
-            output_pass(['juju', 'revoke', username, 'write', token.m_name])
+            output_pass(['juju', 'revoke', username, 'admin', token.m_name], token.c_name)
+            output_pass(['juju', 'revoke', username, 'write', token.m_name], token.c_name)
     elif current_access == 'write':
         if access == 'admin':
-            output_pass(['juju', 'grant', username, 'admin', token.m_name])
+            output_pass(['juju', 'grant', username, 'admin', token.m_name], token.c_name)
         elif access == 'read':
-            output_pass(['juju', 'revoke', username, 'write', token.m_name])
-    elif current_access == 'login':
-        if access != 'login':
-            output_pass(['juju', 'grant', username, access, token.m_name])
+            output_pass(['juju', 'revoke', username, 'write', token.m_name], token.c_name)
+    elif current_access == 'read':
+        if access != 'read':
+            output_pass(['juju', 'grant', username, access, token.m_name], token.c_name)
     elif current_access is None:
-        output_pass(['juju', 'grant', username, access, token.m_name])
+        output_pass(['juju', 'grant', username, access, token.m_name], token.c_name)
 
 
 def remove_from_model(token, username):
