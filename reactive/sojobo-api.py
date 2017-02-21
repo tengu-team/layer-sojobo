@@ -51,6 +51,7 @@ def upgrade_charm():
 
 
 @when('api.installed', 'nginx.passenger.available')
+@when_not('api.running')
 def configure_webapp():
     if SETUP == 'httpsclient':
         close_port(80)
@@ -69,6 +70,7 @@ def configure_webapp():
         render_http()
         open_port(80)
     restart_api()
+    set_state('api.running')
     status_set('active', 'The Sojobo-api is running')
 
 

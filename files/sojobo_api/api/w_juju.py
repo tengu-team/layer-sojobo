@@ -188,7 +188,7 @@ def create_controller(c_type, name, region, credentials):
 
 
 def controller_info(c_name):
-    with open('/home/ubuntu/.local/share/juju/controllers.yaml') as data:
+    with open('/home/sojobo/.local/share/juju/controllers.yaml') as data:
         controller = yaml.load(data)['controllers'][c_name]
     return controller['cloud'], controller['api-endpoints'][-1].split(':')[0]
 
