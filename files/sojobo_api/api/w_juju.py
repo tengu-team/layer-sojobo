@@ -199,12 +199,16 @@ def delete_controller(token):
 
 
 def get_all_controllers():
-    controllers = json.loads(output_pass(['juju', 'controllers', '--format', 'json']))
     try:
-        result = list(controllers['controllers'].keys())
-    except AttributeError:
-        result = []
-    return result
+        controllers = json.loads(output_pass(['juju', 'controllers', '--format', 'json']))
+        try:
+            result = list(controllers['controllers'].keys())
+        except AttributeError:
+            result = []
+        return result
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def controller_exists(c_name):
@@ -212,14 +216,18 @@ def controller_exists(c_name):
 
 
 def get_controller_access(token, username):
-    users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
-    result = None
-    for user in users:
-        if user['user-name'] == username:
-            access = user['access']
-            if c_access_exists(access):
-                result = access
-    return result
+    try:
+        users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
+        result = None
+        for user in users:
+            if user['user-name'] == username:
+                access = user['access']
+                if c_access_exists(access):
+                    result = access
+        return result
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def get_controllers_info(token):
@@ -240,14 +248,22 @@ def c_access_exists(access):
 
 
 def get_controller_superusers(token):
-    users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
-    return [u['user-name'] for u in users if u['access'] == 'superuser']
+    try:
+        users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
+        return [u['user-name'] for u in users if u['access'] == 'superuser']
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
 def get_all_models(token):
-    data = json.loads(output_pass(['juju', 'list-models', '--format', 'json'], token.c_name))
-    return [model['name'] for model in data['models']]
+    try:
+        data = json.loads(output_pass(['juju', 'list-models', '--format', 'json'], token.c_name))
+        return [model['name'] for model in data['models']]
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def model_exists(token, model):
@@ -256,11 +272,15 @@ def model_exists(token, model):
 
 def get_model_access(token, username):
     access = None
-    for model in json.loads(output_pass(['juju', 'models', '--format', 'json'], token.c_name))['models']:
-        if model['name'] == token.m_name and username in model['users'].keys():
-            access = model['users'][username]['access']
-            break
-    return access
+    try:
+        for model in json.loads(output_pass(['juju', 'models', '--format', 'json'], token.c_name))['models']:
+            if model['name'] == token.m_name and username in model['users'].keys():
+                access = model['users'][username]['access']
+                break
+        return access
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def m_access_exists(access):
@@ -286,51 +306,71 @@ def get_ssh_keys(token):
 
 
 def get_applications_info(token):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    result = []
-    for name, info in data['applications'].items():
-        res1 = {'name': name, 'relations': [], 'charm-name': info['charm-name'], 'exposed': info['exposed'],
-                'series': info['series']}
-        for interface, rels in info.get('relations', {}).items():
-            res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
-        try:
-            res1['units'] = []
-            for unit, uinfo in info.get('units', {}).items():
-                res1['units'].append({'name': unit, 'machine': uinfo['machine'], 'ip': uinfo['public-address'],
-                                      'ports': uinfo.get('open-ports', None)})
-        except KeyError:
-            pass
-        result.append(res1)
-    return result
+    try:
+        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+        result = []
+        for name, info in data['applications'].items():
+            res1 = {'name': name, 'relations': [], 'charm-name': info['charm-name'], 'exposed': info['exposed'],
+                    'series': info['series']}
+            for interface, rels in info.get('relations', {}).items():
+                res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
+            try:
+                res1['units'] = []
+                for unit, uinfo in info.get('units', {}).items():
+                    res1['units'].append({'name': unit, 'machine': uinfo['machine'], 'ip': uinfo['public-address'],
+                                          'ports': uinfo.get('open-ports', None)})
+            except KeyError:
+                pass
+            result.append(res1)
+        return result
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def get_units_info(token, application):
-    data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))[application]['units']
-    return [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'],
-             'ports': ui['open-ports']} for u, ui in data.items()]
+    try:
+        data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))[application]['units']
+        return [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'],
+                 'ports': ui['open-ports']} for u, ui in data.items()]
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def get_machines_info(token):
-    data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))['machines'].keys()
-    return [get_machine_info(token, m) for m in data]
+    try:
+        data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))['machines'].keys()
+        return [get_machine_info(token, m) for m in data]
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def get_machine_info(token, machine):
-    data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))['machines'][machine]
     try:
-        containers = None
-        if 'containers' in data.keys():
-            containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data['containers'].items()]
-        result = {'name': machine, 'instance-id': data['instance-id'], 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
-    except KeyError:
-        result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
-    return result
+        data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))['machines'][machine]
+        try:
+            containers = None
+            if 'containers' in data.keys():
+                containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data['containers'].items()]
+            result = {'name': machine, 'instance-id': data['instance-id'], 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
+        except KeyError:
+            result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
+        return result
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def get_gui_url(token):
     data = output_pass(['juju', 'gui', '--no-browser'], token.c_name, token.m_name).rstrip().split(':')[2]
-    url = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, 'controller'))['machines']['0']['dns-name']
-    return 'https://{}:{}'.format(url, data)
+    try:
+        url = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, 'controller'))['machines']['0']['dns-name']
+        return 'https://{}:{}'.format(url, data)
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def create_model(token, model, ssh_key=None):
@@ -359,8 +399,12 @@ def remove_ssh_key(token, ssh_key):
 # APPLICATION FUNCTIONS
 #####################################################################################
 def app_exists(token, app_name):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    return app_name in data['applications'].keys()
+    try:
+        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+        return app_name in data['applications'].keys()
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def deploy_bundle(token, bundle):
@@ -406,19 +450,28 @@ def add_machine(token, series=None, constraints=None):
 
 
 def machine_exists(token, machine):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    if 'lxd' in machine:
-        return machine in data['machines'][machine.split('/')[0]]['containers'].keys()
-    else:
-        return machine in data['machines'].keys()
+    try:
+        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+        if 'lxd' in machine:
+            return machine in data['machines'][machine.split('/')[0]]['containers'].keys()
+        else:
+            return machine in data['machines'].keys()
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
+
 
 
 def get_machine_series(token, machine):
-    data = json.loads(output_pass(['juju', 'list-machines', '--format', 'json'], token.c_name, token.m_name))
-    if 'lxd' in machine:
-        return data['machines'][machine.split('/')[0]]['containers'][machine]['series']
-    else:
-        return data['machines'][machine]['series']
+    try:
+        data = json.loads(output_pass(['juju', 'list-machines', '--format', 'json'], token.c_name, token.m_name))
+        if 'lxd' in machine:
+            return data['machines'][machine.split('/')[0]]['containers'][machine]['series']
+        else:
+            return data['machines'][machine]['series']
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def machine_matches_series(token, machine, series):
@@ -433,20 +486,24 @@ def remove_machine(token, machine):
 
 
 def get_application_info(token, application):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-    result = {'name': application, 'units': [], 'relations': [],
-              'charm-name': data['applications'][application]['charm-name'],
-              'exposed': data['applications'][application]['exposed'],
-              'series': data['applications'][application]['series']}
-    for interface, rels in data['applications'][application].get('relations', {}).items():
-        result['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
-    for u, ui in data['applications'][application].get('units', {}).items():
-        try:
-            unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui.get('open-ports', None)}
-        except KeyError:
-            unit = {'name': u, 'machine': 'Waiting', 'instance-id': 'Unknown', 'ip': 'Unknown', 'ports': 'Unknown'}
-        result['units'].append(unit)
-    return result
+    try:
+        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+        result = {'name': application, 'units': [], 'relations': [],
+                  'charm-name': data['applications'][application]['charm-name'],
+                  'exposed': data['applications'][application]['exposed'],
+                  'series': data['applications'][application]['series']}
+        for interface, rels in data['applications'][application].get('relations', {}).items():
+            result['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
+        for u, ui in data['applications'][application].get('units', {}).items():
+            try:
+                unit = {'name': u, 'machine': ui['machine'], 'instance-id': data['machines'][ui['machine']]['instance-id'], 'ip': ui['public-address'], 'ports': ui.get('open-ports', None)}
+            except KeyError:
+                unit = {'name': u, 'machine': 'Waiting', 'instance-id': 'Unknown', 'ip': 'Unknown', 'ports': 'Unknown'}
+            result['units'].append(unit)
+        return result
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def get_unit_info(token, application, unitnumber):
@@ -457,8 +514,12 @@ def get_unit_info(token, application, unitnumber):
 
 
 def unit_exists(token, application, unitnumber):
-    data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))['applications'][application]
-    return '{}/{}'.format(application, unitnumber) in data['units'].keys()
+    try:
+        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))['applications'][application]
+        return '{}/{}'.format(application, unitnumber) in data['units'].keys()
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def add_unit(token, app_name, target=None):
@@ -521,26 +582,34 @@ def change_user_password(username, password):
 
 
 def get_users_controller(token):
-    if token.c_access == 'superuser':
-        data = json.loads(output_pass(['juju', 'list-users', '--format', 'json'], token.c_name))
-        users = [{'name': u['user-name'], 'access': u['access']} for u in data]
-    elif token.c_access is not None:
-        users = [{'name': token.username, 'access': token.c_access}]
-    else:
-        users = None
-    return users
+    try:
+        if token.c_access == 'superuser':
+            data = json.loads(output_pass(['juju', 'list-users', '--format', 'json'], token.c_name))
+            users = [{'name': u['user-name'], 'access': u['access']} for u in data]
+        elif token.c_access is not None:
+            users = [{'name': token.username, 'access': token.c_access}]
+        else:
+            users = None
+        return users
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def get_users_model(token):
-    if token.m_access == 'admin' or token.m_access == 'write':
-        check_call(['juju', 'switch', '{}:{}'.format(token.c_name, token.m_name)])
-        users_info = json.loads(check_output(['juju', 'show-model', '--format', 'json']).decode('utf-8'))[token.m_name]['users']
-        users = [{'name': k, 'access': v['access']} for k, v in users_info.items()]
-    elif token.m_access is not None:
-        users = [{'name': token.username, 'access': token.m_access}]
-    else:
-        users = None
-    return users
+    try:
+        if token.m_access == 'admin' or token.m_access == 'write':
+            check_call(['juju', 'switch', '{}:{}'.format(token.c_name, token.m_name)])
+            users_info = json.loads(check_output(['juju', 'show-model', '--format', 'json']).decode('utf-8'))[token.m_name]['users']
+            users = [{'name': k, 'access': v['access']} for k, v in users_info.items()]
+        elif token.m_access is not None:
+            users = [{'name': token.username, 'access': token.m_access}]
+        else:
+            users = None
+        return users
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
 
 
 def add_to_controller(token, username, access):
@@ -622,6 +691,9 @@ def get_all_users():
         result = [user['user-name'] for user in users]
     except IndexError:
         result = [settings.JUJU_ADMIN_USER]
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
     return result
 
 
