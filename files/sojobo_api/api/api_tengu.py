@@ -487,9 +487,12 @@ def backup_controllers():
         token = juju.authenticate(request.headers['api-key'], request.authorization)
         if token.is_admin:
             apidir = juju.get_api_dir()
-            homedir = '/home/ubuntu/.local/share/juju'
-            shutil.copy2('{}/install_credentials.py'.format(apidir), '{}/backup/install_credentials.py'.format(apidir))
-            shutil.copy2('{}/clouds.yaml'.format(homedir), '{}/backup/clouds.yaml'.format(apidir))
+            homedir = '/home/{}/.local/share/juju'.format(juju.get_api_user())
+            # shutil.copy2('{}/install_credentials.py'.format(apidir), '{}/backup/install_credentials.py'.format(apidir))
+            try:
+                shutil.copy2('{}/clouds.yaml'.format(homedir), '{}/backup/clouds.yaml'.format(apidir))
+            except FileNotFoundError:
+                pass
             shutil.copy2('{}/credentials.yaml'.format(homedir), '{}/backup/credentials.yaml'.format(apidir))
             shutil.copy2('{}/controllers.yaml'.format(homedir), '{}/backup/controllers.yaml'.format(apidir))
             shutil.make_archive('{}/backup'.format(apidir), 'zip', '{}/backup/'.format(apidir))

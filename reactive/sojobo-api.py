@@ -84,7 +84,8 @@ def install_api():
                                                              'JUJU_ADMIN_PASSWORD': config()['juju-admin-password'],
                                                              'SOJOBO_API_DIR': API_DIR,
                                                              'LOCAL_CHARM_DIR': config()['charm-dir'],
-                                                             'SOJOBO_IP': HOST})
+                                                             'SOJOBO_IP': HOST,
+                                                             'SOJOBO_USER': USER})
     adduser(USER)
     os.mkdir('/home/{}'.format(USER))
     chownr('/home/{}'.format(USER), USER, USER, chowntopdir=True)
