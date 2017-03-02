@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,w0406,e0401
+import os
 import shutil
 from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju
@@ -50,7 +51,7 @@ def create_controller():
             if juju.controller_exists(controller):
                 code, response = errors.already_exists('controller')
             elif 'file' in request.files:
-                path = '{}/files/google-{}.json'.format(juju.get_api_dir(), controller)
+                path = '{}/files/credentials/google-{}.json'.format(juju.get_api_dir(), controller)
                 request.files['file'].save(path)
                 juju.create_controller(c_type, controller, data['region'], path)
                 code, response = 200, juju.get_controller_info(token.set_controller(data['controller']))
@@ -491,6 +492,13 @@ def backup_controllers():
             # shutil.copy2('{}/install_credentials.py'.format(apidir), '{}/backup/install_credentials.py'.format(apidir))
             try:
                 shutil.copy2('{}/clouds.yaml'.format(homedir), '{}/backup/clouds.yaml'.format(apidir))
+            except FileNotFoundError:
+                pass
+            try:
+                shutil.copytree('{}/files/credentials'.format(apidir), '{}/backup/credentials'.format(apidir))
+            except FileExistsError:
+                os.rmdir('{}/backup/credentials'.format(apidir))
+                shutil.copytree('{}/files/credentials'.format(apidir), '{}/backup/credentials'.format(apidir))
             except FileNotFoundError:
                 pass
             shutil.copy2('{}/credentials.yaml'.format(homedir), '{}/backup/credentials.yaml'.format(apidir))
