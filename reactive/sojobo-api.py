@@ -21,7 +21,7 @@ import shutil
 import subprocess
 # Charm pip dependencies
 from charmhelpers.core.templating import render
-from charmhelpers.core.hookenv import status_set, log, config, open_port, close_port, unit_public_ip
+from charmhelpers.core.hookenv import status_set, log, config, open_port, close_port, unit_public_ip, application_version_set
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charmhelpers.contrib.python.packages import pip_install
 
@@ -92,6 +92,7 @@ def install_api():
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
     generate_api_key()
     status_set('active', 'The Sojobo-api is installed')
+    application_version_set('1.0.0')
 
 
 def render_http():
