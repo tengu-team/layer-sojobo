@@ -43,7 +43,7 @@ def unauthorized(error):
 
 @APP.errorhandler(403)
 def forbidden(error):
-    return redirect("http://qrama.io", code=302)
+    return create_response(403, error.description)
 
 
 @APP.errorhandler(404)
