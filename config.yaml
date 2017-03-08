@@ -26,9 +26,9 @@ options:
       The location where the api will search for local charms, when the app_name is prefixed with "local:<app_name>"
   setup:
     type: string
-    default: httpsletsencrypt
+    default: http
     description: |
-      Choose the type of install: http [http], https [httpsclient] with client certificates, https [httpsletsencrypt] with
+      Choose the type of install: http [http], https [https] with client certificates, letsencrypt [letsencrypt] with
       letsencrypt setup. If an option is entered which does not match [http, httpsclient, httpsletsencrypt], defaults to http.
       the setup and config for letsencrypt is a manual process, which is documented in the readme.
   fullchain:
@@ -49,4 +49,4 @@ options:
   host:
     type: string
     default: "127.0.0.1"
-    description: listen address
+    description: listen address. When left at the default value, defaults to internal ip address.

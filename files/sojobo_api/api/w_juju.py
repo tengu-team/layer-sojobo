@@ -607,8 +607,11 @@ def get_users_controller(token):
 def get_users_model(token):
     try:
         if token.m_access == 'admin' or token.m_access == 'write':
-            check_call(['juju', 'switch', '{}:{}'.format(token.c_name, token.m_name)])
-            users_info = json.loads(check_output(['juju', 'show-model', '--format', 'json']).decode('utf-8'))[token.m_name]['users']
+            data = json.loads(output_pass(['juju', 'models', '--format', 'json'], token.c_name))
+            for model in data['models']:
+                if model['name'] == token.m_name:
+                    users_info = model['users']
+                    break
             users = [{'name': k, 'access': v['access']} for k, v in users_info.items()]
         elif token.m_access is not None:
             users = [{'name': token.username, 'access': token.m_access}]

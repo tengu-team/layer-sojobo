@@ -21,7 +21,7 @@ import shutil
 import subprocess
 # Charm pip dependencies
 from charmhelpers.core.templating import render
-from charmhelpers.core.hookenv import status_set, log, config, open_port, close_port, unit_public_ip, application_version_set
+from charmhelpers.core.hookenv import status_set, log, config, open_port, close_port, unit_private_ip, application_version_set
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charmhelpers.contrib.python.packages import pip_install
 
@@ -30,7 +30,7 @@ from charms.reactive import hook, when, when_not, set_state
 API_DIR = config()['api-dir']
 USER = config()['api-user']
 GROUP = config()['nginx-group']
-HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_public_ip()
+HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_private_ip()
 SETUP = config()['setup']
 ###############################################################################
 # INSTALLATION AND UPGRADES
@@ -53,13 +53,13 @@ def upgrade_charm():
 @when('api.installed', 'nginx.passenger.available')
 @when_not('api.running')
 def configure_webapp():
-    if SETUP == 'httpsclient':
+    if SETUP == 'https':
         close_port(80)
         close_port(443)
         render_httpsclient()
         open_port(443)
         open_port(80)
-    elif SETUP == 'httpsletsencrypt':
+    elif SETUP == 'letsencrypt':
         close_port(80)
         close_port(443)
         render_httpsletsencrypt()
@@ -97,7 +97,7 @@ def install_api():
 
 def render_http():
     context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
-    render('sojobo-http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+    render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
 
 
 def render_httpsclient():
@@ -107,11 +107,11 @@ def render_httpsclient():
         chownr('/etc/letsencrypt/live/{}'.format(HOST), GROUP, 'root', chowntopdir=True)
         context['fullchain'] = '/etc/letsencrypt/live/{}/fullchain.pem'.format(HOST)
         context['privatekey'] = '/etc/letsencrypt/live/{}/privkey.pem'.format(HOST)
-        render('sojobo-httpsclient.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+        render('https.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
     elif config()['fullchain'] != '' and config()['privatekey'] != '':
         context['fullchain'] = config()['fullchain']
         context['privatekey'] = config()['privatekey']
-        render('sojobo-httpsclient.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+        render('https.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
     else:
         status_set('blocked', 'Invalid fullchain and privatekey config')
 
@@ -121,7 +121,7 @@ def render_httpsletsencrypt():
     if not os.path.isdir('{}/.well-known'.format(API_DIR)):
         os.mkdir('{}/.well-known'.format(API_DIR))
     chownr('{}/.well-known'.format(API_DIR), USER, GROUP, chowntopdir=True)
-    render('sojobo-httpsletsencrypt.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+    render('letsencrypt.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
 
 
 def restart_api():
@@ -148,12 +148,9 @@ def feature_flags_changed():
 
 @when('sojobo.available')
 def configure(sojobo):
-    if SETUP == 'httpsclient':
-        url = 'https://{}'.format(HOST)
-    else:
-        url = 'http://{}'.format(HOST)
+    prefix = 'https://' if SETUP == 'client' else 'http://'
     with open("/{}/api-key".format(API_DIR), "r") as key:
-        sojobo.configure(url, API_DIR, key.readline(), config()['api-user'])
+        sojobo.configure('{}{}'.format(prefix, HOST), API_DIR, key.readline(), config()['api-user'])
 ###############################################################################
 # UTILS
 ###############################################################################
