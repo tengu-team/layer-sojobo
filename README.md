@@ -13,7 +13,7 @@ There are 3 different setup options that can be specified in the config:
 - https
 
 ## http
-This installs the Sojobo api running on http. **This is highly discouraged!!!**
+This installs the service running on http. **This is highly discouraged!!!**
 
 ## letsencrypt
 
