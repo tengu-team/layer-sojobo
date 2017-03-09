@@ -148,7 +148,7 @@ def feature_flags_changed():
 
 @when('sojobo.available')
 def configure(sojobo):
-    prefix = 'https://' if SETUP == 'client' else 'http://'
+    prefix = 'https://' if SETUP == 'https' else 'http://'
     with open("/{}/api-key".format(API_DIR), "r") as key:
         sojobo.configure('{}{}'.format(prefix, HOST), API_DIR, key.readline(), config()['api-user'])
 ###############################################################################
