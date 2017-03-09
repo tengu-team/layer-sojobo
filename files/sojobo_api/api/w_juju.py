@@ -58,10 +58,12 @@ def output_pass(commands, controller=None, model=None):
         commands.extend(['-c', controller])
     try:
         result = check_output(commands, input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'), stderr=STDOUT).decode('utf-8')
+        if 'please enter password' in result:
+            result = result.split('\n', 1)[1]
     except CalledProcessError as e:
         msg = e.output.decode('utf-8')
         if 'no credentials provided' in msg:
-            check_output(['juju', 'login', settings.JUJU_ADMIN_USER], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
+            check_output(['juju', 'login', settings.JUJU_ADMIN_USER, '-c', controller], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
             result = output_pass(commands)
         else:
             error = errors.cmd_error(msg)
