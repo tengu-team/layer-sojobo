@@ -14,11 +14,6 @@ options:
     default: 'www-data'
     description: |
       The linux group of which nginx is a member
-  juju-admin-password:
-    type: string
-    default: 'admin'
-    description: |
-      MUST BE CHANGED
   charm-dir:
     type: string
     default: '/home/ubuntu/local_charms'

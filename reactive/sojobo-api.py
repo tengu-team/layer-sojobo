@@ -14,9 +14,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0103,c0301
-
+from base64 import b64encode
 from hashlib import sha256
 import os
+import requests
 import shutil
 import subprocess
 # Charm pip dependencies
@@ -71,7 +72,7 @@ def configure_webapp():
         open_port(80)
     restart_api()
     set_state('api.running')
-    status_set('active', 'The Sojobo-api is running')
+    status_set('active', 'The Sojobo-api is running, initial admin-password: {}'.format(get_password()))
 
 
 def install_api():
@@ -80,17 +81,13 @@ def install_api():
         pip_install(pkg)
     mergecopytree('files/sojobo_api', API_DIR)
     os.mkdir('{}/files'.format(API_DIR))
-    render('settings.py', '{}/settings.py'.format(API_DIR), {'JUJU_ADMIN_USER': 'admin',
-                                                             'JUJU_ADMIN_PASSWORD': config()['juju-admin-password'],
-                                                             'SOJOBO_API_DIR': API_DIR,
-                                                             'LOCAL_CHARM_DIR': config()['charm-dir'],
-                                                             'SOJOBO_IP': HOST,
-                                                             'SOJOBO_USER': USER})
     adduser(USER)
+    generate_password()
     os.mkdir('/home/{}'.format(USER))
     chownr('/home/{}'.format(USER), USER, USER, chowntopdir=True)
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
     generate_api_key()
+    generate_password()
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
 
@@ -141,9 +138,14 @@ def dhparam(size):
 
 # Handeling changed configs
 @when('api.installed', 'config.changed')
-def feature_flags_changed():
+def config_changed():
+    render('settings.py', '{}/settings.py'.format(API_DIR), {'JUJU_ADMIN_USER': 'admin',
+                                                             'JUJU_ADMIN_PASSWORD': get_password(),
+                                                             'SOJOBO_API_DIR': API_DIR,
+                                                             'LOCAL_CHARM_DIR': config()['charm-dir'],
+                                                             'SOJOBO_IP': HOST,
+                                                             'SOJOBO_USER': USER})
     configure_webapp()
-    restart_api()
 
 
 @when('sojobo.available')
@@ -180,3 +182,13 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 def generate_api_key():
     with open("/{}/api-key".format(API_DIR), "w") as key:
         key.write(sha256(os.urandom(256)).hexdigest())
+
+
+def generate_password():
+    with open("/{}/juju-admin".format(API_DIR), "w") as key:
+        key.write(b64encode(os.urandom(16)).decode('utf-8'))
+
+
+def get_password():
+    with open("/{}/juju-admin".format(API_DIR), "r") as key:
+        return key.readline()
