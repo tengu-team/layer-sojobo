@@ -76,11 +76,11 @@ def check_login(auth):
         result = auth.password == settings.JUJU_ADMIN_PASSWORD
     else:
         try:
-            check_output(['juju', 'logout'], stderr=STDOUT)
+            check_output(['juju', 'logout', '-c', get_all_controllers()[0]], stderr=STDOUT)
             check_output(['juju', 'login', auth.username, '-c', get_all_controllers()[0]],
                          input=bytes('{}\n'.format(auth.password), 'utf-8'), stderr=STDOUT)
             result = True
-            check_call(['juju', 'logout'])
+            check_call(['juju', 'logout', '-c', get_all_controllers()[0]])
         except CalledProcessError as e:
             result = 'invalid entity name or password (unauthorized access)' in e.output.decode('utf-8')
         except (TypeError, IndexError):
@@ -321,7 +321,7 @@ def get_applications_info(token):
         result = []
         for name, info in data['applications'].items():
             res1 = {'name': name, 'relations': [], 'charm-name': info['charm-name'], 'exposed': info['exposed'],
-                    'series': info['series']}
+                    'series': info['series'], 'application-status': info['application-status']}
             for interface, rels in info.get('relations', {}).items():
                 res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
             try:
@@ -501,7 +501,8 @@ def get_application_info(token, application):
         result = {'name': application, 'units': [], 'relations': [],
                   'charm-name': data['applications'][application]['charm-name'],
                   'exposed': data['applications'][application]['exposed'],
-                  'series': data['applications'][application]['series']}
+                  'series': data['applications'][application]['series'],
+                  'application-status': data['applications'][application]['application-status']}
         for interface, rels in data['applications'][application].get('relations', {}).items():
             result['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
         for u, ui in data['applications'][application].get('units', {}).items():
