@@ -320,8 +320,8 @@ def get_applications_info(token):
         data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
         result = []
         for name, info in data['applications'].items():
-            res1 = {'name': name, 'relations': [], 'charm-name': info['charm-name'], 'exposed': info['exposed'],
-                    'series': info['series'], 'application-status': info['application-status']}
+            res1 = {'name': name, 'relations': [], 'charm': info['charm-name'], 'exposed': info['exposed'],
+                    'series': info['series'], 'status': info['application-status']}
             for interface, rels in info.get('relations', {}).items():
                 res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
             try:
@@ -499,10 +499,10 @@ def get_application_info(token, application):
     try:
         data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
         result = {'name': application, 'units': [], 'relations': [],
-                  'charm-name': data['applications'][application]['charm-name'],
+                  'charm': data['applications'][application]['charm-name'],
                   'exposed': data['applications'][application]['exposed'],
                   'series': data['applications'][application]['series'],
-                  'application-status': data['applications'][application]['application-status']}
+                  'status': data['applications'][application]['application-status']}
         for interface, rels in data['applications'][application].get('relations', {}).items():
             result['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
         for u, ui in data['applications'][application].get('units', {}).items():
