@@ -20,12 +20,17 @@ from importlib import import_module
 import json
 import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
+import asyncio
 import requests
 import yaml
 from flask import abort, Response
 from sojobo_api.api import w_errors as errors
 from sojobo_api import settings
 from git import Repo
+from juju.juju import Juju
+from juju.model import Model
+from juju.controller import Controller
+from juju.cloud import Cloud
 ################################################################################
 # TENGU FUNCTIONS
 ################################################################################
@@ -113,6 +118,21 @@ def check_access(access):
         error = errors.invalid_access('access')
         abort(error[0], error[1])
 
+async def connect(token): #pylint: disable=e0001
+    controller = Controller()
+    await controller.connect(
+        token.url,
+        token.username,
+        token.password,
+        None,)
+    return controller
+
+def execute_task(command, *args):
+    loop = asyncio.get_event_loop()
+    loop.set_debug(False)
+    result = loop.run_until_complete(command(*args))
+    return result
+
 
 class JuJu_Token(object):
     def __init__(self, auth):
@@ -124,12 +144,14 @@ class JuJu_Token(object):
         self.c_token = None
         self.m_name = None
         self.m_access = None
+        self.c_connection = None
 
     def set_controller(self, c_name):
         c_type, c_endpoint = controller_info(c_name)
         self.c_name = c_name
         self.c_access = get_controller_access(self, self.username)
         self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, self.username, self.password)
+        self.c_connection = execute_task(connect, self)
         return self
 
     def set_model(self, modelname):
@@ -142,6 +164,8 @@ class JuJu_Token(object):
 
     def set_admin(self):
         return self.username == settings.JUJU_ADMIN_USER and self.password == settings.JUJU_ADMIN_PASSWORD
+
+
 
 
 def authenticate(api_key, auth, controller=None, modelname=None):
@@ -167,6 +191,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
+# libjuju: ok
 def get_controller_types():
     c_list = {}
     for f_path in os.listdir('{}/controllers'.format(settings.SOJOBO_API_DIR)):
@@ -176,6 +201,7 @@ def get_controller_types():
     return c_list
 
 
+# libjuju: ok
 def cloud_supports_series(token, series):
     if series is None:
         return True
@@ -183,6 +209,7 @@ def cloud_supports_series(token, series):
         return series in get_controller_types()[token.c_token.type].get_supported_series()
 
 
+# libjuju: ok
 def check_c_type(c_type):
     if check_input(c_type) in get_controller_types().keys():
         return c_type.lower()
@@ -191,42 +218,60 @@ def check_c_type(c_type):
         abort(error[0], error[1])
 
 
+# libjuju: nok (TODO change user password wel, eerst aanpassingen aan subordinates)
 def create_controller(c_type, name, region, credentials):
     get_controller_types()[c_type].create_controller(name, region, credentials)
     pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
     check_output(['juju', 'change-user-password', settings.JUJU_ADMIN_USER, '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
 
 
+#libjuju: geen aanpassing nodig
 def controller_info(c_name):
     with open('/home/{}/.local/share/juju/controllers.yaml'.format(settings.SOJOBO_USER)) as data:
         controller = yaml.load(data)['controllers'][c_name]
-    return controller['cloud'], controller['api-endpoints'][-1].split(':')[0]
+    return controller['cloud'], controller['api-endpoints'][0]
 
 
-def delete_controller(token):
-    output_pass(['juju', 'destroy-controller', '-y'], token.c_name)
-    output_pass(['juju', 'remove-credential', token.c_token.type, token.c_name])
-
-
-def get_all_controllers():
+#libjuju: nog geen kill methode implementatie en algemeen geen remove-credential methode
+async def delete_controller(token):
     try:
+        controller = token.c_connection
+        controller.kill()
+        cloud = Cloud()
+        cloud.remove_credential(token.c_name)
+    except NotImplementedError:
+        output_pass(['juju', 'destroy-controller', '-y'], token.c_name)
+        output_pass(['juju', 'remove-credential', token.c_token.type, token.c_name])
+
+
+#libjuju: nog geen get_controllers implementatie
+async def get_all_controllers():
+    try:
+        juju = Juju()
+        controllers = juju.get_controllers()
+        result = list(controllers['controllers'].keys())
+    except NotImplementedError:
         controllers = json.loads(output_pass(['juju', 'controllers', '--format', 'json']))
-        try:
-            result = list(controllers['controllers'].keys())
-        except AttributeError:
-            result = []
-        return result
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
+    except AttributeError:
+        result = []
+    return result
 
 
+#libjuju: geen aanpassing nodig
 def controller_exists(c_name):
     return c_name in get_all_controllers()
 
 
-def get_controller_access(token, username):
+#libjuju: nog geen user opties om te checken
+async def get_controller_access(token, username):
     try:
+        controller = token.c_connection()
+        user = controller.get_user(username)
+        result = user['properties']['access']['type']
+    except NotImplementedError:
         users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
         result = None
         for user in users:
@@ -234,16 +279,18 @@ def get_controller_access(token, username):
                 access = user['access']
                 if c_access_exists(access):
                     result = access
-        return result
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
+    return result
 
 
+#libjuju: geen aanpassing nodig
 def get_controllers_info(token):
     return [get_controller_info(token) for c in get_all_controllers() if token.set_controller(c).c_access is not None]
 
 
+#libjuju: geen aanpassing nodig
 def get_controller_info(token):
     if token.c_access is not None:
         result = {'name': token.c_name, 'type': token.c_token.type, 'models': get_models_info(token),
@@ -252,13 +299,18 @@ def get_controller_info(token):
         result = None
     return result
 
-
+#libjuju: geen aanpassing nodig
 def c_access_exists(access):
     return access in ['login', 'add-model', 'superuser']
 
 
-def get_controller_superusers(token):
+#libjuju : nog geen wrapper geschreven voor get_users()
+async def get_controller_superusers(token):
     try:
+        controller = token.c_connection()
+        users = controller.get_users()
+        return [u['properties']['username']['type'] for u in users if u['properties']['access']['type'] == 'superuser']
+    except NotImplementedError:
         users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
         return [u['user-name'] for u in users if u['access'] == 'superuser']
     except json.decoder.JSONDecodeError as e:
@@ -267,6 +319,7 @@ def get_controller_superusers(token):
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
+# op libjuju controller niveau
 def get_all_models(token):
     try:
         data = json.loads(output_pass(['juju', 'list-models', '--format', 'json'], token.c_name))
@@ -276,10 +329,11 @@ def get_all_models(token):
         abort(error[0], error[1])
 
 
+# ok
 def model_exists(token, model):
     return model in get_all_models(token)
 
-
+# rewrite naar connect_to_model?
 def get_model_access(token, username):
     access = None
     try:
