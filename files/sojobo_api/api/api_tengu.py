@@ -27,6 +27,16 @@ def get():
     return TENGU
 
 
+@TENGU.route('/login', methods=['POST'])
+def login():
+    try:
+        juju.authenticate(request.headers['api-key'], request.authorization)
+        code, response = 200, 'Success'
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
 @TENGU.route('/controllers', methods=['GET'])
 def get_all_info():
     try:
