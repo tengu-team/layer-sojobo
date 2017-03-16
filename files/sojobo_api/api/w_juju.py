@@ -27,19 +27,58 @@ from flask import abort, Response
 from sojobo_api.api import w_errors as errors
 from sojobo_api import settings
 from git import Repo
-from juju.juju import Juju
 from juju.model import Model
 from juju.controller import Controller
 from juju.cloud import Cloud
+from juju.client.connection import JujuData
 ################################################################################
 # TENGU FUNCTIONS
 ################################################################################
-def create_response(http_code, return_object):
-    return Response(
-        json.dumps(return_object),
-        status=http_code,
-        mimetype='application/json',
-    )
+class JuJu_Token(object):
+    def __init__(self, auth):
+        self.username = auth.username
+        self.password = auth.password
+        self.is_admin = self.set_admin()
+        self.c_name = None
+        self.c_access = None
+        self.c_token = None
+        self.c_connection = None
+        self.m_name = None
+        self.m_access = None
+        self.m_uuid = None
+        self.m_connection = None
+
+
+    def set_controller(self, c_name):
+        c_type, c_endpoint = controller_info(c_name)
+        self.c_name = c_name
+        self.c_access = get_controller_access(self, self.username)
+        self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, self.username, self.password)
+        self.c_connection = execute_task(connect_controller, self)
+        return self
+
+
+    def set_model(self, modelname):
+        self.m_name = modelname
+        self.m_access = get_model_access(self, self.username)
+        self.m_uuid = execute_task(get_model_uuid(self))
+        self.m_connection = execute_task(connect_model, self)
+        return self
+
+
+    def m_shared_name(self):
+        return "{}/{}".format(settings.JUJU_ADMIN_USER, self.m_name)
+
+
+    def set_admin(self):
+        return self.username == settings.JUJU_ADMIN_USER and self.password == settings.JUJU_ADMIN_PASSWORD
+
+
+    def disconnect(self):
+        if self.m_connection is not None:
+            self.m_connection.disconnect()
+        if self.c_connection is not None:
+            self.c_connection.disconnect()
 
 
 def get_api_key():
@@ -54,6 +93,30 @@ def get_api_dir():
 
 def get_api_user():
     return settings.SOJOBO_USER
+
+
+def get_controller_types():
+    c_list = {}
+    for f_path in os.listdir('{}/controllers'.format(settings.SOJOBO_API_DIR)):
+        if 'controller_' in f_path and '.pyc' not in f_path:
+            name = f_path.split('.')[0]
+            c_list[name.split('_')[1]] = import_module('sojobo_api.controllers.{}'.format(name))
+    return c_list
+
+
+def execute_task(command, *args):
+    loop = asyncio.get_event_loop()
+    loop.set_debug(False)
+    result = loop.run_until_complete(command(*args))
+    return result
+
+
+def create_response(http_code, return_object):
+    return Response(
+        json.dumps(return_object),
+        status=http_code,
+        mimetype='application/json',
+    )
 
 
 def output_pass(commands, controller=None, model=None):
@@ -76,23 +139,6 @@ def output_pass(commands, controller=None, model=None):
     return result
 
 
-def check_login(auth):
-    if auth.username == settings.JUJU_ADMIN_USER:
-        result = auth.password == settings.JUJU_ADMIN_PASSWORD
-    else:
-        try:
-            check_output(['juju', 'logout', '-c', get_all_controllers()[0]], stderr=STDOUT)
-            check_output(['juju', 'login', auth.username, '-c', get_all_controllers()[0]],
-                         input=bytes('{}\n'.format(auth.password), 'utf-8'), stderr=STDOUT)
-            result = True
-            check_call(['juju', 'logout', '-c', get_all_controllers()[0]])
-        except CalledProcessError as e:
-            result = 'invalid entity name or password (unauthorized access)' in e.output.decode('utf-8')
-        except (TypeError, IndexError):
-            result = False
-    return result
-
-
 def check_input(data):
     if data is not None:
         items = data.split(':', 1)
@@ -110,15 +156,15 @@ def check_input(data):
     return result
 
 
-def check_access(access):
-    acc = access.lower()
-    if c_access_exists(acc) or m_access_exists(acc):
-        return acc
-    else:
-        error = errors.invalid_access('access')
-        abort(error[0], error[1])
+# def check_access(access):
+#     acc = access.lower()
+#     if c_access_exists(acc) or m_access_exists(acc):
+#         return acc
+#     else:
+#         error = errors.invalid_access('access')
+#         abort(error[0], error[1])
 
-async def connect(token): #pylint: disable=e0001
+async def connect_controller(token): #pylint: disable=e0001
     controller = Controller()
     await controller.connect(
         token.url,
@@ -127,64 +173,51 @@ async def connect(token): #pylint: disable=e0001
         None,)
     return controller
 
-def execute_task(command, *args):
-    loop = asyncio.get_event_loop()
-    loop.set_debug(False)
-    result = loop.run_until_complete(command(*args))
+
+async def connect_model(token): #pylint: disable=e0001
+    model = Model()
+    await model.connect(
+        token.url,
+        token.m_uuid,
+        token.username,
+        token.password,)
+    return model
+
+
+async def check_login(auth):
+    if auth.username == settings.JUJU_ADMIN_USER:
+        result = auth.password == settings.JUJU_ADMIN_PASSWORD
+    else:
+        try:
+            check_output(['juju', 'logout', '-c', get_all_controllers()[0]], stderr=STDOUT)
+            check_output(['juju', 'login', auth.username, '-c', get_all_controllers()[0]],
+                         input=bytes('{}\n'.format(auth.password), 'utf-8'), stderr=STDOUT)
+            result = True
+            check_call(['juju', 'logout', '-c', get_all_controllers()[0]])
+        except CalledProcessError as e:
+            result = 'invalid entity name or password (unauthorized access)' in e.output.decode('utf-8')
+        except (TypeError, IndexError):
+            result = False
     return result
 
 
-class JuJu_Token(object):
-    def __init__(self, auth):
-        self.username = auth.username
-        self.password = auth.password
-        self.is_admin = self.set_admin()
-        self.c_name = None
-        self.c_access = None
-        self.c_token = None
-        self.m_name = None
-        self.m_access = None
-        self.c_connection = None
-
-    def set_controller(self, c_name):
-        c_type, c_endpoint = controller_info(c_name)
-        self.c_name = c_name
-        self.c_access = get_controller_access(self, self.username)
-        self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, self.username, self.password)
-        self.c_connection = execute_task(connect, self)
-        return self
-
-    def set_model(self, modelname):
-        self.m_name = modelname
-        self.m_access = get_model_access(self, self.username)
-        return self
-
-    def m_shared_name(self):
-        return "{}/{}".format(settings.JUJU_ADMIN_USER, self.m_name)
-
-    def set_admin(self):
-        return self.username == settings.JUJU_ADMIN_USER and self.password == settings.JUJU_ADMIN_PASSWORD
-
-
-
-
-def authenticate(api_key, auth, controller=None, modelname=None):
-    if api_key != get_api_key() or not check_login(auth):
+async def authenticate(api_key, auth, controller=None, modelname=None):
+    if api_key != get_api_key() or not await check_login(auth):
         error = errors.unauthorized()
         abort(error[0], error[1])
     token = JuJu_Token(auth)
-    if controller is not None and controller_exists(controller):
+    if controller is not None and await controller_exists(controller):
         if token.set_controller(controller).c_access is None:
             error = errors.no_access('controller')
             abort(error[0], error[1])
-        if modelname is not None and model_exists(token, modelname):
+        if modelname is not None and await model_exists(token, modelname):
             if token.set_model(modelname).m_access is None:
                 error = errors.no_access('model')
                 abort(error[0], error[1])
-        elif modelname is not None and not model_exists(token, modelname):
+        elif modelname is not None and not await model_exists(token, modelname):
             error = errors.does_not_exist('model')
             abort(error[0], error[1])
-    elif not controller_exists(controller) and controller is not None:
+    elif not await controller_exists(controller) and controller is not None:
         error = errors.does_not_exist('controller')
         abort(error[0], error[1])
     return token
@@ -192,17 +225,7 @@ def authenticate(api_key, auth, controller=None, modelname=None):
 # CONTROLLER FUNCTIONS
 ###############################################################################
 # libjuju: ok
-def get_controller_types():
-    c_list = {}
-    for f_path in os.listdir('{}/controllers'.format(settings.SOJOBO_API_DIR)):
-        if 'controller_' in f_path and '.pyc' not in f_path:
-            name = f_path.split('.')[0]
-            c_list[name.split('_')[1]] = import_module('sojobo_api.controllers.{}'.format(name))
-    return c_list
-
-
-# libjuju: ok
-def cloud_supports_series(token, series):
+async def cloud_supports_series(token, series):
     if series is None:
         return True
     else:
@@ -210,7 +233,7 @@ def cloud_supports_series(token, series):
 
 
 # libjuju: ok
-def check_c_type(c_type):
+async def check_c_type(c_type):
     if check_input(c_type) in get_controller_types().keys():
         return c_type.lower()
     else:
@@ -219,26 +242,36 @@ def check_c_type(c_type):
 
 
 # libjuju: nok (TODO change user password wel, eerst aanpassingen aan subordinates)
-def create_controller(c_type, name, region, credentials):
+async def create_controller(c_type, name, region, credentials):
     get_controller_types()[c_type].create_controller(name, region, credentials)
     pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
-    check_output(['juju', 'change-user-password', settings.JUJU_ADMIN_USER, '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
+    try:
+        con = await controller_info(name)
+        controller = Controller()
+        await controller.connect(
+            con[1],
+            'admin',
+            '',
+            None,)
+        await controller.change_user_password('admin', pswd)
+    except NotImplementedError:
+        check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
 
 
 #libjuju: geen aanpassing nodig
-def controller_info(c_name):
-    with open('/home/{}/.local/share/juju/controllers.yaml'.format(settings.SOJOBO_USER)) as data:
-        controller = yaml.load(data)['controllers'][c_name]
-    return controller['cloud'], controller['api-endpoints'][0]
+async def controller_info(c_name):
+    jujudata = JujuData()
+    controllers = jujudata.controllers()[c_name]
+    return controllers['cloud'], controllers['api-endpoints'][0]
 
 
-#libjuju: nog geen kill methode implementatie en algemeen geen remove-credential methode
+#libjuju: ok
 async def delete_controller(token):
     try:
-        controller = token.c_connection
-        controller.kill()
+        controller = await token.c_connection
+        await controller.destroy(True)
         cloud = Cloud()
-        cloud.remove_credential(token.c_name)
+        await cloud.remove_credential(token.c_name)
     except NotImplementedError:
         output_pass(['juju', 'destroy-controller', '-y'], token.c_name)
         output_pass(['juju', 'remove-credential', token.c_token.type, token.c_name])
@@ -247,37 +280,31 @@ async def delete_controller(token):
 #libjuju: nog geen get_controllers implementatie
 async def get_all_controllers():
     try:
-        juju = Juju()
-        controllers = juju.get_controllers()
-        result = list(controllers['controllers'].keys())
-    except NotImplementedError:
-        controllers = json.loads(output_pass(['juju', 'controllers', '--format', 'json']))
-    except json.decoder.JSONDecodeError as e:
-        error = errors.cmd_error(e)
-        abort(error[0], error[1])
-    except AttributeError:
+        jujudata = JujuData()
+        result = jujudata.controllers()
+    except FileNotFoundError:
         result = []
     return result
 
 
 #libjuju: geen aanpassing nodig
-def controller_exists(c_name):
-    return c_name in get_all_controllers()
+async def controller_exists(c_name):
+    return c_name in await get_all_controllers()
 
 
 #libjuju: nog geen user opties om te checken
 async def get_controller_access(token, username):
     try:
-        controller = token.c_connection()
-        user = controller.get_user(username)
-        result = user['properties']['access']['type']
+        controller = await token.c_connection()
+        user = await controller.get_user(username, True)
+        result = user.serialize()['results'][0].serialize()['result'].serialize()['access']
     except NotImplementedError:
         users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
         result = None
         for user in users:
             if user['user-name'] == username:
                 access = user['access']
-                if c_access_exists(access):
+                if await c_access_exists(access):
                     result = access
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
@@ -286,29 +313,30 @@ async def get_controller_access(token, username):
 
 
 #libjuju: geen aanpassing nodig
-def get_controllers_info(token):
-    return [get_controller_info(token) for c in get_all_controllers() if token.set_controller(c).c_access is not None]
+async def get_controllers_info(token):
+    result = await get_all_controllers()
+    return [await get_controller_info(token) for c in result if token.set_controller(c).c_access is not None]
 
 
 #libjuju: geen aanpassing nodig
-def get_controller_info(token):
+async def get_controller_info(token):
     if token.c_access is not None:
-        result = {'name': token.c_name, 'type': token.c_token.type, 'models': get_models_info(token),
-                  'users': get_users_controller(token)}
+        result = {'name': token.c_name, 'type': token.c_token.type, 'models': await get_models_info(token),
+                  'users': await get_users_controller(token)}
     else:
         result = None
     return result
 
 #libjuju: geen aanpassing nodig
-def c_access_exists(access):
+async def c_access_exists(access):
     return access in ['login', 'add-model', 'superuser']
 
 
 #libjuju : nog geen wrapper geschreven voor get_users()
 async def get_controller_superusers(token):
     try:
-        controller = token.c_connection()
-        users = controller.get_users()
+        controller = await token.c_connection()
+        users = await controller.get_users()
         return [u['properties']['username']['type'] for u in users if u['properties']['access']['type'] == 'superuser']
     except NotImplementedError:
         users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
@@ -319,24 +347,44 @@ async def get_controller_superusers(token):
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
-# op libjuju controller niveau
-def get_all_models(token):
+async def get_all_models(token):
     try:
-        data = json.loads(output_pass(['juju', 'list-models', '--format', 'json'], token.c_name))
-        return [model['name'] for model in data['models']]
+        controller = await token.c_connection
+        models = await controller.get_all_models()
+        return [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
+    except NotImplementedError:
+        try:
+            jujudata = JujuData()
+            return jujudata.models()[token.c_name].keys()
+        except FileNotFoundError:
+            return []
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
 
-# ok
-def model_exists(token, model):
-    return model in get_all_models(token)
+#libjuju: geen aanpassing nodig
+async def model_exists(token, model):
+    return model in await get_all_models(token)
+
+#libjuju: ok
+async def get_model_uuid(token):
+    try:
+        jujudata = JujuData()
+        return jujudata.models()[token.c_name]['models']['{}/{}'.format(token.username, token.m_name)]['uuid']
+    except FileNotFoundError:
+        return []
+
 
 # rewrite naar connect_to_model?
-def get_model_access(token, username):
+async def get_model_access(token, username):
     access = None
     try:
+        controller = await token.c_connection
+        models = await controller.get_all_models()
+        for model in models:
+            model.get_info()
+    except NotImplementedError:
         for model in json.loads(output_pass(['juju', 'models', '--format', 'json'], token.c_name))['models']:
             if model['name'] == token.m_name and username in model['users'].keys():
                 access = model['users'][username]['access']
@@ -347,31 +395,42 @@ def get_model_access(token, username):
         abort(error[0], error[1])
 
 
-def m_access_exists(access):
-    return access in ['read', 'write', 'admin']
+#libjuju: geen aanpassing nodig
+# async def m_access_exists(access):
+#     return access in ['read', 'write', 'admin']
 
 
-def get_models_info(token):
-    return [get_model_info(token) for m in get_all_models(token) if token.set_model(m).m_access is not None]
+#libjuju: geen aanpassing nodig
+async def get_models_info(token):
+    result = await get_all_models(token)
+    return [await get_model_info(token) for m in result if token.set_model(m).m_access is not None]
 
 
-def get_model_info(token):
+#libjuju: geen aanpassing nodig
+async def get_model_info(token):
     if token.m_access is not None:
-        result = {'name': token.m_name, 'users': get_users_model(token), 'ssh-keys': get_ssh_keys(token),
-                  'applications': get_applications_info(token), 'machines': get_machines_info(token),
-                  'juju-gui-url': get_gui_url(token)}
+        result = {'name': token.m_name, 'users': await get_users_model(token), 'ssh-keys': await get_ssh_keys(token),
+                  'applications': await get_applications_info(token), 'machines': await get_machines_info(token),
+                  'juju-gui-url': await get_gui_url(token)}
     else:
         result = None
     return result
 
 
-def get_ssh_keys(token):
-    return output_pass(['juju', 'ssh-keys', '--full'], token.c_name, token.m_name).split('\n')[1:-1]
-
-
-def get_applications_info(token):
+#libjuju: ok
+async def get_ssh_keys(token):
     try:
-        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+        model = await token.m_connection
+        return await model.get_ssh_key()
+    except NotImplementedError:
+        return output_pass(['juju', 'ssh-keys', '--full'], token.c_name, token.m_name).split('\n')[1:-1]
+
+
+# TODO
+async def get_applications_info(token):
+    try:
+        model = token.m_connection
+        data = model.get_status()
         result = []
         for name, info in data['applications'].items():
             res1 = {'name': name, 'relations': [], 'charm': info['charm-name'], 'exposed': info['exposed'],
@@ -391,8 +450,8 @@ def get_applications_info(token):
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
-
-def get_units_info(token, application):
+# TODO
+async def get_units_info(token, application):
     try:
         data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))[application]['units']
         return [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'],
@@ -402,6 +461,58 @@ def get_units_info(token, application):
         abort(error[0], error[1])
 
 
+#libjuju geen manier om gui te verkrijgen of juju gui methode
+async def get_gui_url(token):
+    try:
+        data = output_pass(['juju', 'gui', '--no-browser'], token.c_name, token.m_name).rstrip().split(':')
+        return 'https:{}:{}'.format(data[2], data[3])
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
+
+
+#libjuju: ok
+async def create_model(token, model, ssh_key=None):
+    controller = await token.c_connection
+    await controller.add_model(model, token.c_name)
+    if ssh_key is not None:
+        await add_ssh_key(token, ssh_key)
+    await add_to_model(token.set_model(model), token.username, 'admin')
+    for user in await get_controller_superusers(token):
+        await add_to_model(token, user, 'admin')
+
+#libjuju: ok
+async def delete_model(token):
+    try:
+        controller = await token.c_connection
+        await controller.destroy_models(token.m_uuid)
+    except NotImplementedError:
+        output_pass(['juju', 'destroy-model', '-y', '{}:{}'.format(token.c_name, token.m_name)])
+
+
+#libjuju: ok
+async def add_ssh_key(token, ssh_key):
+    try:
+        model = await token.m_connection
+        await model.add_ssh_key(ssh_key)
+    except NotImplementedError:
+        output_pass(['juju', 'add-ssh-key', '"{}"'.format(ssh_key)], token.c_name, token.m_name)
+
+
+#libjuju: ok
+async def remove_ssh_key(token, ssh_key):
+    key = base64.b64decode(bytes(ssh_key.strip().split()[1].encode('ascii')))
+    fp_plain = hashlib.md5(key).hexdigest()
+    fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
+    try:
+        model = await token.m_connection
+        await model.add_ssh_key(fingerprint)
+    except NotImplementedError:
+        output_pass(['juju', 'remove-ssh-key', fingerprint], token.c_name, token.m_name)
+
+#####################################################################################
+# Machines FUNCTIONS
+#####################################################################################
 def get_machines_info(token):
     try:
         data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))['machines'].keys()
@@ -425,76 +536,6 @@ def get_machine_info(token, machine):
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
-
-
-def get_gui_url(token):
-    data = output_pass(['juju', 'gui', '--no-browser'], token.c_name, token.m_name).rstrip().split(':')[2]
-    try:
-        url = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, 'controller'))['machines']['0']['dns-name']
-        return 'https://{}:{}'.format(url, data)
-    except json.decoder.JSONDecodeError as e:
-        error = errors.cmd_error(e)
-        abort(error[0], error[1])
-
-
-def create_model(token, model, ssh_key=None):
-    output_pass(['juju', 'add-model', model], token.c_name)
-    if ssh_key is not None:
-        add_ssh_key(token, ssh_key)
-    add_to_model(token.set_model(model), token.username, 'admin')
-    for user in get_controller_superusers(token):
-        add_to_model(token, user, 'admin')
-
-
-def delete_model(token):
-    output_pass(['juju', 'destroy-model', '-y', '{}:{}'.format(token.c_name, token.m_name)])
-
-
-def add_ssh_key(token, ssh_key):
-    output_pass(['juju', 'add-ssh-key', '"{}"'.format(ssh_key)], token.c_name, token.m_name)
-
-
-def remove_ssh_key(token, ssh_key):
-    key = base64.b64decode(bytes(ssh_key.strip().split()[1].encode('ascii')))
-    fp_plain = hashlib.md5(key).hexdigest()
-    fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
-    output_pass(['juju', 'remove-ssh-key', fingerprint], token.c_name, token.m_name)
-#####################################################################################
-# APPLICATION FUNCTIONS
-#####################################################################################
-def app_exists(token, app_name):
-    try:
-        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-        return app_name in data['applications'].keys()
-    except json.decoder.JSONDecodeError as e:
-        error = errors.cmd_error(e)
-        abort(error[0], error[1])
-
-
-def deploy_bundle(token, bundle):
-    with open('{}/files/data.yml'.format(settings.SOJOBO_API_DIR), 'w+') as outfile:
-        yaml.dump(bundle, outfile, default_flow_style=False)
-    output_pass(['juju', 'deploy', '/opt/sojobo_api/files/data.yml'], token.c_name, token.m_name)
-
-
-def deploy_app(token, app_name, series=None, target=None):
-    if 'local:' in app_name:
-        app_name = app_name.replace('local:', '{}/'.format(settings.LOCAL_CHARM_DIR))
-    elif 'github:' in app_name:
-        Repo.clone(app_name.split(':', 1)[1], settings.LOCAL_CHARM_DIR)
-        app_name = '{}/{}'.format(settings.LOCAL_CHARM_DIR, app_name.split('/')[-1])
-    if target is None and series is None:
-        output_pass(['juju', 'deploy', app_name], token.c_name, token.m_name)
-    elif target is None:
-        output_pass(['juju', 'deploy', app_name, '--series', series], token.c_name, token.m_name)
-    elif series is None:
-        output_pass(['juju', 'deploy', app_name, '--to', target], token.c_name, token.m_name)
-    else:
-        output_pass(['juju', 'deploy', app_name, '--series', series, '--to', target], token.c_name, token.m_name)
-
-
-def remove_app(token, app_name):
-    output_pass(['juju', 'remove-application', app_name], token.c_name, token.m_name)
 
 
 def add_machine(token, series=None, constraints=None):
@@ -547,6 +588,43 @@ def machine_matches_series(token, machine, series):
 
 def remove_machine(token, machine):
     output_pass(['juju', 'remove-machine', '--force', machine], token.c_name, token.m_name)
+
+#####################################################################################
+# APPLICATION FUNCTIONS
+#####################################################################################
+def app_exists(token, app_name):
+    try:
+        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
+        return app_name in data['applications'].keys()
+    except json.decoder.JSONDecodeError as e:
+        error = errors.cmd_error(e)
+        abort(error[0], error[1])
+
+
+def deploy_bundle(token, bundle):
+    with open('{}/files/data.yml'.format(settings.SOJOBO_API_DIR), 'w+') as outfile:
+        yaml.dump(bundle, outfile, default_flow_style=False)
+    output_pass(['juju', 'deploy', '/opt/sojobo_api/files/data.yml'], token.c_name, token.m_name)
+
+
+def deploy_app(token, app_name, series=None, target=None):
+    if 'local:' in app_name:
+        app_name = app_name.replace('local:', '{}/'.format(settings.LOCAL_CHARM_DIR))
+    elif 'github:' in app_name:
+        Repo.clone(app_name.split(':', 1)[1], settings.LOCAL_CHARM_DIR)
+        app_name = '{}/{}'.format(settings.LOCAL_CHARM_DIR, app_name.split('/')[-1])
+    if target is None and series is None:
+        output_pass(['juju', 'deploy', app_name], token.c_name, token.m_name)
+    elif target is None:
+        output_pass(['juju', 'deploy', app_name, '--series', series], token.c_name, token.m_name)
+    elif series is None:
+        output_pass(['juju', 'deploy', app_name, '--to', target], token.c_name, token.m_name)
+    else:
+        output_pass(['juju', 'deploy', app_name, '--series', series, '--to', target], token.c_name, token.m_name)
+
+
+def remove_app(token, app_name):
+    output_pass(['juju', 'remove-application', app_name], token.c_name, token.m_name)
 
 
 def get_application_info(token, application):
@@ -769,10 +847,11 @@ def get_users_info(token):
     return [get_user_info(token, u) for u in get_all_users()]
 
 
+#libjuju niet aanpassen
 def get_user_info(token, username):
     return {'name': username, 'controllers': get_controllers_access(token, username)}
 
-
+#libjuju niet aanpassen
 def get_controllers_access(token, username):
     controllers = []
     for controller in get_all_controllers():
