@@ -268,7 +268,7 @@ async def controller_info(c_name):
 #libjuju: ok
 async def delete_controller(token):
     try:
-        controller = await token.c_connection
+        controller = token.c_connection
         await controller.destroy(True)
         cloud = Cloud()
         await cloud.remove_credential(token.c_name)
@@ -295,7 +295,7 @@ async def controller_exists(c_name):
 #libjuju: nog geen user opties om te checken
 async def get_controller_access(token, username):
     try:
-        controller = await token.c_connection()
+        controller = token.c_connection()
         user = await controller.get_user(username, True)
         result = user.serialize()['results'][0].serialize()['result'].serialize()['access']
     except NotImplementedError:
@@ -312,17 +312,23 @@ async def get_controller_access(token, username):
     return result
 
 
-#libjuju: geen aanpassing nodig
+#libjuju: ok
 async def get_controllers_info(token):
     result = await get_all_controllers()
-    return [await get_controller_info(token) for c in result if token.set_controller(c).c_access is not None]
+    output = []
+    for c in result:
+        if token.set_controller(c).c_access is not None:
+            output.append(await get_controller_info(token))
+    return output
 
 
-#libjuju: geen aanpassing nodig
+#libjuju: ok
 async def get_controller_info(token):
     if token.c_access is not None:
-        result = {'name': token.c_name, 'type': token.c_token.type, 'models': await get_models_info(token),
-                  'users': await get_users_controller(token)}
+        models = await get_models_info(token)
+        users = await get_users_controller(token)
+        result = {'name': token.c_name, 'type': token.c_token.type, 'models': models,
+                  'users': users}
     else:
         result = None
     return result
@@ -335,7 +341,7 @@ async def c_access_exists(access):
 #libjuju : nog geen wrapper geschreven voor get_users()
 async def get_controller_superusers(token):
     try:
-        controller = await token.c_connection()
+        controller = token.c_connection()
         users = await controller.get_users()
         return [u['properties']['username']['type'] for u in users if u['properties']['access']['type'] == 'superuser']
     except NotImplementedError:
@@ -349,7 +355,7 @@ async def get_controller_superusers(token):
 ###############################################################################
 async def get_all_models(token):
     try:
-        controller = await token.c_connection
+        controller = token.c_connection
         models = await controller.get_all_models()
         return [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
     except NotImplementedError:
@@ -380,7 +386,7 @@ async def get_model_uuid(token):
 async def get_model_access(token, username):
     access = None
     try:
-        controller = await token.c_connection
+        controller = token.c_connection
         models = await controller.get_all_models()
         for model in models:
             model.get_info()
@@ -403,15 +409,24 @@ async def get_model_access(token, username):
 #libjuju: geen aanpassing nodig
 async def get_models_info(token):
     result = await get_all_models(token)
-    return [await get_model_info(token) for m in result if token.set_model(m).m_access is not None]
+    output = []
+    for m in result:
+        if token.set_model(m).m_access is not None:
+            output.append(await get_model_info(token))
+    return output
 
 
 #libjuju: geen aanpassing nodig
 async def get_model_info(token):
     if token.m_access is not None:
-        result = {'name': token.m_name, 'users': await get_users_model(token), 'ssh-keys': await get_ssh_keys(token),
-                  'applications': await get_applications_info(token), 'machines': await get_machines_info(token),
-                  'juju-gui-url': await get_gui_url(token)}
+        users = await get_users_model(token)
+        ssh = await get_ssh_keys(token)
+        applications = await get_applications_info(token)
+        machines = await get_machines_info(token)
+        gui = await get_gui_url(token)
+        result = {'name': token.m_name, 'users': users, 'ssh-keys': ssh,
+                  'applications': applications, 'machines': machines,
+                  'juju-gui-url': gui}
     else:
         result = None
     return result
@@ -420,7 +435,7 @@ async def get_model_info(token):
 #libjuju: ok
 async def get_ssh_keys(token):
     try:
-        model = await token.m_connection
+        model = token.m_connection
         return await model.get_ssh_key()
     except NotImplementedError:
         return output_pass(['juju', 'ssh-keys', '--full'], token.c_name, token.m_name).split('\n')[1:-1]
@@ -430,32 +445,43 @@ async def get_ssh_keys(token):
 async def get_applications_info(token):
     try:
         model = token.m_connection
-        data = model.get_status()
+        data = model.state.state
         result = []
-        for name, info in data['applications'].items():
-            res1 = {'name': name, 'relations': [], 'charm': info['charm-name'], 'exposed': info['exposed'],
-                    'series': info['series'], 'status': info['application-status']}
-            for interface, rels in info.get('relations', {}).items():
-                res1['relations'].extend([{'interface': interface, 'with': rel} for rel in rels])
-            try:
-                res1['units'] = []
-                for unit, uinfo in info.get('units', {}).items():
-                    res1['units'].append({'name': unit, 'machine': uinfo['machine'], 'ip': uinfo['public-address'],
-                                          'ports': uinfo.get('open-ports', None)})
-            except KeyError:
-                pass
+        for app in data['application'].values():
+            res1 = {'name': app[0]['name'], 'relations': [], 'charm': app[0]['charm-url'], 'exposed': app[0]['exposed'],
+                    'series': app[0]['charm-url'].split(":")[1].split("/")[0], 'status': app[0]['status']['current']}
+            for rels in data['relation'].values():
+                keys = rels[0]['key'].split(" ")
+                if len(keys) == 1 and app[0]['name'] == keys[0].split(":")[0]:
+                    res1['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
+                elif len(keys) == 2 and app[0]['name'] == keys[0].split(":")[0]:
+                    res1['relations'].extend([{'interface': keys[1].split(":")[1], 'with': keys[1].split(":")[0]}])
+                elif len(keys) == 2 and app[0]['name'] == keys[1].split(":")[0]:
+                    res1['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
+            res1['units'] = await get_units_info(model, app[0]['name'])
             result.append(res1)
         return result
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
-# TODO
+# libjuju: ok
 async def get_units_info(token, application):
     try:
-        data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))[application]['units']
-        return [{'name': u, 'machine': ui['machine'], 'ip': ui['public-address'],
-                 'ports': ui['open-ports']} for u, ui in data.items()]
+        model = token.m_connection
+        data = model.state.state['unit']
+        units = []
+        result = []
+        for unit in data.keys():
+            if unit.startswith(application):
+                units.append(data[unit][0])
+        for u in units:
+            ports = await get_unit_ports(u)
+            result.append({'name': u['name'],
+                           'machine': u['machine-id'],
+                           'ip': u['public-address'],
+                           'ports': ports})
+        return result
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
@@ -473,18 +499,22 @@ async def get_gui_url(token):
 
 #libjuju: ok
 async def create_model(token, model, ssh_key=None):
-    controller = await token.c_connection
-    await controller.add_model(model, token.c_name)
+    try:
+        controller = token.c_connection
+        await controller.add_model(model, token.c_name)
+    except NotImplementedError:
+        output_pass(['juju', 'add-model', model], token.c_name)
     if ssh_key is not None:
         await add_ssh_key(token, ssh_key)
     await add_to_model(token.set_model(model), token.username, 'admin')
-    for user in await get_controller_superusers(token):
+    cont = await get_controller_superusers(token)
+    for user in cont:
         await add_to_model(token, user, 'admin')
 
 #libjuju: ok
 async def delete_model(token):
     try:
-        controller = await token.c_connection
+        controller = token.c_connection
         await controller.destroy_models(token.m_uuid)
     except NotImplementedError:
         output_pass(['juju', 'destroy-model', '-y', '{}:{}'.format(token.c_name, token.m_name)])
@@ -493,7 +523,7 @@ async def delete_model(token):
 #libjuju: ok
 async def add_ssh_key(token, ssh_key):
     try:
-        model = await token.m_connection
+        model = token.m_connection
         await model.add_ssh_key(ssh_key)
     except NotImplementedError:
         output_pass(['juju', 'add-ssh-key', '"{}"'.format(ssh_key)], token.c_name, token.m_name)
@@ -505,7 +535,7 @@ async def remove_ssh_key(token, ssh_key):
     fp_plain = hashlib.md5(key).hexdigest()
     fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
     try:
-        model = await token.m_connection
+        model = token.m_connection
         await model.add_ssh_key(fingerprint)
     except NotImplementedError:
         output_pass(['juju', 'remove-ssh-key', fingerprint], token.c_name, token.m_name)
@@ -513,81 +543,113 @@ async def remove_ssh_key(token, ssh_key):
 #####################################################################################
 # Machines FUNCTIONS
 #####################################################################################
-def get_machines_info(token):
+#libjuju: ok
+async def get_machines_info(token):
     try:
-        data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))['machines'].keys()
-        return [get_machine_info(token, m) for m in data]
+        model = token.m_connection
+        data = model.state.machines.keys()
+        return [get_machine_info(token, m) for m in data if not 'lxd' in m]
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
 
-def get_machine_info(token, machine):
+#libjuju: ok
+async def get_machine_info(token, machine):
     try:
-        data = json.loads(output_pass(['juju', 'machines', '--format', 'json'], token.c_name, token.m_name))['machines'][machine]
-        try:
-            containers = None
-            if 'containers' in data.keys():
-                containers = [{'name': c, 'ip': ci['dns-name'], 'series': ci['series']} for c, ci in data['containers'].items()]
-            result = {'name': machine, 'instance-id': data['instance-id'], 'ip': data['dns-name'], 'series': data['series'], 'containers': containers}
-        except KeyError:
-            result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
-        return result
+        model = token.m_connection
+        data = model.state.state['machine']
+        machine_data = data[machine][0]
+        containers = []
+        if not 'lxd' in machine:
+            lxd = []
+            for key in data.keys():
+                if key.startswith('{}/lxd'.format(machine)):
+                    lxd.append(key)
+            if lxd != []:
+                for cont in lxd:
+                    cont_data = data[cont][0]
+                    ip = await get_machine_ip(cont_data, 'local_cloud')
+                    containers.append({'name': cont, 'instance-id': cont_data['instance-id'], 'ip': ip, 'series': cont_data['series']})
+            mach_ip = await get_machine_ip(machine_data, 'public')
+            result = {'name': machine, 'instance-id': machine_data['instance-id'], 'ip': mach_ip, 'series': machine_data['series'], 'containers': containers}
+        else:
+            mach_ip = await get_machine_ip(machine_data, 'local_cloud')
+            result = {'name': machine, 'instance-id': machine_data['instance-id'], 'ip': mach_ip, 'series': machine_data['series']}
+    except KeyError:
+        result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
-
-
-def add_machine(token, series=None, constraints=None):
-    if series is None and constraints is None:
-        result = output_pass(['juju', 'add-machine'], token.c_name, token.m_name)
-    elif series is None:
-        commands = ['juju', 'add-machine', '--constraints']
-        commands.extend(constraints)
-        result = output_pass(commands, token.c_name, token.m_name)
-    elif constraints is None:
-        result = output_pass(['juju', 'add-machine', '--series', series], token.c_name, token.m_name)
-    else:
-        commands = ['juju', 'add-machine', '--series', series, '--constraints']
-        commands.extend(constraints)
-        result = output_pass(commands, token.c_name, token.m_name)
     return result
 
 
-def machine_exists(token, machine):
+#libjuju: ok
+async def get_machine_ip(machine_data, cloud):
+    for dns in machine_data['addresses']:
+        if dns['scope'] == cloud:
+            dns_name = dns['value']
+    return dns_name
+
+
+#libjuju: ok
+async def add_machine(token, ser=None, cont=None):
     try:
-        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-        if 'lxd' in machine:
-            return machine in data['machines'][machine.split('/')[0]]['containers'].keys()
+        model = token.m_connection
+        await model.add_machine(series=ser, constraints =cont)
+    except NotImplementedError:
+        if ser is None and cont is None:
+            result = output_pass(['juju', 'add-machine'], token.c_name, token.m_name)
+        elif ser is None:
+            commands = ['juju', 'add-machine', '--constraints']
+            commands.extend(cont)
+            result = output_pass(commands, token.c_name, token.m_name)
+        elif cont is None:
+            result = output_pass(['juju', 'add-machine', '--series', ser], token.c_name, token.m_name)
         else:
-            return machine in data['machines'].keys()
+            commands = ['juju', 'add-machine', '--series', ser, '--constraints']
+            commands.extend(cont)
+            result = output_pass(commands, token.c_name, token.m_name)
+        return result
+
+
+#libjuju: ok
+async def machine_exists(token, machine):
+    try:
+        model = token.m_connection
+        data = model.state.state['machine'].keys()
+        return machine in data
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
 
-
-def get_machine_series(token, machine):
+#libjuju: ok
+async def get_machine_series(token, machine):
     try:
-        data = json.loads(output_pass(['juju', 'list-machines', '--format', 'json'], token.c_name, token.m_name))
-        if 'lxd' in machine:
-            return data['machines'][machine.split('/')[0]]['containers'][machine]['series']
-        else:
-            return data['machines'][machine]['series']
+        data = await get_machine_info(token, machine)
+        return data['series']
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
 
-def machine_matches_series(token, machine, series):
+#libjuju: ok
+async def machine_matches_series(token, machine, series):
     if machine is None or series is None:
         return True
     else:
-        return series == get_machine_series(token, machine)
+        return series == await get_machine_series(token, machine)
 
 
-def remove_machine(token, machine):
-    output_pass(['juju', 'remove-machine', '--force', machine], token.c_name, token.m_name)
+#libjuju: ok
+async def remove_machine(token, machine):
+    try:
+        model = token.m_connection
+        await model.remove_machine(machine)
+    except NotImplementedError:
+        output_pass(['juju', 'remove-machine', '--force', machine], token.c_name, token.m_name)
+
 
 #####################################################################################
 # APPLICATION FUNCTIONS
@@ -674,6 +736,13 @@ def add_unit(token, app_name, target=None):
 
 def remove_unit(token, application, unit_number):
     return output_pass(['juju', 'remove-unit', '{}/{}'.format(application, unit_number)], token.c_name, token.m_name)
+
+#mag niet async zijn
+async def get_unit_ports(unit):
+    ports = []
+    for port in unit['ports']:
+        ports.append(port)
+    return ports
 
 
 def get_relations_info(token):
