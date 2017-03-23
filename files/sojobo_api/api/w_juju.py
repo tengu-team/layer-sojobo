@@ -39,6 +39,7 @@ class JuJu_Token(object):
         self.username = auth.username
         self.password = auth.password
         self.is_admin = self.set_admin()
+        self.url = None
         self.c_name = None
         self.c_access = None
         self.c_token = None
@@ -49,21 +50,33 @@ class JuJu_Token(object):
         self.m_connection = None
 
 
-    def set_controller(self, c_name):
+    async def set_controller(self, c_name):
         c_type, c_endpoint = controller_info(c_name)
+        self.url = c_endpoint
         self.c_name = c_name
-        self.c_access = get_controller_access(self, self.username)
         self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, self.username, self.password)
-        self.c_connection = execute_task(connect_controller, self)
+        if self.c_connection is not None:
+            await self.c_connection.disconnect()
+        self.c_connection = await connect_controller(self)
+        self.c_access = await get_controller_access(self, self.username)
         return self
 
 
-    def set_model(self, modelname):
+    async def set_model(self, modelname):
         self.m_name = modelname
-        self.m_access = get_model_access(self, self.username)
-        self.m_uuid = execute_task(get_model_uuid(self))
-        self.m_connection = execute_task(connect_model, self)
+        if self.m_connection is not None:
+            await self.m_connection.disconnect()
+        self.m_uuid = await get_model_uuid(self)
+        self.m_connection = await connect_model(self)
+        self.m_access = await get_model_access(self, self.username)
         return self
+
+
+    async def disconnect(self):
+        if self.m_connection is not None:
+            await self.m_connection.disconnect()
+        if self.c_connection is not None:
+            await self.c_connection.disconnect()
 
 
     def m_shared_name(self):
@@ -72,13 +85,6 @@ class JuJu_Token(object):
 
     def set_admin(self):
         return self.username == settings.JUJU_ADMIN_USER and self.password == settings.JUJU_ADMIN_PASSWORD
-
-
-    def disconnect(self):
-        if self.m_connection is not None:
-            self.m_connection.disconnect()
-        if self.c_connection is not None:
-            self.c_connection.disconnect()
 
 
 def get_api_key():
@@ -103,11 +109,23 @@ def get_controller_types():
             c_list[name.split('_')[1]] = import_module('sojobo_api.controllers.{}'.format(name))
     return c_list
 
-
 def execute_task(command, *args):
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     result = loop.run_until_complete(command(*args))
+    return result
+
+
+def execute_task_con(command, token, *args):
+    loop = asyncio.get_event_loop()
+    loop.set_debug(False)
+    result = loop.run_until_complete(wrapper(command, token, *args))
+    return result
+
+
+async def wrapper(command, token, *args):
+    result = await command(token, *args)
+    await token.disconnect()
     return result
 
 
@@ -164,6 +182,7 @@ def check_input(data):
 #         error = errors.invalid_access('access')
 #         abort(error[0], error[1])
 
+
 async def connect_controller(token): #pylint: disable=e0001
     controller = Controller()
     await controller.connect(
@@ -176,11 +195,13 @@ async def connect_controller(token): #pylint: disable=e0001
 
 async def connect_model(token): #pylint: disable=e0001
     model = Model()
+    print(token.url, token.m_uuid, settings.JUJU_ADMIN_USER, settings.JUJU_ADMIN_PASSWORD)
     await model.connect(
         token.url,
         token.m_uuid,
         settings.JUJU_ADMIN_USER,
-        settings.JUJU_ADMIN_PASSWORD,)
+        settings.JUJU_ADMIN_PASSWORD,
+        None, )
     return model
 
 
@@ -207,14 +228,16 @@ async def authenticate(api_key, auth, controller=None, modelname=None):
         abort(error[0], error[1])
     token = JuJu_Token(auth)
     if controller is not None and await controller_exists(controller):
-        if token.set_controller(controller).c_access is None:
+        await token.set_controller(controller)
+        if token.c_access is None:
             error = errors.no_access('controller')
             abort(error[0], error[1])
-        if modelname is not None and await model_exists(token, modelname):
-            if token.set_model(modelname).m_access is None:
+        if modelname is not None and model_exists(token, modelname):
+            await token.set_model(modelname)
+            if token.m_access is None:
                 error = errors.no_access('model')
                 abort(error[0], error[1])
-        elif modelname is not None and not await model_exists(token, modelname):
+        elif modelname is not None and model_exists(token, modelname):
             error = errors.does_not_exist('model')
             abort(error[0], error[1])
     elif not await controller_exists(controller) and controller is not None:
@@ -256,7 +279,7 @@ async def create_controller(c_type, name, region, credentials):
         check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
 
 
-async def controller_info(c_name):
+def controller_info(c_name):
     jujudata = JujuData()
     controllers = jujudata.controllers()[c_name]
     return controllers['cloud'], controllers['api-endpoints'][0]
@@ -288,7 +311,7 @@ async def controller_exists(c_name):
 
 async def get_controller_access(token, username):
     try:
-        controller = token.c_connection()
+        controller = token.c_connection
         user = await controller.get_user(username, True)
         result = user.serialize()['results'][0].serialize()['result'].serialize()['access']
     except NotImplementedError:
@@ -309,7 +332,7 @@ async def get_controllers_info(token):
     result = await get_all_controllers()
     output = []
     for c in result:
-        if token.set_controller(c).c_access is not None:
+        if await token.set_controller(c).c_access is not None:
             output.append(await get_controller_info(token))
     return output
 
@@ -370,14 +393,15 @@ async def get_model_uuid(token):
             return model['uuid']
 
 
+#TODO
 async def get_model_access(token, username):
     access = None
     try:
-        controller = token.c_connection
-        models = await controller.get_all_models()
-        for model in models:
-            model.get_info()
-    except NotImplementedError:
+    #     controller = token.c_connection
+    #     models = await controller.get_models()
+    #     for model in models:
+    #         model.get_info()
+    # except NotImplementedError:
         for model in json.loads(output_pass(['juju', 'models', '--format', 'json'], token.c_name))['models']:
             if model['name'] == token.m_name and username in model['users'].keys():
                 access = model['users'][username]['access']
@@ -396,7 +420,8 @@ async def get_models_info(token):
     result = await get_all_models(token)
     output = []
     for m in result:
-        if token.set_model(m).m_access is not None:
+        await token.set_model(m['name'])
+        if token.m_access is not None:
             output.append(await get_model_info(token))
     return output
 
@@ -419,7 +444,8 @@ async def get_model_info(token):
 async def get_ssh_keys(token):
     try:
         model = token.m_connection
-        return await model.get_ssh_key()
+        res = await model.get_ssh_key(False)
+        return res.serialize()['results'][0].serialize()
     except NotImplementedError:
         return output_pass(['juju', 'ssh-keys', '--full'], token.c_name, token.m_name).split('\n')[1:-1]
 
@@ -429,7 +455,8 @@ async def get_applications_info(token):
         model = token.m_connection
         data = model.state.state
         result = []
-        for app in data['application'].keys():
+        apps = data.get('application', {})
+        for app in apps.keys():
             result.append(await get_application_info(token, app))
         return result
     except json.decoder.JSONDecodeError as e:
@@ -461,8 +488,8 @@ async def get_units_info(token, application):
 #libjuju geen manier om gui te verkrijgen of juju gui methode
 async def get_gui_url(token):
     try:
-        data = output_pass(['juju', 'gui', '--no-browser'], token.c_name, token.m_name).rstrip().split(':')
-        return 'https:{}:{}'.format(data[2], data[3])
+        data = output_pass(['juju', 'gui', '--no-browser'], token.c_name, token.m_name)
+        return data.split('\n')[0]
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
@@ -476,7 +503,7 @@ async def create_model(token, model, ssh_key=None):
         output_pass(['juju', 'add-model', model], token.c_name)
     if ssh_key is not None:
         await add_ssh_key(token, ssh_key)
-    await add_to_model(token.set_model(model), token.username, 'admin')
+    await add_to_model(await token.set_model(model), token.username, 'admin')
     cont = await get_controller_superusers(token)
     for user in cont:
         await add_to_model(token, user, 'admin')
@@ -515,7 +542,12 @@ async def get_machines_info(token):
     try:
         model = token.m_connection
         data = model.state.machines.keys()
-        return [get_machine_info(token, m) for m in data if not 'lxd' in m]
+        result = []
+        for m in data:
+            if not 'lxd' in m:
+                res = await get_machine_info(token, m)
+                result.append(res)
+        return result
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
@@ -841,8 +873,8 @@ async def get_users_controller(token):
 async def get_users_model(token):
     try:
         if token.m_access == 'admin' or token.m_access == 'write':
-            data = await get_all_models(token)
-            for model in data:
+            data = json.loads(output_pass(['juju', 'models', '--format', 'json'], token.c_name))
+            for model in data['models']:
                 if model['name'] == token.m_name:
                     users_info = model['users']
                     break
@@ -910,7 +942,7 @@ async def get_user_info(token, username):
 async def get_controllers_access(token, username):
     controllers = []
     for controller in await get_all_controllers():
-        access = await get_controller_access(token.set_controller(controller), username)
+        access = await get_controller_access(await token.set_controller(controller), username)
         if access is not None:
             model_acc = await get_models_access(token, username)
             controllers.append({'name': controller, 'type': token.c_token.type, 'access': access,
@@ -929,7 +961,7 @@ async def get_ucontroller_access(token, username):
 async def get_models_access(token, username):
     models = []
     for model in await get_all_models(token):
-        access = await get_model_access(token.set_model(model), username)
+        access = await get_model_access(await token.set_model(model), username)
         if access is not None:
             models.append({'name': model, 'access': access})
     return models

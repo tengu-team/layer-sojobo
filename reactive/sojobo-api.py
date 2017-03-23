@@ -17,8 +17,8 @@
 from base64 import b64encode
 from hashlib import sha256
 import os
-import requests
 import shutil
+import requests
 import subprocess
 # Charm pip dependencies
 from charmhelpers.core.templating import render
@@ -77,7 +77,7 @@ def configure_webapp():
 
 def install_api():
     # Install pip pkgs
-    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython']:
+    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'juju']:
         pip_install(pkg)
     mergecopytree('files/sojobo_api', API_DIR)
     os.mkdir('{}/files'.format(API_DIR))
