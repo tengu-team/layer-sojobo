@@ -121,8 +121,7 @@ def create_model(controller):
 def get_models_info(controller):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
-        code, response = 200, execute_task(juju.get_models_info, token)
-        execute_task(juju.disconnect, token)
+        code, response = 200, execute_task_con(juju.get_models_info, token)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)

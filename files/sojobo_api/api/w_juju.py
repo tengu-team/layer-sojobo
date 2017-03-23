@@ -16,6 +16,7 @@
 # pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401
 import base64
 import hashlib
+import datetime
 from importlib import import_module
 import json
 import os
@@ -195,7 +196,6 @@ async def connect_controller(token): #pylint: disable=e0001
 
 async def connect_model(token): #pylint: disable=e0001
     model = Model()
-    print(token.url, token.m_uuid, settings.JUJU_ADMIN_USER, settings.JUJU_ADMIN_PASSWORD)
     await model.connect(
         token.url,
         token.m_uuid,
