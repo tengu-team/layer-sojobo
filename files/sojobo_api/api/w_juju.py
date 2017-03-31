@@ -13,15 +13,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401
-import base64
-import hashlib
-import datetime
+# pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401,C0302
 from importlib import import_module
 import json
 import os
 from subprocess import check_output, STDOUT, CalledProcessError
 import asyncio
+import yaml
 from flask import abort, Response
 from sojobo_api.api import w_errors as errors
 from sojobo_api import settings
@@ -35,61 +33,70 @@ from juju.client.connection import JujuData
 ################################################################################
 # TENGU FUNCTIONS
 ################################################################################
-class JuJu_Token(object):
+class JuJu_Token(object):#pylint: disable=R0903
     def __init__(self, auth):
         self.username = auth.username
         self.password = auth.password
         self.is_admin = self.set_admin()
-        self.url = None
-        self.c_name = None
-        self.c_access = None
-        self.c_token = None
-        self.c_connection = None
+
+    def set_admin(self):
+        return self.username == settings.JUJU_ADMIN_USER and self.password == settings.JUJU_ADMIN_PASSWORD
+
+
+class Model_Connection(object):
+    def __init__(self):
         self.m_name = None
         self.m_access = None
         self.m_uuid = None
         self.m_connection = None
 
 
-    async def set_controller(self, c_name):
-        c_type, c_endpoint = controller_info(c_name)
-        self.url = c_endpoint
-        self.c_name = c_name
-        self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, self.username, self.password)
-        if self.c_connection is not None:
-            await self.c_connection.disconnect()
-        self.c_connection = await connect_controller(self)
-        self.c_access = await get_controller_access(self, self.username)
-        return self
+    def m_shared_name(self):
+        return "{}/{}".format(settings.JUJU_ADMIN_USER, self.m_name)
 
 
-    async def set_model(self, modelname):
+    async def set_model(self, token, controller, modelname):
         self.m_name = modelname
         if self.m_connection is not None:
             await self.m_connection.disconnect()
-        self.m_uuid = await get_model_uuid(self)
-        self.m_connection = await connect_model(self)
-        self.m_access = await get_model_access(self, self.username)
+        self.m_uuid = await get_model_uuid(controller, self)
+        self.m_connection = await connect_model(controller, self, token)
+        self.m_access = await get_model_access(self, controller, token.username)
         return self
 
 
     async def disconnect(self):
         if self.m_connection is not None:
             await self.m_connection.disconnect()
+
+class Controller_Connection(object):
+    def __init__(self):
+        self.url = None
+        self.c_name = None
+        self.c_access = None
+        self.c_token = None
+        self.c_connection = None
+
+
+    async def set_controller(self, token, c_name):
+        controllers = get_all_controllers()
+        c_type, c_endpoint = controllers[c_name]['cloud'], controllers[c_name]['api-endpoints'][0]
+        self.url = c_endpoint
+        self.c_name = c_name
+        self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, token.username, token.password)
+        if self.c_connection is not None:
+            await self.c_connection.disconnect()
+        self.c_connection = await connect_controller(self, token)
+        self.c_access = await get_controller_access(self, token)
+        return self
+
+    async def disconnect(self):
         if self.c_connection is not None:
             await self.c_connection.disconnect()
 
 
-    def m_shared_name(self):
-        return "{}/{}".format(settings.JUJU_ADMIN_USER, self.m_name)
-
-
-    def set_admin(self):
-        return self.username == settings.JUJU_ADMIN_USER and self.password == settings.JUJU_ADMIN_PASSWORD
-
-
 def get_api_key():
-    with open('{}/api-key'.format(settings.SOJOBO_API_DIR), 'r') as key:
+    with open('{}/api-key'.format(get_api_dir()), 'r') as key:
         apikey = key.readlines()[0]
     return apikey
 
@@ -114,19 +121,6 @@ def execute_task(command, *args):
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     result = loop.run_until_complete(command(*args))
-    return result
-
-
-def execute_task_con(command, token, *args):
-    loop = asyncio.get_event_loop()
-    loop.set_debug(False)
-    result = loop.run_until_complete(wrapper(command, token, *args))
-    return result
-
-
-async def wrapper(command, token, *args):
-    result = await command(token, *args)
-    await token.disconnect()
     return result
 
 
@@ -184,74 +178,81 @@ def check_input(data):
 #         abort(error[0], error[1])
 
 
-async def connect_controller(token): #pylint: disable=e0001
+async def connect_controller(con, token): #pylint: disable=e0001
     controller = Controller()
     await controller.connect(
-        token.url,
-        settings.JUJU_ADMIN_USER,
-        settings.JUJU_ADMIN_PASSWORD,
+        con.url,
+        token.username,
+        token.password,
         None,)
     return controller
 
 
-async def connect_model(token): #pylint: disable=e0001
+async def connect_model(con, mod, token): #pylint: disable=e0001
     model = Model()
     await model.connect(
-        token.url,
-        token.m_uuid,
-        settings.JUJU_ADMIN_USER,
-        settings.JUJU_ADMIN_PASSWORD,
+        con.url,
+        mod.m_uuid,
+        token.username,
+        token.password,
         None, )
     return model
 
 
-async def check_login(auth, controller=None):
-    if auth.username == settings.JUJU_ADMIN_USER:
-        result = auth.password == settings.JUJU_ADMIN_PASSWORD
-    elif controller is not None:
-        try:
-            controller = Controller()
-            controller_endpoint = controller_info(controller)[1]
-            await controller.connect(controller_endpoint, auth.username, auth.password)
-            await controller.disconnect()
-            result = True
-        except JujuAPIError as e:
-            result = 'invalid entity name or password' in e.message.decode('utf-8')
+async def check_login(token):
+    if token.username == settings.JUJU_ADMIN_USER:
+        result = token.password == settings.JUJU_ADMIN_PASSWORD
     else:
-        result = False
+        controller = Controller_Connection()
+        try:
+            cont_name = list(await get_all_controllers())[0]
+            await controller.set_controller(token, cont_name)
+            result = True
+        except JujuAPIError:
+            result = False
+        finally:
+            controller.disconnect()
     return result
 
 
 async def authenticate(api_key, auth, controller=None, modelname=None):
-    if api_key != get_api_key() or not await check_login(auth, controller):
+    token = JuJu_Token(auth)
+    if controller is None and api_key != get_api_key() or not await check_login(token):
         error = errors.unauthorized()
         abort(error[0], error[1])
-    token = JuJu_Token(auth)
-    if controller is not None and await controller_exists(controller):
-        await token.set_controller(controller)
-        if token.c_access is None:
+    elif controller is not None and await controller_exists(controller):
+        cont_con = Controller_Connection()
+        await cont_con.set_controller(token, controller)
+        modelex = await model_exists(token, modelname)
+        if cont_con.c_access is None:
             error = errors.no_access('controller')
             abort(error[0], error[1])
-        if modelname is not None and model_exists(token, modelname):
-            await token.set_model(modelname)
-            if token.m_access is None:
+        if modelname is not None and modelex:
+            mod_con = Model_Connection()
+            await mod_con.set_model(token, cont_con, modelname)
+            if mod_con.m_access is None:
                 error = errors.no_access('model')
                 abort(error[0], error[1])
-        elif modelname is not None and model_exists(token, modelname):
+        elif modelname is not None and not modelex:
             error = errors.does_not_exist('model')
             abort(error[0], error[1])
     elif not await controller_exists(controller) and controller is not None:
         error = errors.does_not_exist('controller')
         abort(error[0], error[1])
-    return token
+    if controller and modelname:
+        return token, cont_con, mod_con
+    elif controller:
+        return token, cont_con
+    else:
+        return token
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
-async def cloud_supports_series(token, series):
+async def cloud_supports_series(controller_connection, series):
     if series is None:
         return True
     else:
-        return series in get_controller_types()[token.c_token.type].get_supported_series()
+        return series in get_controller_types()[controller_connection.c_token.type].get_supported_series()
 
 
 async def check_c_type(c_type):
@@ -266,34 +267,30 @@ async def check_c_type(c_type):
 async def create_controller(c_type, name, region, credentials):
     get_controller_types()[c_type].create_controller(name, region, credentials)
     pswd = os.environ.get('JUJU_ADMIN_PASSWORD')
+    # try:
+    #     con = Controller_Connection()
+    #     controller = Controller()
+    #     # await controller.connect(
+    #     #     con[1],
+    #     #     'admin',
+    #     #     '',
+    #     #     None,)
+    #     await controller.change_user_password('admin', pswd)
+    # except NotImplementedError:
+    check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
+    controller = Controller_Connection()
+    return controller
+
+
+async def delete_controller(con):
     try:
-        con = await controller_info(name)
-        controller = Controller()
-        await controller.connect(
-            con[1],
-            'admin',
-            '',
-            None,)
-        await controller.change_user_password('admin', pswd)
-    except NotImplementedError:
-        check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
-
-
-def controller_info(c_name):
-    jujudata = JujuData()
-    controllers = jujudata.controllers()[c_name]
-    return controllers['cloud'], controllers['api-endpoints'][0]
-
-
-async def delete_controller(token):
-    try:
-        controller = token.c_connection
+        controller = con.c_connection
         await controller.destroy(True)
         cloud = Cloud()
-        await cloud.remove_credential(token.c_name)
+        await cloud.remove_credential(con.c_name)
     except NotImplementedError:
-        output_pass(['juju', 'destroy-controller', '-y'], token.c_name)
-        output_pass(['juju', 'remove-credential', token.c_token.type, token.c_name])
+        output_pass(['juju', 'destroy-controller', '-y'], con.c_name)
+        output_pass(['juju', 'remove-credential', con.c_token.type, con.c_name])
 
 
 async def get_all_controllers():
@@ -306,19 +303,19 @@ async def get_all_controllers():
 
 
 async def controller_exists(c_name):
-    return c_name in await get_all_controllers()
+    return c_name in list(await get_all_controllers())
 
 
-async def get_controller_access(token, username):
+async def get_controller_access(con, token):
     try:
-        controller = token.c_connection
-        user = await controller.get_user(username, True)
+        controller = con.c_connection
+        user = await controller.get_user(token.username, True)
         result = user.serialize()['results'][0].serialize()['result'].serialize()['access']
     except NotImplementedError:
-        users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
+        users = json.loads(output_pass(['juju', 'users', '--format', 'json'], con.c_name))
         result = None
         for user in users:
-            if user['user-name'] == username:
+            if user['user-name'] == token.username:
                 access = user['access']
                 if await c_access_exists(access):
                     result = access
@@ -328,20 +325,25 @@ async def get_controller_access(token, username):
     return result
 
 
-async def get_controllers_info(token):
+async def get_controllers_info():
+#     result = await get_all_controllers()
+#     output = []
+#     for m in result:
+#         cont_con = Controller_Connection()
+#         cont = await cont_con.set_controller(token, m)
+#         if cont.c_access is not None:
+#             result = await get_controller_info(controller, token)
+#             outputlist.append(result)
+#     return output
     result = await get_all_controllers()
-    output = []
-    for c in result:
-        if await token.set_controller(c).c_access is not None:
-            output.append(await get_controller_info(token))
-    return output
+    return [c for c in result]
 
 
-async def get_controller_info(token):
-    if token.c_access is not None:
-        models = await get_models_info(token)
-        users = await get_users_controller(token)
-        result = {'name': token.c_name, 'type': token.c_token.type, 'models': models,
+async def get_controller_info(token, controller):
+    if controller.c_access is not None:
+        models = await get_models_info(controller)
+        users = await get_users_controller(token, controller)
+        result = {'name': controller.c_name, 'type': controller.c_token.type, 'models': models,
                   'users': users}
     else:
         result = None
@@ -353,13 +355,13 @@ async def c_access_exists(access):
 
 
 #libjuju : nog geen wrapper geschreven voor get_users()
-async def get_controller_superusers(token):
+async def get_controller_superusers(controller):
     try:
-        controller = token.c_connection()
-        users = await controller.get_users()
+        con = controller.c_connection
+        users = await con.get_users()
         return [u['properties']['username']['type'] for u in users if u['properties']['access']['type'] == 'superuser']
     except NotImplementedError:
-        users = json.loads(output_pass(['juju', 'users', '--format', 'json'], token.c_name))
+        users = json.loads(output_pass(['juju', 'users', '--format', 'json'], controller.c_name))
         return [u['user-name'] for u in users if u['access'] == 'superuser']
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
@@ -367,15 +369,15 @@ async def get_controller_superusers(token):
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
-async def get_all_models(token):
+async def get_all_models(controller):
     try:
-        controller = token.c_connection
-        models = await controller.get_models()
+        cont_conn = controller.c_connection
+        models = await cont_conn.get_models()
         return [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
     except NotImplementedError:
         try:
             jujudata = JujuData()
-            return jujudata.models()[token.c_name].keys()
+            return list(jujudata.models()[controller.c_name])
         except FileNotFoundError:
             return []
     except json.decoder.JSONDecodeError as e:
@@ -383,18 +385,22 @@ async def get_all_models(token):
         abort(error[0], error[1])
 
 
-async def model_exists(token, model):
-    return model in await get_all_models(token)
+async def model_exists(controller, modelname):
+    all_models = await get_all_models(controller)
+    for model in all_models:
+        if model['name'] == modelname:
+            return True
+    return False
 
 
-async def get_model_uuid(token):
-    for model in await get_all_models(token):
-        if model['name'] == token.m_name:
+async def get_model_uuid(controller, model):
+    for model in await get_all_models(controller):
+        if model['name'] == model.m_name:
             return model['uuid']
 
 
 #TODO
-async def get_model_access(token, username):
+async def get_model_access(model, controller, username):
     access = None
     try:
     #     controller = token.c_connection
@@ -402,9 +408,9 @@ async def get_model_access(token, username):
     #     for model in models:
     #         model.get_info()
     # except NotImplementedError:
-        for model in json.loads(output_pass(['juju', 'models', '--format', 'json'], token.c_name))['models']:
-            if model['name'] == token.m_name and username in model['users'].keys():
-                access = model['users'][username]['access']
+        for mod in json.loads(output_pass(['juju', 'models', '--format', 'json'], controller.c_name))['models']:
+            if mod['name'] == model.m_name and username in mod['users'].keys():
+                access = mod['users'][username]['access']
                 break
         return access
     except json.decoder.JSONDecodeError as e:
@@ -416,57 +422,48 @@ async def get_model_access(token, username):
 #     return access in ['read', 'write', 'admin']
 
 
-async def get_models_info(token):
-    result = await get_all_models(token)
-    output = []
-    for m in result:
-        await token.set_model(m['name'])
-        if token.m_access is not None:
-            output.append(await get_model_info(token))
-    return output
+async def get_models_info(controller):
+    return [(m['name']) for m in await get_all_models(controller)]
 
 
-async def get_model_info(token):
-    if token.m_access is not None:
-        users = await get_users_model(token)
-        ssh = await get_ssh_keys(token)
-        applications = await get_applications_info(token)
-        machines = await get_machines_info(token)
-        gui = await get_gui_url(token)
-        result = {'name': token.m_name, 'users': users, 'ssh-keys': ssh,
-                  'applications': applications, 'machines': machines,
-                  'juju-gui-url': gui}
+async def get_model_info(token, model, controller):
+    if model.m_access is not None:
+        users = await get_users_model(token, model, controller)
+        ssh = await get_ssh_keys(model, controller)
+        applications = await get_applications_info(model)
+        machines = await get_machines_info(model)
+        result = {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
+                  'applications': applications, 'machines': machines}
     else:
         result = None
     return result
 
 
-async def get_ssh_keys(token):
+async def get_ssh_keys(model, controller):
     try:
-        model = token.m_connection
-        res = await model.get_ssh_key(False)
+        model_con = model.m_connection
+        res = await model_con.get_ssh_key(False)
         return res.serialize()['results'][0].serialize()
     except NotImplementedError:
-        return output_pass(['juju', 'ssh-keys', '--full'], token.c_name, token.m_name).split('\n')[1:-1]
+        return output_pass(['juju', 'ssh-keys', '--full'], controller.c_name, model.m_name).split('\n')[1:-1]
 
 
-async def get_applications_info(token):
+async def get_applications_info(model):
     try:
-        model = token.m_connection
-        data = model.state.state
+        model_con = model.m_connection
+        data = model_con.state.state
         result = []
         apps = data.get('application', {})
         for app in apps.keys():
-            result.append(await get_application_info(token, app))
+            result.append(await get_application_info(model, app))
         return result
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
 
-async def get_units_info(token, application):
+async def get_units_info(model, application):
     try:
-        model = token.m_connection
         data = model.state.state['unit']
         units = []
         result = []
@@ -486,66 +483,57 @@ async def get_units_info(token, application):
 
 
 #libjuju geen manier om gui te verkrijgen of juju gui methode
-async def get_gui_url(token):
+async def get_gui_url(model, controller):
     try:
-        data = output_pass(['juju', 'gui', '--no-browser'], token.c_name, token.m_name)
+        data = output_pass(['juju', 'gui', '--no-browser'], controller.c_name, model.m_name)
         return data.split('\n')[0]
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
 
-async def create_model(token, model, ssh_key=None):
-    try:
-        controller = token.c_connection
-        await controller.add_model(model, token.c_name)
-    except NotImplementedError:
-        output_pass(['juju', 'add-model', model], token.c_name)
+async def create_model(token, controller, modelname, ssh_key=None):
+    controller = controller.c_connection
+    await controller.add_model(modelname)
+    model = Model_Connection()
+    model.set_model(token, controller, modelname)
     if ssh_key is not None:
-        await add_ssh_key(token, ssh_key)
-    await add_to_model(await token.set_model(model), token.username, 'admin')
-    cont = await get_controller_superusers(token)
+        await add_ssh_key(token, model, ssh_key)
+    await add_to_model(model, token.username, 'admin')
+    cont = await get_controller_superusers(controller)
     for user in cont:
-        await add_to_model(token, user, 'admin')
+        await add_to_model(model, user, 'admin')
+    return model
 
 
-async def delete_model(token):
+async def delete_model(controller, model):
     try:
-        controller = token.c_connection
-        await controller.destroy_models(token.m_uuid)
+        controller_con = controller.c_connection
+        await controller_con.destroy_models(model.m_uuid)
     except NotImplementedError:
-        output_pass(['juju', 'destroy-model', '-y', '{}:{}'.format(token.c_name, token.m_name)])
+        output_pass(['juju', 'destroy-model', '-y', '{}:{}'.format(controller.c_name, model.m_name)])
 
 
-async def add_ssh_key(token, ssh_key):
-    try:
-        model = token.m_connection
-        await model.add_ssh_key(ssh_key)
-    except NotImplementedError:
-        output_pass(['juju', 'add-ssh-key', '"{}"'.format(ssh_key)], token.c_name, token.m_name)
+async def add_ssh_key(token, model, ssh_key):
+    model_con = model.m_connection
+    await model_con.add_ssh_key(token.username, ssh_key)
 
 
-async def remove_ssh_key(token, ssh_key):
-    key = base64.b64decode(bytes(ssh_key.strip().split()[1].encode('ascii')))
-    fp_plain = hashlib.md5(key).hexdigest()
-    fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
-    try:
-        model = token.m_connection
-        await model.add_ssh_key(fingerprint)
-    except NotImplementedError:
-        output_pass(['juju', 'remove-ssh-key', fingerprint], token.c_name, token.m_name)
+async def remove_ssh_key(token, model, ssh_key):
+    model_con = model.m_connection
+    await model_con.remove_ssh_key(token.username, ssh_key)
 
 #####################################################################################
 # Machines FUNCTIONS
 #####################################################################################
-async def get_machines_info(token):
+async def get_machines_info(model):
     try:
-        model = token.m_connection
-        data = model.state.machines.keys()
+        model_con = model.m_connection
+        data = model_con.state.machines.keys()
         result = []
         for m in data:
             if not 'lxd' in m:
-                res = await get_machine_info(token, m)
+                res = await get_machine_info(model, m)
                 result.append(res)
         return result
     except json.decoder.JSONDecodeError as e:
@@ -553,17 +541,17 @@ async def get_machines_info(token):
         abort(error[0], error[1])
 
 
-async def get_machine_entity(token, machine):
-    model = token.m_connection
-    for app in model.state.machines.items():
+async def get_machine_entity(model, machine):
+    model_con = model.m_connection
+    for app in model_con.state.machines.items():
         if app[0] == machine:
             return app[1]
 
 
-async def get_machine_info(token, machine):
+async def get_machine_info(model, machine):
     try:
-        model = token.m_connection
-        data = model.state.state['machine']
+        model_con = model.m_connection
+        data = model_con.state.state['machine']
         machine_data = data[machine][0]
         containers = []
         if not 'lxd' in machine:
@@ -596,122 +584,88 @@ async def get_machine_ip(machine_data, cloud):
     return dns_name
 
 
-async def add_machine(token, ser=None, cont=None):
-    try:
-        model = token.m_connection
-        await model.add_machine(series=ser, constraints=cont)
-    except NotImplementedError:
-        if ser is None and cont is None:
-            result = output_pass(['juju', 'add-machine'], token.c_name, token.m_name)
-        elif ser is None:
-            commands = ['juju', 'add-machine', '--constraints']
-            commands.extend(cont)
-            result = output_pass(commands, token.c_name, token.m_name)
-        elif cont is None:
-            result = output_pass(['juju', 'add-machine', '--series', ser], token.c_name, token.m_name)
-        else:
-            commands = ['juju', 'add-machine', '--series', ser, '--constraints']
-            commands.extend(cont)
-            result = output_pass(commands, token.c_name, token.m_name)
-        return result
+async def add_machine(model, ser=None, cont=None):
+    model_con = model.m_connection
+    await model_con.add_machine(series=ser, constraints=cont)
 
 
-async def machine_exists(token, machine):
+async def machine_exists(model, machine):
     try:
-        model = token.m_connection
-        data = model.state.state['machine'].keys()
+        model_con = model.m_connection
+        data = model_con.state.state['machine'].keys()
         return machine in data
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
 
-async def get_machine_series(token, machine):
+async def get_machine_series(model, machine):
     try:
-        data = await get_machine_info(token, machine)
+        data = await get_machine_info(model, machine)
         return data['series']
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
 
-async def machine_matches_series(token, machine, series):
-    if machine is None or series is None:
-        return True
-    else:
-        return series == await get_machine_series(token, machine)
+# async def machine_matches_series(model, machine, series):
+#     if machine is None or series is None:
+#         return True
+#     else:
+#         return series == await get_machine_series(model, machine)
 
 
-async def remove_machine(token, machine):
-    try:
-        machine = await get_machine_entity(token, machine)
-        machine.destroy(force=True)
-    except NotImplementedError:
-        output_pass(['juju', 'remove-machine', '--force', machine], token.c_name, token.m_name)
+async def remove_machine(model, machine):
+    machine = await get_machine_entity(model, machine)
+    machine.destroy(force=True)
 
 
 #####################################################################################
 # APPLICATION FUNCTIONS
 #####################################################################################
-async def app_exists(token, app_name):
+async def app_exists(token, controller, model, app_name):
     try:
-        model_info = await get_model_info(token)
-        return app_name in model_info['applications'].keys()
-    except NotImplementedError:
-        data = json.loads(output_pass(['juju', 'status', '--format', 'json'], token.c_name, token.m_name))
-        return app_name in data['applications'].keys()
+        model_info = await get_model_info(token, model, controller)
+        for app in model_info['applications']:
+            if app['name'] == app_name:
+                return True
+        return False
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
 
 
-# def deploy_bundle(token, bundle):
-#     with open('{}/files/data.yml'.format(settings.SOJOBO_API_DIR), 'w+') as outfile:
-#         yaml.dump(bundle, outfile, default_flow_style=False)
-#     output_pass(['juju', 'deploy', '/opt/sojobo_api/files/data.yml'], token.c_name, token.m_name)
+async def deploy_bundle(model, bundle):
+    with open('{}/bundle/bundle.yaml'.format(settings.SOJOBO_API_DIR), 'w+') as outfile:
+        yaml.dump(bundle, outfile, default_flow_style=False)
+    model_con = model.m_connection
+    await model_con.deploy('{}/bundle/'.format(settings.SOJOBO_API_DIR), series=bundle['series'])
 
 
-async def deploy_app(token, app_name, ser=None, tar=None):
-    try:
-        model = token.m_connection
-        await model.deploy(app_name, series=ser, target=tar)
-    except NotImplementedError:
-        if 'local:' in app_name:
-            app_name = app_name.replace('local:', '{}/'.format(settings.LOCAL_CHARM_DIR))
-        elif 'github:' in app_name:
-            Repo.clone(app_name.split(':', 1)[1], settings.LOCAL_CHARM_DIR)
-            app_name = '{}/{}'.format(settings.LOCAL_CHARM_DIR, app_name.split('/')[-1])
-        if tar is None and ser is None:
-            output_pass(['juju', 'deploy', app_name], token.c_name, token.m_name)
-        elif tar is None:
-            output_pass(['juju', 'deploy', app_name, '--series', ser], token.c_name, token.m_name)
-        elif ser is None:
-            output_pass(['juju', 'deploy', app_name, '--to', tar], token.c_name, token.m_name)
-        else:
-            output_pass(['juju', 'deploy', app_name, '--series', ser, '--to', tar], token.c_name, token.m_name)
+async def deploy_app(model, app_name, ser=None, tar=None):
+    model_con = model.m_connection
+    await model_con.deploy(app_name, series=ser, to=tar)
 
 
-async def get_application_entity(token, app_name):
-    model = token.m_connection
-    for app in model.state.applications.items():
+async def get_application_entity(model, app_name):
+    model_con = model.m_connection
+    for app in model_con.state.applications.items():
         if app[0] == app_name:
             return app[1]
 
 
-async def remove_app(token, app_name):
-    try:
-        app = await get_application_entity(token, app_name)
-        await app.remove()
-    except NotImplementedError:
-        output_pass(['juju', 'remove-application', app_name], token.c_name, token.m_name)
+async def remove_app(model, app_name):
+    app = await get_application_entity(model, app_name)
+    await app.remove()
 
 
-async def get_application_info(token, application):
+async def get_application_info(model, applic):
     try:
-        model = token.m_connection
-        data = model.state.state
+        model_con = model.m_connection
+        data = model_con.state.state
+        res1 = {}
         for application in data['application'].items():
-            if application[0] == application:
+            if application[0] == applic:
                 app = application[1]
                 res1 = {'name': app[0]['name'], 'relations': [], 'charm': app[0]['charm-url'], 'exposed': app[0]['exposed'],
                         'series': app[0]['charm-url'].split(":")[1].split("/")[0], 'status': app[0]['status']['current']}
@@ -730,8 +684,8 @@ async def get_application_info(token, application):
         abort(error[0], error[1])
 
 
-async def get_unit_info(token, application, unitnumber):
-    data = await get_application_info(token, application)
+async def get_unit_info(model, application, unitnumber):
+    data = await get_application_info(model, application)
     for u in data['units']:
         if u['name'] == '{}/{}'.format(application, unitnumber):
             return u
@@ -745,24 +699,15 @@ async def get_unit_info(token, application, unitnumber):
 #             return u
 
 
-async def add_unit(token, app_name, target=None):
-    try:
-        application = await get_application_entity(token, app_name)
-        await application.add_unit(count=1, to=target)
-    except NotImplementedError:
-        if target is None:
-            return output_pass(['juju', 'add-unit', app_name], token.c_name, token.m_name)
-        else:
-            return output_pass(['juju', 'add-unit', app_name, '--to', target])
+async def add_unit(model, app_name, target=None):
+    application = await get_application_entity(model, app_name)
+    await application.add_unit(count=1, to=target)
 
 
-async def remove_unit(token, application, unit_number):
-    try:
-        app = await get_application_entity(token, application)
-        unit = '{}/{}'.format(application, unit_number)
-        await app.destroy_unit(unit)
-    except NotImplementedError:
-        return output_pass(['juju', 'remove-unit', '{}/{}'.format(application, unit_number)], token.c_name, token.m_name)
+async def remove_unit(model, application, unit_number):
+    app = await get_application_entity(model, application)
+    unit = '{}/{}'.format(application, unit_number)
+    await app.destroy_unit(unit)
 
 
 async def get_unit_ports(unit):
@@ -772,37 +717,31 @@ async def get_unit_ports(unit):
     return ports
 
 
-async def get_relations_info(token):
-    data = await get_applications_info(token)
+async def get_relations_info(model):
+    data = await get_applications_info(model)
     return [{'name': a['name'], 'relations': a['relations']} for a in data]
 
 
-async def add_relation(token, app1, app2):
-    try:
-        model = token.m_connection
-        await model.add_relation(app1, app2)
-    except NotImplementedError:
-        output_pass(['juju', 'add-relation', app1, app2], token.c_name, token.m_name)
+async def add_relation(model, app1, app2):
+    model_con = model.m_connection
+    await model_con.add_relation(app1, app2)
 
 
-async def remove_relation(token, app1, app2):
-    try:
-        model = token.m_connection
-        data = model.state.state
-        application = await get_application_entity(token, app1)
-        if app1 == app2:
-            for relation in data['relation'].items():
-                keys = relation[1][0]['keys'].split(':')
-                await application.destroy_relation(keys[1], '{}:{}'.format(keys[0], keys[1]))
-        else:
-            for relation in data['relation'].items():
-                keys = relation[1][0]['keys'].split(' ')
-                if keys[0].startswith(app1):
-                    await application.destroy_relation(keys[0].split(':')[1], keys[1])
-                elif keys[1].startswith(app1):
-                    await application.destroy_relation(keys[1].split(':')[1], keys[0])
-    except NotImplementedError:
-        output_pass(['juju', 'remove-relation', app1, app2], token.c_name, token.m_name)
+async def remove_relation(model, app1, app2):
+    model_con = model.m_connection
+    data = model_con.state.state
+    application = await get_application_entity(model, app1)
+    if app1 == app2:
+        for relation in data['relation'].items():
+            keys = relation[1][0]['keys'].split(':')
+            await application.destroy_relation(keys[1], '{}:{}'.format(keys[0], keys[1]))
+    else:
+        for relation in data['relation'].items():
+            keys = relation[1][0]['keys'].split(' ')
+            if keys[0].startswith(app1):
+                await application.destroy_relation(keys[0].split(':')[1], keys[1])
+            elif keys[1].startswith(app1):
+                await application.destroy_relation(keys[1].split(':')[1], keys[0])
 
 
 # async def app_supports_series(app_name, series):
@@ -822,45 +761,45 @@ async def remove_relation(token, app1, app2):
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
-async def create_user(token, username, password):
+async def create_user(controller_con, username, password):
     try:
-        controller = token.c_connection
-        await controller.add_user(username)
-        await change_user_password(token, username, password)
+        con = controller_con.c_connection
+        await con.add_user(username)
+        await change_user_password(controller_con, username, password)
     except NotImplementedError:
         for controller in get_all_controllers():
             output_pass(['juju', 'add-user', username], controller)
             output_pass(['juju', 'revoke', username, 'login'], controller)
-        await change_user_password(token, username, password)
+        await change_user_password(controller_con, username, password)
 
 
-async def delete_user(token, username):
+async def delete_user(controller, username):
     try:
-        controller = token.c_connection
-        await controller.disable_user(username)
+        con = controller.c_connection
+        await con.disable_user(username)
     except NotImplementedError:
-        for controller in await get_all_controllers():
-            output_pass(['juju', 'remove-user', username, '-y'], controller)
+        for control in await get_all_controllers():
+            output_pass(['juju', 'remove-user', username, '-y'], control)
 
 
-async def change_user_password(token, username, password):
+async def change_user_password(controller, username, password):
     try:
-        controller = token.c_connection
-        await controller.change_user_password(username, password)
+        cont = controller.c_connection
+        await cont.change_user_password(username, password)
     except NotImplementedError:
-        for controller in get_all_controllers():
-            check_output(['juju', 'change-user-password', username, '-c', controller],
+        for control in get_all_controllers():
+            check_output(['juju', 'change-user-password', username, '-c', control],
                          input=bytes('{}\n{}\n'.format(password, password), 'utf-8'))
 
 
 #libjuju: nog gene methode om get_all_users te implementeren
-async def get_users_controller(token):
+async def get_users_controller(token, controller):
     try:
-        if token.c_access == 'superuser':
-            data = json.loads(output_pass(['juju', 'list-users', '--format', 'json'], token.c_name))
+        if controller.c_access == 'superuser':
+            data = json.loads(output_pass(['juju', 'list-users', '--format', 'json'], controller.c_name))
             users = [{'name': u['user-name'], 'access': u['access']} for u in data]
-        elif token.c_access is not None:
-            users = [{'name': token.username, 'access': token.c_access}]
+        elif controller.c_access is not None:
+            users = [{'name': token.username, 'access': controller.c_access}]
         else:
             users = None
         return users
@@ -870,17 +809,17 @@ async def get_users_controller(token):
 
 
 #libjuju: nog gene methode om get_all_users te implementeren
-async def get_users_model(token):
+async def get_users_model(token, model, controller):
     try:
-        if token.m_access == 'admin' or token.m_access == 'write':
-            data = json.loads(output_pass(['juju', 'models', '--format', 'json'], token.c_name))
+        if model.m_access == 'admin' or model.m_access == 'write':
+            data = json.loads(output_pass(['juju', 'models', '--format', 'json'], controller.c_name))
             for model in data['models']:
-                if model['name'] == token.m_name:
+                if model['name'] == model.m_name:
                     users_info = model['users']
                     break
             users = [{'name': k, 'access': v['access']} for k, v in users_info.items()]
-        elif token.m_access is not None:
-            users = [{'name': token.username, 'access': token.m_access}]
+        elif model.m_access is not None:
+            users = [{'name': token.username, 'access': model.m_access}]
         else:
             users = None
         return users
@@ -889,24 +828,24 @@ async def get_users_model(token):
         abort(error[0], error[1])
 
 
-async def add_to_controller(token, username, access):
-    controller = token.c_connection
-    await controller.grant(username, access)
+async def add_to_controller(controller, username, access):
+    cont = controller.c_connection
+    await cont.grant(username, access)
 
 
-async def remove_from_controller(token, username):
-    controller = token.c_connection
-    await controller.revoke(username)
+async def remove_from_controller(controller, username):
+    cont = controller.c_connection
+    await cont.revoke(username)
 
 
-async def add_to_model(token, username, access):
-    model = token.m_connection
-    await model.grant(username, access)
+async def add_to_model(model, username, access):
+    model_con = model.m_connection
+    await model_con.grant(username, access)
 
 
 async def remove_from_model(token, username):
-    model = token.m_connection
-    await model.revoke(username)
+    model_con = token.m_connection
+    await model_con.revoke(username)
 
 
 async def user_exists(username):
@@ -935,38 +874,39 @@ async def get_users_info(token):
 
 
 async def get_user_info(token, username):
-    user_acc = await get_controllers_access(token, username)
+    user_acc = await get_controllers_access(token)
     return {'name': username, 'controllers': user_acc}
 
 
-async def get_controllers_access(token, username):
+async def get_controllers_access(token):
     controllers = []
     for controller in await get_all_controllers():
-        access = await get_controller_access(await token.set_controller(controller), username)
+        cont_obj = Controller_Connection()
+        access = await get_controller_access(await cont_obj.set_controller(token, controller), token.username)
         if access is not None:
-            model_acc = await get_models_access(token, username)
+            model_acc = await get_models_access(token, token.username)
             controllers.append({'name': controller, 'type': token.c_token.type, 'access': access,
                                 'models': model_acc})
     return controllers
 
 
-async def get_ucontroller_access(token, username):
-    acc = await get_controller_access(token, username)
-    mod = await get_models_access(token, username)
-    return {'name': token.c_name,
+async def get_ucontroller_access(controller, username):
+    acc = await get_controller_access(controller, username)
+    mod = await get_models_access(controller, username)
+    return {'name': controller.c_name,
             'access': acc,
             'models': mod}
 
 
-async def get_models_access(token, username):
+async def get_models_access(controller, username):
     models = []
-    for model in await get_all_models(token):
-        access = await get_model_access(await token.set_model(model), username)
+    for model in await get_all_models(controller):
+        access = await get_model_access(await model.set_model(model), controller, username)
         if access is not None:
             models.append({'name': model, 'access': access})
     return models
 
 
-async def get_umodel_access(token, username):
-    mod_acc = await get_model_access(token, username)
-    return {'name': token.m_name, 'access': mod_acc}
+async def get_umodel_access(controller, model, username):
+    mod_acc = await get_model_access(model, controller, username)
+    return {'name': model.m_name, 'access': mod_acc}

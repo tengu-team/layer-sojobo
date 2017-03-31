@@ -81,6 +81,7 @@ def install_api():
         pip_install(pkg)
     mergecopytree('files/sojobo_api', API_DIR)
     os.mkdir('{}/files'.format(API_DIR))
+    os.mkdir('{}/bundle'.format(API_DIR))
     adduser(USER)
     generate_password()
     os.mkdir('/home/{}'.format(USER))
@@ -88,6 +89,9 @@ def install_api():
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
     generate_api_key()
     generate_password()
+    shutil.copyfile('files/controller.py', '/usr/local/lib/python3.5/dist-packages/juju/controller.py')
+    shutil.copyfile('files/model.py', '/usr/local/lib/python3.5/dist-packages/juju/model.py')
+    service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
 
