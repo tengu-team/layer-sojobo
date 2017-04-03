@@ -29,6 +29,7 @@ from juju.controller import Controller
 from juju.cloud import Cloud
 from juju.errors import JujuAPIError
 #from juju.client import client
+from datetime import datetime
 from juju.client.connection import JujuData
 ################################################################################
 # TENGU FUNCTIONS
@@ -79,7 +80,7 @@ class Controller_Connection(object):
 
 
     async def set_controller(self, token, c_name):
-        controllers = get_all_controllers()
+        controllers = await get_all_controllers()
         c_type, c_endpoint = controllers[c_name]['cloud'], controllers[c_name]['api-endpoints'][0]
         self.url = c_endpoint
         self.c_name = c_name
@@ -223,7 +224,7 @@ async def authenticate(api_key, auth, controller=None, modelname=None):
     elif controller is not None and await controller_exists(controller):
         cont_con = Controller_Connection()
         await cont_con.set_controller(token, controller)
-        modelex = await model_exists(token, modelname)
+        modelex = await model_exists(cont_con, modelname)
         if cont_con.c_access is None:
             error = errors.no_access('controller')
             abort(error[0], error[1])
@@ -394,9 +395,9 @@ async def model_exists(controller, modelname):
 
 
 async def get_model_uuid(controller, model):
-    for model in await get_all_models(controller):
-        if model['name'] == model.m_name:
-            return model['uuid']
+    for mod in await get_all_models(controller):
+        if mod['name'] == model.m_name:
+            return mod['uuid']
 
 
 #TODO
@@ -426,7 +427,7 @@ async def get_models_info(controller):
     return [(m['name']) for m in await get_all_models(controller)]
 
 
-async def get_model_info(token, model, controller):
+async def get_model_info(token, controller, model):
     if model.m_access is not None:
         users = await get_users_model(token, model, controller)
         ssh = await get_ssh_keys(model, controller)
@@ -464,7 +465,8 @@ async def get_applications_info(model):
 
 async def get_units_info(model, application):
     try:
-        data = model.state.state['unit']
+        mod = model.m_connection
+        data = mod.state.state['unit']
         units = []
         result = []
         for unit in data.keys():
@@ -483,9 +485,9 @@ async def get_units_info(model, application):
 
 
 #libjuju geen manier om gui te verkrijgen of juju gui methode
-async def get_gui_url(model, controller):
+async def get_gui_url(controller, model):
     try:
-        data = output_pass(['juju', 'gui', '--no-browser'], controller.c_name, model.m_name)
+        data = output_pass(['juju', 'gui', '--no-browser'], controller.c_name, model)
         return data.split('\n')[0]
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
@@ -493,10 +495,10 @@ async def get_gui_url(model, controller):
 
 
 async def create_model(token, controller, modelname, ssh_key=None):
-    controller = controller.c_connection
-    await controller.add_model(modelname)
+    con_con = controller.c_connection
+    await con_con.add_model(modelname)
     model = Model_Connection()
-    model.set_model(token, controller, modelname)
+    await model.set_model(token, controller, modelname)
     if ssh_key is not None:
         await add_ssh_key(token, model, ssh_key)
     await add_to_model(model, token.username, 'admin')
@@ -625,7 +627,7 @@ async def remove_machine(model, machine):
 #####################################################################################
 async def app_exists(token, controller, model, app_name):
     try:
-        model_info = await get_model_info(token, model, controller)
+        model_info = await get_model_info(token, controller, model)
         for app in model_info['applications']:
             if app['name'] == app_name:
                 return True
@@ -813,9 +815,9 @@ async def get_users_model(token, model, controller):
     try:
         if model.m_access == 'admin' or model.m_access == 'write':
             data = json.loads(output_pass(['juju', 'models', '--format', 'json'], controller.c_name))
-            for model in data['models']:
-                if model['name'] == model.m_name:
-                    users_info = model['users']
+            for mod in data['models']:
+                if mod['name'] == model.m_name:
+                    users_info = mod['users']
                     break
             users = [{'name': k, 'access': v['access']} for k, v in users_info.items()]
         elif model.m_access is not None:

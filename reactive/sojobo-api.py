@@ -91,6 +91,8 @@ def install_api():
     generate_password()
     shutil.copyfile('files/controller.py', '/usr/local/lib/python3.5/dist-packages/juju/controller.py')
     shutil.copyfile('files/model.py', '/usr/local/lib/python3.5/dist-packages/juju/model.py')
+    shutil.copyfile('files/utils.py', '/usr/local/lib/python3.5/dist-packages/juju/utils.py')
+    shutil.copyfile('files/connection.py', '/usr/local/lib/python3.5/dist-packages/juju/client/connection.py')
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
