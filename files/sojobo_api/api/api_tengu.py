@@ -138,7 +138,7 @@ def get_model_info(controller, model):
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
         code, response = 200, execute_task(juju.get_model_info, token, con, mod)
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -155,7 +155,7 @@ def add_bundle(controller, model):
             code, response = 200, "Bundle is being deployed"
         else:
             code, response = errors.no_permission()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -172,7 +172,7 @@ def delete_model(controller, model):
             code, response = 200, "Model {} is being deleted".format(model)
         else:
             code, response = errors.no_permission()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -187,7 +187,7 @@ def get_gui_url(controller, model):
             code, response = 200, execute_task(juju.get_gui_url, con, mod)
         else:
             code, response = errors.no_permission()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -203,7 +203,7 @@ def get_ssh_keys(controller, model):
             code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
         else:
             code, response = errors.no_permission()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -221,7 +221,7 @@ def add_ssh_key(controller, model):
             code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
         else:
             code, response = errors.no_permission()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -239,7 +239,7 @@ def remove_ssh_key(controller, model):
             code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
         else:
             code, response = errors.no_permission()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -255,7 +255,7 @@ def get_applications_info(controller, model):
             code, response = 200, execute_task(juju.get_applications_info, mod)
         else:
             code, response = errors.no_permission()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -280,7 +280,7 @@ def add_application(controller, model):
 
             else:
                 code, response = errors.no_permission()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -296,9 +296,8 @@ def get_application_info(controller, model, application):
         if execute_task(juju.app_exists, token, con, mod, app):
             code, response = 200, execute_task(juju.get_application_info, mod, app)
         else:
-            token.disconnect()
             code, response = errors.does_not_exist('application')
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -311,15 +310,15 @@ def remove_app(controller, model, application):
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
         app = juju.check_input(application)
-        if execute_task(juju.app_exists, token, con, mod, app):
-            if mod.m_access == 'write' or mod.m_access == 'admin':
+        if mod.m_access == 'write' or mod.m_access == 'admin':
+            if execute_task(juju.app_exists, token, con, mod, app):
                 execute_task(juju.remove_app, mod, app)
                 code, response = 200, execute_task(juju.get_applications_info, mod)
             else:
-                code, response = errors.no_permission()
+                code, response = errors.does_not_exist('application')
         else:
-            code, response = errors.does_not_exist('application')
-        execute_task(mod.disconnect())
+            code, response = errors.no_permission()
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -332,7 +331,7 @@ def get_machines_info(controller, model):
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
         code, response = 200, execute_task(juju.get_machines_info, mod)
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -349,7 +348,7 @@ def get_machine_info(controller, model, machine):
             code, response = 200, execute_task(juju.get_machine_info, mod, mach)
         else:
             code, response = errors.does_not_exist('machine')
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -372,7 +371,7 @@ def add_machine(controller, model):
                 code, response = 400, 'This cloud does not support this version of Ubuntu'
         else:
             code, response = errors.no_permission()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -393,7 +392,7 @@ def remove_machine(controller, model, machine):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('machine')
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -410,7 +409,7 @@ def get_units_info(controller, model, application):
             code, response = 200, execute_task(juju.get_units_info, mod, app)
         else:
             code, response = errors.does_not_exist('application')
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -432,7 +431,7 @@ def add_unit(controller, model, application):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('application')
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -454,7 +453,7 @@ def remove_unit(controller, model, application, unitnumber):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('unit')
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -473,7 +472,7 @@ def get_unit_info(controller, model, application, unitnumber):
             code, response = 200, unit
         else:
             code, response = errors.does_not_exist('unit')
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -486,7 +485,7 @@ def get_relations_info(controller, model):
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
         code, response = 200, execute_task(juju.get_relations_info, mod)
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -508,7 +507,7 @@ def add_relation(controller, model):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('application')
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -525,7 +524,7 @@ def get_relations(controller, model, application):
             code, response = 200, execute_task(juju.get_application_info, mod, app)['relations']
         else:
             code, response = errors.does_not_exist('application')
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -546,7 +545,7 @@ def remove_relation(controller, model, app1, app2):
                 code, response = errors.no_permission()
         else:
             code, response = errors.no_app()
-        execute_task(mod.disconnect())
+        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()

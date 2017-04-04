@@ -487,8 +487,7 @@ async def get_units_info(model, application):
 #libjuju geen manier om gui te verkrijgen of juju gui methode
 async def get_gui_url(controller, model):
     try:
-        data = output_pass(['juju', 'gui', '--no-browser'], controller.c_name, model)
-        return data.split('\n')[0]
+        return 'https://{}/gui/{}'.format(controller.url, model.m_uuid)
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
@@ -555,6 +554,9 @@ async def get_machine_info(model, machine):
         model_con = model.m_connection
         data = model_con.state.state['machine']
         machine_data = data[machine][0]
+        if machine_data is None:
+            result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
+            return result
         containers = []
         if not 'lxd' in machine:
             lxd = []
@@ -658,7 +660,8 @@ async def get_application_entity(model, app_name):
 
 async def remove_app(model, app_name):
     app = await get_application_entity(model, app_name)
-    await app.remove()
+    if app is not None:
+        await app.remove()
 
 
 async def get_application_info(model, applic):
