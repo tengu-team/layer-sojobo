@@ -88,7 +88,7 @@ class Controller_Connection(object):
         if self.c_connection is not None:
             await self.c_connection.disconnect()
         self.c_connection = await connect_controller(self, token)
-        self.c_access = await get_controller_access(self, token)
+        self.c_access = await get_controller_access(self, token.username)
         return self
 
     async def disconnect(self):
@@ -307,16 +307,16 @@ async def controller_exists(c_name):
     return c_name in list(await get_all_controllers())
 
 
-async def get_controller_access(con, token):
+async def get_controller_access(con, username):
     try:
         controller = con.c_connection
-        user = await controller.get_user(token.username, True)
+        user = await controller.get_user(username, True)
         result = user.serialize()['results'][0].serialize()['result'].serialize()['access']
     except NotImplementedError:
         users = json.loads(output_pass(['juju', 'users', '--format', 'json'], con.c_name))
         result = None
         for user in users:
-            if user['user-name'] == token.username:
+            if user['user-name'] == username:
                 access = user['access']
                 if await c_access_exists(access):
                     result = access
@@ -500,10 +500,10 @@ async def create_model(token, controller, modelname, ssh_key=None):
     await model.set_model(token, controller, modelname)
     if ssh_key is not None:
         await add_ssh_key(token, model, ssh_key)
-    await add_to_model(model, token.username, 'admin')
+    await model_grant(model, token.username, 'admin')
     cont = await get_controller_superusers(controller)
     for user in cont:
-        await add_to_model(model, user, 'admin')
+        await model_grant(model, user, 'admin')
     return model
 
 
@@ -766,16 +766,17 @@ async def remove_relation(model, app1, app2):
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
-async def create_user(controller_con, username, password):
+async def create_user(token, con, username, password):
     try:
-        con = controller_con.c_connection
-        await con.add_user(username)
-        await change_user_password(controller_con, username, password)
+        await con.c_connection.add_user(username)
+        await change_user_password(con, username, password)
+        await controller_grant(con, username, 'login')
     except NotImplementedError:
-        for controller in get_all_controllers():
+        for controller in list(await get_all_controllers()):
             output_pass(['juju', 'add-user', username], controller)
             output_pass(['juju', 'revoke', username, 'login'], controller)
-        await change_user_password(controller_con, username, password)
+            check_output(['juju', 'change-user-password', username, '-c', controller],
+                         input=bytes('{}\n{}\n'.format(password, password), 'utf-8'))
 
 
 async def delete_user(controller, username):
@@ -833,23 +834,23 @@ async def get_users_model(token, model, controller):
         abort(error[0], error[1])
 
 
-async def add_to_controller(controller, username, access):
+async def controller_grant(controller, username, access):
     cont = controller.c_connection
     await cont.grant(username, access)
 
 
-async def remove_from_controller(controller, username):
+async def controller_revoke(controller, username):
     cont = controller.c_connection
     await cont.revoke(username)
 
 
-async def add_to_model(model, username, access):
+async def model_grant(model, username, access):
     model_con = model.m_connection
     await model_con.grant(username, access)
 
 
-async def remove_from_model(token, username):
-    model_con = token.m_connection
+async def model_revoke(model, username):
+    model_con = model.m_connection
     await model_con.revoke(username)
 
 
@@ -860,7 +861,8 @@ async def user_exists(username):
 #libjuju: geen andere methode om users op te vragen atm
 async def get_all_users():
     try:
-        users = json.loads(output_pass(['juju', 'users', '--all', '--format', 'json'], await get_all_controllers()[0]))
+        controller = list(await get_all_controllers())
+        users = json.loads(output_pass(['juju', 'users', '--all', '--format', 'json'], controller[0]))
         result = [user['user-name'] for user in users]
     except IndexError:
         result = [settings.JUJU_ADMIN_USER]
@@ -889,24 +891,26 @@ async def get_controllers_access(token):
         cont_obj = Controller_Connection()
         access = await get_controller_access(await cont_obj.set_controller(token, controller), token.username)
         if access is not None:
-            model_acc = await get_models_access(token, token.username)
+            model_acc = await get_models_access(controller, token)
             controllers.append({'name': controller, 'type': token.c_token.type, 'access': access,
                                 'models': model_acc})
     return controllers
 
 
-async def get_ucontroller_access(controller, username):
+async def get_ucontroller_access(controller, token, username):
     acc = await get_controller_access(controller, username)
-    mod = await get_models_access(controller, username)
+    mod = await get_models_access(controller, token)
     return {'name': controller.c_name,
             'access': acc,
             'models': mod}
 
 
-async def get_models_access(controller, username):
+async def get_models_access(controller, token):
     models = []
     for model in await get_all_models(controller):
-        access = await get_model_access(await model.set_model(model), controller, username)
+        model_con = Model_Connection()
+        await model_con.set_model(token, controller, model)
+        access = await get_model_access(model_con, controller, token.username)
         if access is not None:
             models.append({'name': model, 'access': access})
     return models
