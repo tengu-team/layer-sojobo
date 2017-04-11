@@ -78,11 +78,15 @@ def remove_user(controller, user):
 ################################################################################
 # MODEL FUNCTIONS
 ################################################################################
-def create_model():
-    return None
+def remove_model(controller, model, username):
+    access = get_model_access(controller, model, username)
+    MONGO.db.users.update_one(
+        {'name' : username},
+        {'$pull': {'access' : {controller : {'models' : {model : access}}}}
+        })
 
-def remove_model():
-    return None
-
-def set_model_access():
-    return None
+def set_model_access(controller, model, username, access):
+    MONGO.db.users.update_one(
+        {'name' : username},
+        {'$push': {'access' : {controller : {'models' : {model : access}}}}
+        })
