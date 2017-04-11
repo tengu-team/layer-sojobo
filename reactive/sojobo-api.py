@@ -14,11 +14,11 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0103,c0301
+import binascii
 from base64 import b64encode
 from hashlib import sha256
 import os
 import shutil
-import requests
 import subprocess
 # Charm pip dependencies
 from charmhelpers.core.templating import render
@@ -52,7 +52,7 @@ def upgrade_charm():
 
 
 @when('api.installed', 'nginx.passenger.available')
-@when_not('api.running')
+@when_not('api.configured')
 def configure_webapp():
     if SETUP == 'https':
         close_port(80)
@@ -71,13 +71,83 @@ def configure_webapp():
         render_http()
         open_port(80)
     restart_api()
-    set_state('api.running')
-    status_set('active', 'The Sojobo-api is running, initial admin-password: {}'.format(get_password()))
+    set_state('api.configured')
+    status_set('blocked', 'Waiting for a connection with MongoDB')
 
+
+# Handeling changed configs
+@when('api.configured', 'config.changed', 'mongodb.available')
+@when_not('api.running')
+def config_changed(mongodb):
+    from pymongo import MongoClient
+    uri = list(mongodb.connection())[-1]['uri']
+    client = MongoClient(uri)
+    db = client.sojobo
+    pwd = str(binascii.b2a_hex(os.urandom(16)).decode('utf-8'))
+    db.add_user('sojobo', pwd, roles=[{'role': 'dbOwner', 'db': 'sojobo'}])
+    sojobo_uri = 'mongodb://{}:{}@{}:{}/sojobo'.format('sojobo', pwd, list(mongodb.connection())[-1]['host'],
+                                                list(mongodb.connection())[-1]['port'])
+    render('settings.py', '{}/settings.py'.format(API_DIR), {'JUJU_ADMIN_USER': 'admin',
+                                                             'JUJU_ADMIN_PASSWORD': get_password(),
+                                                             'SOJOBO_API_DIR': API_DIR,
+                                                             'LOCAL_CHARM_DIR': config()['charm-dir'],
+                                                             'SOJOBO_IP': HOST,
+                                                             'SOJOBO_USER': USER,
+                                                             'MONOG_URI': sojobo_uri})
+    configure_webapp()
+    set_state('api.running')
+    status_set('active', 'The Sojobo-api is running, initial admin-password: {} and MongoDB password: {}'.format(get_password(), pwd))
+
+
+@when('sojobo.available')
+def configure(sojobo):
+    prefix = 'https://' if SETUP == 'https' else 'http://'
+    with open("/{}/api-key".format(API_DIR), "r") as key:
+        sojobo.configure('{}{}'.format(prefix, HOST), API_DIR, key.readline(), config()['api-user'])
+
+###############################################################################
+# UTILS
+###############################################################################
+def mergecopytree(src, dst, symlinks=False, ignore=None):
+    """"Recursive copy src to dst, mergecopy directory if dst exists.
+    OVERWRITES EXISTING FILES!!"""
+    if not os.path.exists(dst):
+        os.makedirs(dst)
+        shutil.copystat(src, dst)
+    lst = os.listdir(src)
+    if ignore:
+        excl = ignore(src, lst)
+        lst = [x for x in lst if x not in excl]
+    for item in lst:
+        src_item = os.path.join(src, item)
+        dst_item = os.path.join(dst, item)
+        if symlinks and os.path.islink(src_item):
+            if os.path.lexists(dst_item):
+                os.remove(dst_item)
+            os.symlink(os.readlink(src_item), dst_item)
+        elif os.path.isdir(src_item):
+            mergecopytree(src_item, dst_item, symlinks, ignore)
+        else:
+            shutil.copy2(src_item, dst_item)
+
+
+def generate_api_key():
+    with open("/{}/api-key".format(API_DIR), "w") as key:
+        key.write(sha256(os.urandom(256)).hexdigest())
+
+
+def generate_password():
+    with open("/{}/juju-admin".format(API_DIR), "w") as key:
+        key.write(b64encode(os.urandom(16)).decode('utf-8'))
+
+
+def get_password():
+    with open("/{}/juju-admin".format(API_DIR), "r") as key:
+        return key.readline()
 
 def install_api():
     # Install pip pkgs
-    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'juju']:
+    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'juju', 'Flask-PyMongo', 'pymongo']:
         pip_install(pkg)
     mergecopytree('files/sojobo_api', API_DIR)
     os.mkdir('{}/files'.format(API_DIR))
@@ -140,61 +210,3 @@ def dhparam(size):
     chownr('/etc/nginx/ssl/{}'.format(HOST), GROUP, 'root', chowntopdir=True)
     subprocess.check_call(['openssl', 'dhparam', '-out', '/etc/nignx/ssl/{}/dhparam.pem'.format(HOST), str(size)])
     return '/etc/nignx/ssl/{}/dhparam.pem'.format(HOST)
-
-
-# Handeling changed configs
-@when('api.installed', 'config.changed')
-def config_changed():
-    render('settings.py', '{}/settings.py'.format(API_DIR), {'JUJU_ADMIN_USER': 'admin',
-                                                             'JUJU_ADMIN_PASSWORD': get_password(),
-                                                             'SOJOBO_API_DIR': API_DIR,
-                                                             'LOCAL_CHARM_DIR': config()['charm-dir'],
-                                                             'SOJOBO_IP': HOST,
-                                                             'SOJOBO_USER': USER})
-    configure_webapp()
-
-
-@when('sojobo.available')
-def configure(sojobo):
-    prefix = 'https://' if SETUP == 'https' else 'http://'
-    with open("/{}/api-key".format(API_DIR), "r") as key:
-        sojobo.configure('{}{}'.format(prefix, HOST), API_DIR, key.readline(), config()['api-user'])
-###############################################################################
-# UTILS
-###############################################################################
-def mergecopytree(src, dst, symlinks=False, ignore=None):
-    """"Recursive copy src to dst, mergecopy directory if dst exists.
-    OVERWRITES EXISTING FILES!!"""
-    if not os.path.exists(dst):
-        os.makedirs(dst)
-        shutil.copystat(src, dst)
-    lst = os.listdir(src)
-    if ignore:
-        excl = ignore(src, lst)
-        lst = [x for x in lst if x not in excl]
-    for item in lst:
-        src_item = os.path.join(src, item)
-        dst_item = os.path.join(dst, item)
-        if symlinks and os.path.islink(src_item):
-            if os.path.lexists(dst_item):
-                os.remove(dst_item)
-            os.symlink(os.readlink(src_item), dst_item)
-        elif os.path.isdir(src_item):
-            mergecopytree(src_item, dst_item, symlinks, ignore)
-        else:
-            shutil.copy2(src_item, dst_item)
-
-
-def generate_api_key():
-    with open("/{}/api-key".format(API_DIR), "w") as key:
-        key.write(sha256(os.urandom(256)).hexdigest())
-
-
-def generate_password():
-    with open("/{}/juju-admin".format(API_DIR), "w") as key:
-        key.write(b64encode(os.urandom(16)).decode('utf-8'))
-
-
-def get_password():
-    with open("/{}/juju-admin".format(API_DIR), "r") as key:
-        return key.readline()

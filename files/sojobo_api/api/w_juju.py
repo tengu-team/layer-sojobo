@@ -21,7 +21,7 @@ from subprocess import check_output, STDOUT, CalledProcessError
 import asyncio
 import yaml
 from flask import abort, Response
-from sojobo_api.api import w_errors as errors
+from sojobo_api.api import w_errors as errors, w_mongo as mongo
 from sojobo_api import settings
 from git import Repo
 from juju.model import Model
@@ -202,18 +202,17 @@ async def connect_model(con, mod, token): #pylint: disable=e0001
 
 async def check_login(token):
     if token.username == settings.JUJU_ADMIN_USER:
-        result = token.password == settings.JUJU_ADMIN_PASSWORD
+        return token.password == settings.JUJU_ADMIN_PASSWORD
     else:
         controller = Controller_Connection()
         try:
             cont_name = list(await get_all_controllers())[0]
             await controller.set_controller(token, cont_name)
-            result = True
+            return True
         except JujuAPIError:
-            result = False
+            return False
         finally:
             controller.disconnect()
-    return result
 
 
 async def authenticate(api_key, auth, controller=None, modelname=None):
@@ -279,6 +278,7 @@ async def create_controller(c_type, name, region, credentials):
     #     await controller.change_user_password('admin', pswd)
     # except NotImplementedError:
     check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
+
     controller = Controller_Connection()
     return controller
 
