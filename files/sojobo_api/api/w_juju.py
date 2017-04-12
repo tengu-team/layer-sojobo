@@ -278,7 +278,7 @@ async def create_controller(c_type, name, region, credentials):
     #     await controller.change_user_password('admin', pswd)
     # except NotImplementedError:
     check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
-
+    mongo.create_controller()
     controller = Controller_Connection()
     return controller
 
@@ -861,21 +861,16 @@ async def user_exists(username):
 #libjuju: geen andere methode om users op te vragen atm
 async def get_all_users():
     try:
-        controller = list(await get_all_controllers())
-        users = json.loads(output_pass(['juju', 'users', '--all', '--format', 'json'], controller[0]))
-        result = [user['user-name'] for user in users]
-    except IndexError:
-        result = [settings.JUJU_ADMIN_USER]
+        return mongo.get_all_users()
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
-    return result
 
 
 async def get_users_info(token):
     result = []
     for u in await get_all_users():
-        ui = await get_user_info(token, u)
+        ui = await get_user_info(u)
         result.append(ui)
     return result
 

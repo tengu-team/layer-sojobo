@@ -1,7 +1,7 @@
 # pylint: disable=c0111,c0301
 #!/usr/bin/env python3
-from bson.json_util import dumps
 from urllib.parse import unquote
+from bson.json_util import dumps
 from sojobo_api.app import MONGO
 from pymongo.errors import DuplicateKeyError
 
@@ -43,6 +43,13 @@ def disable_user(user):
 def get_user_id(name):
     result = dumps(MONGO.db.users.find_one_or_404({'name': unquote(name)}))
     return result['_id']
+
+def get_all_users():
+    users = dumps(MONGO.db.users.find())
+    result = []
+    for user in users:
+        result.append(user['name'])
+    return result
 ################################################################################
 # CONTROLLER FUNCTIONS
 ################################################################################

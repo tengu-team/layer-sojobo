@@ -19,7 +19,7 @@
 ###############################################################################
 from flask import request, Blueprint
 
-from sojobo_api.api import w_errors as errors, w_juju as juju
+from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
 from sojobo_api.api.w_juju import execute_task, Controller_Connection
 
 USERS = Blueprint('users', __name__)
@@ -29,15 +29,15 @@ def get():
 
 @USERS.route('/', methods=['GET'])
 def get_users_info():
-    # try:
-    #     token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-    #     if token.is_admin:
-    #         code, response = 200, juju.get_users_info(token)
-    #     else:
-    #         code, response = errors.no_permission()
-    # except KeyError:
-    #     code, response = errors.invalid_data()
-    return 501, 'Not Implemented'
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        if token.is_admin:
+            code, response = 200, juju.get_users_info()
+        else:
+            code, response = errors.no_permission()
+    except KeyError:
+        code, response = errors.invalid_data()
+    return code, response
 
 
 @USERS.route('/', methods=['POST'])
