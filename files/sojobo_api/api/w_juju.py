@@ -777,11 +777,13 @@ async def get_users_model(token, model, controller):
 async def controller_grant(controller, username, access):
     cont = controller.c_connection
     await cont.grant(username, access)
+    mongo.set_controller_access(controller.c_name, username, access)
 
 
 async def controller_revoke(controller, username):
     cont = controller.c_connection
     await cont.revoke(username)
+    mongo.remove_controller(controller.c_name, username)
 
 
 async def model_grant(model, username, access):
@@ -807,7 +809,7 @@ async def get_all_users():
         abort(error[0], error[1])
 
 
-async def get_users_info(token):
+async def get_users_info():
     result = []
     for u in await get_all_users():
         ui = await get_user_info(u)
@@ -815,40 +817,26 @@ async def get_users_info(token):
     return result
 
 
-async def get_user_info(token, username):
-    user_acc = await get_controllers_access(token)
-    return {'name': username, 'controllers': user_acc}
+async def get_user_info(username):
+    return mongo.get_user_info(username)
 
 
-async def get_controllers_access(token):
-    controllers = []
-    for controller in await get_all_controllers():
-        cont_obj = Controller_Connection()
-        access = await get_controller_access(await cont_obj.set_controller(token, controller), token.username)
-        if access is not None:
-            model_acc = await get_models_access(controller, token)
-            controllers.append({'name': controller, 'type': token.c_token.type, 'access': access,
-                                'models': model_acc})
-    return controllers
+async def get_controllers_access(usr):
+    user = mongo.get_user(usr)
+    return user['access']
 
 
-async def get_ucontroller_access(controller, token, username):
+async def get_ucontroller_access(controller, username):
     acc = await get_controller_access(controller, username)
-    mod = await get_models_access(controller, token)
+    mod = await get_models_access(controller, username)
     return {'name': controller.c_name,
             'access': acc,
             'models': mod}
 
 
-async def get_models_access(controller, token):
-    models = []
-    for model in await get_all_models(controller):
-        model_con = Model_Connection()
-        await model_con.set_model(token, controller, model)
-        access = await get_model_access(model_con.m_name, controller.m_name, token.username)
-        if access is not None:
-            models.append({'name': model, 'access': access})
-    return models
+async def get_models_access(controller, name):
+    user = mongo.get_user(name)
+    return user['access'][controller.c_name]['models']
 
 
 async def get_umodel_access(controller, model, username):

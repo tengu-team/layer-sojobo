@@ -50,11 +50,13 @@ def create_user():
             if execute_task(juju.user_exists, user):
                 code, response = errors.already_exists('user')
             else:
+                mongo.create_user(user)
                 controllers = execute_task(juju.get_all_controllers)
                 for con in controllers:
                     controller = Controller_Connection()
                     execute_task(controller.set_controller, token, con)
                     execute_task(juju.create_user, controller, user, data['password'])
+                    mongo.add_user(con, user, 'login')
                     execute_task(controller.disconnect)
                 code, response = 200, 'User {} succesfully created'.format(user)
         else:
@@ -66,19 +68,20 @@ def create_user():
 
 @USERS.route('/<user>', methods=['GET'])
 def get_user_info(user):
-    # try:
-    #     token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-    #     usr = juju.check_input(user)
-    #     if juju.user_exists(usr):
-    #         if usr == token.username or token.is_admin:
-    #             code, response = 200, juju.get_user_info(token, usr)
-    #         else:
-    #             code, response = errors.no_permission()
-    #     else:
-    #         code, response = errors.does_not_exist('user')
-    # except KeyError:
-    #     code, response = errors.invalid_data()
-    return 501, 'Not Implemented'
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        usr = juju.check_input(user)
+        if juju.user_exists(usr):
+            if usr == token.username or token.is_admin:
+                code, response = 200, juju.get_user_info(usr)
+            else:
+                code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
 
 
 @USERS.route('/<user>', methods=['PUT'])
@@ -117,8 +120,10 @@ def delete_user(user):
                         controller = Controller_Connection()
                         execute_task(controller.set_controller, token, con)
                         execute_task(juju.delete_user, controller, usr)
+                        mongo.remove_user(con, usr)
                         execute_task(controller.disconnect)
                     code, response = 200, 'User {} succesfully removed'.format(usr)
+                    mongo.disable_user(usr)
                 else:
                     code, response = 403, 'This would remove the admin from the system!'
             else:
@@ -132,36 +137,36 @@ def delete_user(user):
 
 @USERS.route('/<user>/controllers', methods=['GET'])
 def get_controllers_access(user):
-    # try:
-    #     token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-    #     usr = juju.check_input(user)
-    #     if juju.user_exists(usr):
-    #         if token.is_admin or token.username == usr:
-    #             code, response = 200, juju.get_controllers_access(token, usr)
-    #         else:
-    #             code, response = errors.no_permission()
-    #     else:
-    #         code, response = errors.does_not_exist('user')
-    # except KeyError:
-    #     code, response = errors.invalid_data()
-    return 501, 'Not Implemented'
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        usr = juju.check_input(user)
+        if juju.user_exists(usr):
+            if token.is_admin or token.username == usr:
+                code, response = 200, juju.get_controllers_access(usr)
+            else:
+                code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['GET'])
 def get_ucontroller_access(user, controller):
-    # try:
-    #     token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
-    #     usr = juju.check_input(user)
-    #     if juju.user_exists(usr):
-    #         if token.is_admin or token.username == usr:
-    #             code, response = 200, juju.get_ucontroller_access(token, usr)
-    #         else:
-    #             code, response = errors.no_permission()
-    #     else:
-    #         code, response = errors.does_not_exist('user')
-    # except KeyError:
-    #     code, response = errors.invalid_data()
-    return 501, 'Not Implemented'
+    try:
+        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
+        usr = juju.check_input(user)
+        if juju.user_exists(usr):
+            if token.is_admin or token.username == usr:
+                code, response = 200, juju.get_controller_access(con, usr)
+            else:
+                code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['PUT'])
@@ -204,37 +209,37 @@ def revoke_from_controller(user, controller):
 
 @USERS.route('<user>/controllers/<controller>/models', methods=['GET'])
 def get_models_access(user, controller):
-    # try:
-    #     token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
-    #     usr = juju.check_input(user)
-    #     if juju.user_exists(usr):
-    #         if token.is_admin or token.username == usr:
-    #             code, response = 200, juju.get_models_access(token, usr)
-    #         else:
-    #             code, response = errors.no_permission()
-    #     else:
-    #         code, response = errors.does_not_exist('user')
-    # except KeyError:
-    #     code, response = errors. invalid_data()
-    return 501, 'Not Implemented'
+    try:
+        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
+        usr = juju.check_input(user)
+        if juju.user_exists(usr):
+            if token.is_admin or token.username == usr:
+                code, response = 200, juju.get_models_access(con, usr)
+            else:
+                code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
+    except KeyError:
+        code, response = errors. invalid_data()
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_access(user, controller, model):
-    # try:
-    #     token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-    #                                    juju.check_input(controller), juju.check_input(model))
-    #     usr = juju.check_input(user)
-    #     if juju.user_exists(usr):
-    #         if token.is_admin or token.username == usr:
-    #             code, response = 200, juju.get_umodel_access(token, usr)
-    #         else:
-    #             code, response = errors.no_permission()
-    #     else:
-    #         code, response = errors.does_not_exist('user')
-    # except KeyError:
-    #     code, response = errors.invalid_data()
-    return 501, 'Not Implemented'
+    try:
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        usr = juju.check_input(user)
+        if juju.user_exists(usr):
+            if token.is_admin or token.username == usr:
+                code, response = 200, juju.get_umodel_access(token, usr)
+            else:
+                code, response = errors.no_permission()
+        else:
+            code, response = errors.does_not_exist('user')
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['PUT'])

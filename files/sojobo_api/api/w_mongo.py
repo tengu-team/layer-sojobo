@@ -74,9 +74,12 @@ def create_controller(controller_name):
     except DuplicateKeyError:
         return False
 
+def destroy_controller(c_name):
+    app.MONGO.db.controllers.delete_one({'name': unquote(c_name)})
+    for user in get_all_users():
+        remove_controller(c_name, user)
 
 def remove_controller(controller_name, user):
-    app.MONGO.db.controllers.delete_one({'name': unquote(controller_name)})
     app.MONGO.db.users.update_one(
         {'name' : user},
         {'$pull': {'access' : {controller_name :{}}}
@@ -107,6 +110,18 @@ def add_user(controller, user, access):
         {'$push': {'access' : {controller : {'access' : access, 'models' : []}}}
         })
 
+
+def set_controller_access(controller, user, access):
+    result = app.MONGO.db.users.find_one_or_404({'name': unquote(user)})
+    new_access = []
+    for acc in result['access']:
+        if list(acc.keys())[0] == controller:
+            acc[controller]['access'] = access
+        new_access.append(acc)
+    app.MONGO.db.users.update_one(
+        {'name' : user},
+        {'$set': {'access' : new_access}}
+        )
 
 def remove_user(controller, user):
     userobj = get_user(user)
