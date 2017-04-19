@@ -26,7 +26,7 @@ from charmhelpers.core.hookenv import status_set, log, config, open_port, close_
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charmhelpers.contrib.python.packages import pip_install
 
-from charms.reactive import hook, when, when_not, set_state
+from charms.reactive import hook, when, when_not, set_state, remove_state
 
 API_DIR = config()['api-dir']
 USER = config()['api-user']
@@ -40,6 +40,9 @@ SETUP = config()['setup']
 @when_not('api.installed')
 def install():
     log('Installing Sojobo API')
+    os.mkdir(API_DIR)
+    generate_api_key()
+    generate_password()
     install_api()
     set_state('api.installed')
 
@@ -76,7 +79,7 @@ def configure_webapp():
 
 
 # Handeling changed configs
-@when('api.configured', 'config.changed', 'mongodb.available')
+@when('api.configured', 'mongodb.available')
 @when_not('api.running')
 def config_changed(mongodb):
     from pymongo import MongoClient
@@ -86,17 +89,24 @@ def config_changed(mongodb):
     pwd = str(binascii.b2a_hex(os.urandom(16)).decode('utf-8'))
     db.add_user('sojobo', pwd, roles=[{'role': 'dbOwner', 'db': 'sojobo'}])
     sojobo_uri = 'mongodb://{}:{}@{}:{}/sojobo'.format('sojobo', pwd, list(mongodb.connection())[-1]['host'],
-                                                list(mongodb.connection())[-1]['port'])
+                                                       list(mongodb.connection())[-1]['port'])
     render('settings.py', '{}/settings.py'.format(API_DIR), {'JUJU_ADMIN_USER': 'admin',
                                                              'JUJU_ADMIN_PASSWORD': get_password(),
                                                              'SOJOBO_API_DIR': API_DIR,
                                                              'LOCAL_CHARM_DIR': config()['charm-dir'],
                                                              'SOJOBO_IP': HOST,
                                                              'SOJOBO_USER': USER,
-                                                             'MONOG_URI': sojobo_uri})
-    configure_webapp()
+                                                             'MONGO_URI': sojobo_uri})
     set_state('api.running')
     status_set('active', 'The Sojobo-api is running, initial admin-password: {} and MongoDB password: {}'.format(get_password(), pwd))
+
+
+@when('api.running')
+@when_not('mongodb.available')
+def mongo_db_removed():
+    remove_state('api.running')
+    status_set('blocked', 'Waiting for a connection with MongoDB')
+
 
 
 @when('sojobo.available')
@@ -132,17 +142,17 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 
 
 def generate_api_key():
-    with open("/{}/api-key".format(API_DIR), "w") as key:
+    with open("{}/api-key".format(API_DIR), "w+") as key:
         key.write(sha256(os.urandom(256)).hexdigest())
 
 
 def generate_password():
-    with open("/{}/juju-admin".format(API_DIR), "w") as key:
+    with open("{}/juju-admin".format(API_DIR), "w+") as key:
         key.write(b64encode(os.urandom(16)).decode('utf-8'))
 
 
 def get_password():
-    with open("/{}/juju-admin".format(API_DIR), "r") as key:
+    with open("{}/juju-admin".format(API_DIR), "r") as key:
         return key.readline()
 
 def install_api():
@@ -153,12 +163,9 @@ def install_api():
     os.mkdir('{}/files'.format(API_DIR))
     os.mkdir('{}/bundle'.format(API_DIR))
     adduser(USER)
-    generate_password()
     os.mkdir('/home/{}'.format(USER))
     chownr('/home/{}'.format(USER), USER, USER, chowntopdir=True)
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
-    generate_api_key()
-    generate_password()
     shutil.copyfile('files/controller.py', '/usr/local/lib/python3.5/dist-packages/juju/controller.py')
     shutil.copyfile('files/model.py', '/usr/local/lib/python3.5/dist-packages/juju/model.py')
     shutil.copyfile('files/utils.py', '/usr/local/lib/python3.5/dist-packages/juju/utils.py')
