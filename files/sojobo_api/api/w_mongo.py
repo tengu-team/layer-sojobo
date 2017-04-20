@@ -1,7 +1,6 @@
-# pylint: disable=c0111,c0301
+# pylint: disable=c0111,c0301, E0611, E0401
 #!/usr/bin/env python3
 from urllib.parse import unquote
-from bson.json_util import dumps, loads
 from sojobo_api import app
 from pymongo.errors import DuplicateKeyError
 

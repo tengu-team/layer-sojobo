@@ -28,8 +28,7 @@ from sojobo_api import settings
 from juju.model import Model
 from juju.controller import Controller
 from juju.errors import JujuAPIError
-#from juju.client import client
-from datetime import datetime
+# from datetime import datetime
 from juju.client.connection import JujuData
 ################################################################################
 # TENGU FUNCTIONS
@@ -442,11 +441,11 @@ async def create_model(token, controller, modelname, ssh_key=None):
     cont = await get_controller_superusers(controller.c_name)
     await model.set_model(token, controller, modelname)
     for user in cont:
-        await model_grant(model, user, 'admin')
+        await model_grant(controller, model, user, 'admin')
         mongo.set_model_access(controller.c_name, model.m_name, user, 'admin')
     if ssh_key is not None:
         await add_ssh_key(token, model, ssh_key)
-    await model_grant(model, token.username, 'admin')
+    await model_grant(controller, model, token.username, 'admin')
     return model
 
 
@@ -713,11 +712,12 @@ async def remove_relation(model, app1, app2):
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
-async def create_user(token, con, username, password):
+async def create_user(con, username, password):
     try:
         await con.c_connection.add_user(username)
         await change_user_password(con, username, password)
         await controller_grant(con, username, 'login')
+        mongo.add_user(con.c_name, username, 'login')
     except NotImplementedError:
         for controller in list(await get_all_controllers()):
             output_pass(['juju', 'add-user', username], controller)
@@ -730,6 +730,7 @@ async def delete_user(controller, username):
     try:
         con = controller.c_connection
         await con.disable_user(username)
+        mongo.remove_user(controller.c_name, username)
     except NotImplementedError:
         for control in await get_all_controllers():
             output_pass(['juju', 'remove-user', username, '-y'], control)
@@ -786,15 +787,16 @@ async def controller_revoke(controller, username):
     mongo.remove_controller(controller.c_name, username)
 
 
-async def model_grant(model, username, access):
+async def model_grant(controller, model, username, access):
     model_con = model.m_connection
     await model_con.grant(username, access)
+    mongo.set_model_acces(controller.c_name, model.m_name, username, access)
 
 
-async def model_revoke(model, username):
+async def model_revoke(controller, model, username):
     model_con = model.m_connection
     await model_con.revoke(username)
-
+    mongo.remove_model(controller.c_name, model.m_name, username)
 
 async def user_exists(username):
     return username == settings.JUJU_ADMIN_USER or username in await get_all_users()
@@ -826,19 +828,6 @@ async def get_controllers_access(usr):
     return user['access']
 
 
-async def get_ucontroller_access(controller, username):
-    acc = await get_controller_access(controller, username)
-    mod = await get_models_access(controller, username)
-    return {'name': controller.c_name,
-            'access': acc,
-            'models': mod}
-
-
 async def get_models_access(controller, name):
     user = mongo.get_user(name)
     return user['access'][controller.c_name]['models']
-
-
-async def get_umodel_access(controller, model, username):
-    mod_acc = await get_model_access(model, controller, username)
-    return {'name': model.m_name, 'access': mod_acc}

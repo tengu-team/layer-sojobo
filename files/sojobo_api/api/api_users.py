@@ -56,7 +56,6 @@ def create_user():
                     controller = Controller_Connection()
                     execute_task(controller.set_controller, token, con)
                     execute_task(juju.create_user, controller, user, data['password'])
-                    mongo.add_user(con, user, 'login')
                     execute_task(controller.disconnect)
                 code, response = 200, 'User {} succesfully created'.format(user)
         else:
@@ -120,7 +119,6 @@ def delete_user(user):
                         controller = Controller_Connection()
                         execute_task(controller.set_controller, token, con)
                         execute_task(juju.delete_user, controller, usr)
-                        mongo.remove_user(con, usr)
                         execute_task(controller.disconnect)
                     code, response = 200, 'User {} succesfully removed'.format(usr)
                     mongo.disable_user(usr)
@@ -232,7 +230,7 @@ def get_model_access(user, controller, model):
         usr = juju.check_input(user)
         if juju.user_exists(usr):
             if token.is_admin or token.username == usr:
-                code, response = 200, juju.get_umodel_access(token, usr)
+                code, response = 200, juju.get_model_access(mod.m_name, con.c_name, usr)
             else:
                 code, response = errors.no_permission()
         else:
@@ -252,7 +250,7 @@ def grant_to_model(user, controller, model):
         u_exists = juju.user_exists(user)
         if u_exists:
             if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
-                execute_task(juju.model_grant, mod, usr, access)
+                execute_task(juju.model_grant,con, mod, usr, access)
                 code, response = 200, 'Granted access for user {} on model {}'.format(usr, model)
             else:
                 code, response =  errors.no_permission()
@@ -273,7 +271,7 @@ def revoke_from_model(user, controller, model):
         usr = juju.check_input(user)
         if juju.user_exists(usr):
             if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
-                execute_task(juju.model_revoke, model, usr)
+                execute_task(juju.model_revoke, con, mod, usr)
                 code, response = 200, 'Revoked access for user {} on model {}'.format(usr, model)
             else:
                 code, response = errors.no_permission()
