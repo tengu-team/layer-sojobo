@@ -172,15 +172,6 @@ def check_input(data):
     return result
 
 
-# def check_access(access):
-#     acc = access.lower()
-#     if c_access_exists(acc) or m_access_exists(acc):
-#         return acc
-#     else:
-#         error = errors.invalid_access('access')
-#         abort(error[0], error[1])
-
-
 async def connect_controller(con, token): #pylint: disable=e0001
     controller = Controller()
     await controller.connect(
@@ -311,10 +302,6 @@ async def get_controller_info(controller):
     return result
 
 
-async def c_access_exists(access):
-    return access in ['login', 'add-model', 'superuser']
-
-
 async def get_controller_superusers(controller):
     try:
         users = mongo.get_controller_users(controller)
@@ -360,10 +347,6 @@ async def get_model_access(model, controller, username):
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
-
-
-# async def m_access_exists(access):
-#     return access in ['read', 'write', 'admin']
 
 
 async def get_models_info(controller):
@@ -833,3 +816,21 @@ async def get_controllers_access(usr):
 
 async def get_models_access(controller, name):
     return json.loads(dumps(mongo.get_models_access(controller.c_name, name)))
+#########################
+# extra Acces checks
+#########################
+def c_access_exists(access):
+    return access in ['login', 'add-model', 'superuser']
+
+
+def m_access_exists(access):
+    return access in ['read', 'write', 'admin']
+
+
+def check_access(access):
+    acc = access.lower()
+    if c_access_exists(acc) or m_access_exists(acc):
+        return acc
+    else:
+        error = errors.invalid_access('access')
+abort(error[0], error[1])
