@@ -95,7 +95,7 @@ def delete_controller(controller):
     try:
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         if con.c_access == 'superuser':
-            execute_task(juju.delete_controller, con, token)
+            execute_task(juju.delete_controller, con)
             code, response = 200, execute_task(juju.get_all_controllers)
         else:
             code, response = errors.no_permission()
@@ -174,7 +174,7 @@ def delete_model(controller, model):
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
         if mod.m_access == 'admin':
-            execute_task(juju.delete_model, con, mod)
+            execute_task(juju.delete_model, con, mod, token)
             code, response = 200, "Model {} is being deleted".format(model)
         else:
             code, response = errors.no_permission()
@@ -200,56 +200,56 @@ def get_gui_url(controller, model):
     return juju.create_response(code, response)
 
 
-# @TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['GET'])
-# def get_ssh_keys(controller, model):
-#     try:
-#         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-#                                        juju.check_input(controller), juju.check_input(model))
-#         if mod.m_access == 'admin':
-#             code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
-#         else:
-#             code, response = errors.no_permission()
-#         execute_task(mod.disconnect)
-#         execute_task(con.disconnect)
-#     except KeyError:
-#         code, response = errors.invalid_data()
-#     return juju.create_response(code, response)
-#
-#
-# @TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['POST'])
-# def add_ssh_key(controller, model):
-#     data = request.json
-#     try:
-#         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-#                                        juju.check_input(controller), juju.check_input(model))
-#         if mod.m_access == 'admin':
-#             execute_task(juju.add_ssh_key, token, mod, data['ssh-key'])
-#             code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
-#         else:
-#             code, response = errors.no_permission()
-#         execute_task(mod.disconnect)
-#         execute_task(con.disconnect)
-#     except KeyError:
-#         code, response = errors.invalid_data()
-#     return juju.create_response(code, response)
-#
-#
-# @TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['DELETE'])
-# def remove_ssh_key(controller, model):
-#     data = request.json
-#     try:
-#         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-#                                        juju.check_input(controller), juju.check_input(model))
-#         if mod.m_access == 'admin':
-#             execute_task(juju.remove_ssh_key, token, mod, data['ssh-key'])
-#             code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
-#         else:
-#             code, response = errors.no_permission()
-#         execute_task(mod.disconnect)
-#         execute_task(con.disconnect)
-#     except KeyError:
-#         code, response = errors.invalid_data()
-#     return juju.create_response(code, response)
+@TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['GET'])
+def get_ssh_keys(controller, model):
+    try:
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'admin':
+            code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
+        else:
+            code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
+@TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['POST'])
+def add_ssh_key(controller, model):
+    data = request.json
+    try:
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'admin':
+            execute_task(juju.add_ssh_key, token, mod, data['ssh-key'])
+            code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
+        else:
+            code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
+@TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['DELETE'])
+def remove_ssh_key(controller, model):
+    data = request.json
+    try:
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'admin':
+            execute_task(juju.remove_ssh_key, token, mod, data['ssh-key'])
+            code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
+        else:
+            code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['GET'])

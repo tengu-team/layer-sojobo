@@ -157,8 +157,9 @@ def get_password():
 
 def install_api():
     # Install pip pkgs
-    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'juju', 'Flask-PyMongo', 'pymongo']:
+    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'Flask-PyMongo', 'pymongo']:
         pip_install(pkg)
+    subprocess.check_call(['pip', 'install', 'juju==0.3.0'])
     mergecopytree('files/sojobo_api', API_DIR)
     os.mkdir('{}/files'.format(API_DIR))
     os.mkdir('{}/bundle'.format(API_DIR))

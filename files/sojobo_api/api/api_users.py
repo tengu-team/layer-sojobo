@@ -32,13 +32,35 @@ def get_users_info():
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         if token.is_admin:
-            code, response = 200, juju.get_users_info()
+            code, response = 200, execute_task(juju.get_users_info)
         else:
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-    return code, response
+    return juju.create_response(code, response)
 
+
+@USERS.route('/', methods=['PUT'])
+def reactivate_user():
+    data = request.json
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        user = juju.check_input(data['username'])
+        if token.is_admin:
+            if execute_task(juju.user_exists, user):
+                controllers = execute_task(juju.get_all_controllers)
+                for con in controllers:
+                    controller = Controller_Connection()
+                    execute_task(controller.set_controller, token, con)
+                    execute_task(juju.enable_user, controller, user)
+                    execute_task(controller.disconnect)
+                mongo.enable_user(user)
+                code, response = 200, 'User {} succesfully activated'.format(user)
+        else:
+            code, response = errors.no_permission()
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
 
 @USERS.route('/', methods=['POST'])
 def create_user():
@@ -70,9 +92,9 @@ def get_user_info(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         usr = juju.check_input(user)
-        if juju.user_exists(usr):
+        if execute_task(juju.user_exists, usr):
             if usr == token.username or token.is_admin:
-                code, response = 200, juju.get_user_info(usr)
+                code, response = 200, execute_task(juju.get_user_info, usr)
             else:
                 code, response = errors.no_permission()
         else:
@@ -133,14 +155,52 @@ def delete_user(user):
     return juju.create_response(code, response)
 
 
+# @USERS.route('/<user>/ssh', methods=['GET'])
+# def get_ssh_keys(user):
+#     try:
+#         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+#         code, response = 200, execute_task(juju.get_ssh_keys, user)
+#     except KeyError:
+#         code, response = errors.invalid_data()
+#     return juju.create_response(code, response)
+#
+#
+# @USERS.route('/<user>/ssh', methods=['POST'])
+# def add_ssh_key(user):
+#     data = request.json
+#     try:
+#         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+#         execute_task(juju.add_ssh_key, user, data['ssh-key'])
+#         code, response = 200, execute_task(juju.get_ssh_keys, user)
+#     except KeyError:
+#         code, response = errors.invalid_data()
+#     return juju.create_response(code, response)
+#
+#
+# @USERS.route('/<user>/ssh', methods=['DELETE'])
+# def delete_ssh_key(user):
+#     try:
+#         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+#         usr = juju.check_input(user)
+#         if execute_task(juju.user_exists, usr):
+#             if token.is_admin or token.username == usr:
+#                 code, response = 200, juju.get_controllers_access(usr)
+#             else:
+#                 code, response = errors.no_permission()
+#         else:
+#             code, response = errors.does_not_exist('user')
+#     except KeyError:
+#         code, response = errors.invalid_data()
+#     return juju.create_response(code, response)
+
 @USERS.route('/<user>/controllers', methods=['GET'])
 def get_controllers_access(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         usr = juju.check_input(user)
-        if juju.user_exists(usr):
+        if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
-                code, response = 200, juju.get_controllers_access(usr)
+                code, response = 200, execute_task(juju.get_controllers_access, usr)
             else:
                 code, response = errors.no_permission()
         else:
@@ -155,9 +215,9 @@ def get_ucontroller_access(user, controller):
     try:
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         usr = juju.check_input(user)
-        if juju.user_exists(usr):
+        if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
-                code, response = 200, juju.get_controller_access(con, usr)
+                code, response = 200, execute_task(juju.get_controller_access, con, usr)
             else:
                 code, response = errors.no_permission()
         else:
@@ -177,6 +237,7 @@ def grant_to_controller(user, controller):
         if u_exists:
             if token.c_access == 'superuser' and user != 'admin':
                 execute_task(juju.controller_grant, con, usr, access)
+                mongo.set_controller_access(con.c_name, usr, access)
                 code, response = 200, execute_task(juju.get_controller_access, token, usr)
             else:
                 code, response = errors.no_permission()
@@ -192,10 +253,12 @@ def revoke_from_controller(user, controller):
     try:
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         usr = juju.check_input(user)
-        if juju.user_exists(usr):
+        if execute_task(juju.user_exists, usr):
             if con.c_access == 'superuser' and user != 'admin':
                 execute_task(juju.controller_revoke, con, usr)
-                code, response = 200, execute_task(juju.get_controller_access, token, usr)
+                mongo.set_controller_access(con.c_name, usr, 'login')
+                mongo.remove_models_access(con.c_name, usr)
+                code, response = 200, execute_task(juju.get_controller_access, con, usr)
             else:
                 code, response = errors.no_permission()
         else:
@@ -205,14 +268,14 @@ def revoke_from_controller(user, controller):
     return juju.create_response(code, response)
 
 
-@USERS.route('<user>/controllers/<controller>/models', methods=['GET'])
+@USERS.route('/<user>/controllers/<controller>/models', methods=['GET'])
 def get_models_access(user, controller):
     try:
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         usr = juju.check_input(user)
-        if juju.user_exists(usr):
+        if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
-                code, response = 200, juju.get_models_access(con, usr)
+                code, response = 200, execute_task(juju.get_models_access, con, usr)
             else:
                 code, response = errors.no_permission()
         else:
@@ -228,9 +291,9 @@ def get_model_access(user, controller, model):
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
         usr = juju.check_input(user)
-        if juju.user_exists(usr):
+        if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
-                code, response = 200, juju.get_model_access(mod.m_name, con.c_name, usr)
+                code, response = 200, execute_task(juju.get_model_access, mod.m_name, con.c_name, usr)
             else:
                 code, response = errors.no_permission()
         else:
@@ -247,10 +310,11 @@ def grant_to_model(user, controller, model):
                                        juju.check_input(controller), juju.check_input(model))
         access = juju.check_access(request.json['access'])
         usr = juju.check_input(user)
-        u_exists = juju.user_exists(user)
+        u_exists = execute_task(juju.user_exists, user)
         if u_exists:
             if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
-                execute_task(juju.model_grant,con, mod, usr, access)
+                execute_task(juju.model_grant, con, mod, usr, access)
+                mongo.set_model_access(con.c_name, mod.m_name, usr, access)
                 code, response = 200, 'Granted access for user {} on model {}'.format(usr, model)
             else:
                 code, response =  errors.no_permission()
@@ -269,9 +333,10 @@ def revoke_from_model(user, controller, model):
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
         usr = juju.check_input(user)
-        if juju.user_exists(usr):
+        if execute_task(juju.user_exists, usr):
             if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
                 execute_task(juju.model_revoke, con, mod, usr)
+                mongo.remove_model(con.c_name, mod.m_name, usr)
                 code, response = 200, 'Revoked access for user {} on model {}'.format(usr, model)
             else:
                 code, response = errors.no_permission()
