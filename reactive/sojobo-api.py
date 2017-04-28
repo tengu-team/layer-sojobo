@@ -78,17 +78,23 @@ def configure_webapp():
     status_set('blocked', 'Waiting for a connection with MongoDB')
 
 
+@when('config.changed', 'api.running')
+def config_changed():
+    configure_webapp()
+    status_set('active', 'The Sojobo-api is running, initial admin-password: {} and MongoDB password: {}'.format(get_password(), get_mongo_pwd()))
+
+
 # Handeling changed configs
 @when('api.configured', 'mongodb.available')
 @when_not('api.running')
-def config_changed(mongodb):
+def connect_to_mongo(mongodb):
     from pymongo import MongoClient
     uri = list(mongodb.connection())[-1]['uri']
     client = MongoClient(uri)
     db = client.sojobo
-    pwd = str(binascii.b2a_hex(os.urandom(16)).decode('utf-8'))
-    db.add_user('sojobo', pwd, roles=[{'role': 'dbOwner', 'db': 'sojobo'}])
-    sojobo_uri = 'mongodb://{}:{}@{}:{}/sojobo'.format('sojobo', pwd, list(mongodb.connection())[-1]['host'],
+    generate_mongo_pwd()
+    db.add_user('sojobo', get_mongo_pwd(), roles=[{'role': 'dbOwner', 'db': 'sojobo'}])
+    sojobo_uri = 'mongodb://{}:{}@{}:{}/sojobo'.format('sojobo', get_mongo_pwd(), list(mongodb.connection())[-1]['host'],
                                                        list(mongodb.connection())[-1]['port'])
     render('settings.py', '{}/settings.py'.format(API_DIR), {'JUJU_ADMIN_USER': 'admin',
                                                              'JUJU_ADMIN_PASSWORD': get_password(),
@@ -98,7 +104,7 @@ def config_changed(mongodb):
                                                              'SOJOBO_USER': USER,
                                                              'MONGO_URI': sojobo_uri})
     set_state('api.running')
-    status_set('active', 'The Sojobo-api is running, initial admin-password: {} and MongoDB password: {}'.format(get_password(), pwd))
+    status_set('active', 'The Sojobo-api is running, initial admin-password: {} and MongoDB password: {}'.format(get_password(), get_mongo_pwd()))
 
 
 @when('api.running')
@@ -155,6 +161,19 @@ def get_password():
     with open("{}/juju-admin".format(API_DIR), "r") as key:
         return key.readline()
 
+
+def generate_mongo_pwd():
+    pwd = str(binascii.b2a_hex(os.urandom(16)).decode('utf-8'))
+    with open("{}/mongo_cred".format(API_DIR), "w+") as key:
+        key.write(pwd)
+
+
+def get_mongo_pwd():
+    with open("{}/mongo_cred".format(API_DIR), "r") as key:
+        return key.readline()
+
+
+
 def install_api():
     # Install pip pkgs
     for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'Flask-PyMongo', 'pymongo']:
@@ -167,10 +186,10 @@ def install_api():
     os.mkdir('/home/{}'.format(USER))
     chownr('/home/{}'.format(USER), USER, USER, chowntopdir=True)
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
-    shutil.copyfile('files/controller.py', '/usr/local/lib/python3.5/dist-packages/juju/controller.py')
+    from git import Repo
+    Repo.clone_from('https://github.com/juju/python-libjuju.git', '{}/libjuju'.format(API_DIR))
+    mergecopytree('{}/libjuju/juju'.format(API_DIR), '/usr/local/lib/python3.5/dist-packages/juju/')
     shutil.copyfile('files/model.py', '/usr/local/lib/python3.5/dist-packages/juju/model.py')
-    shutil.copyfile('files/utils.py', '/usr/local/lib/python3.5/dist-packages/juju/utils.py')
-    shutil.copyfile('files/connection.py', '/usr/local/lib/python3.5/dist-packages/juju/client/connection.py')
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')

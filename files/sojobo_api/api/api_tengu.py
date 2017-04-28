@@ -111,13 +111,10 @@ def create_model(controller):
     try:
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         model = juju.check_input(data['model'])
-        print('{} : authenticated'.format(datetime.now()))
         if execute_task(juju.model_exists, con, model):
             code, response = errors.already_exists('model')
         elif con.c_access == 'add-model' or con.c_access == 'superuser':
-            print('{} : creating model'.format(datetime.now()))
             model_con = execute_task(juju.create_model, token, con, model, data.get('ssh-key', None))
-            print('{} :model created'.format(datetime.now()))
             code, response = 200, execute_task(juju.get_model_info, token, con, model_con)
         else:
             code, response = errors.no_permission()
@@ -174,7 +171,7 @@ def delete_model(controller, model):
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
         if mod.m_access == 'admin':
-            execute_task(juju.delete_model, con, mod, token)
+            execute_task(juju.delete_model, con, mod)
             code, response = 200, "Model {} is being deleted".format(model)
         else:
             code, response = errors.no_permission()
@@ -279,9 +276,9 @@ def add_application(controller, model):
         else:
             if mod.m_access == 'write' or mod.m_access == 'admin':
                 series = juju.check_input(data.get('series', None))
-                machine = juju.check_input(data.get('target', None))
+                # machine = juju.check_input(data.get('target', None))
                 app = juju.check_input(data['application'])
-                execute_task(juju.deploy_app, mod, app, series, machine)
+                execute_task(juju.deploy_app, mod, app, series, data.get('target', None))
                 code, response = 200, execute_task(juju.get_application_info, mod, app)
 
             else:

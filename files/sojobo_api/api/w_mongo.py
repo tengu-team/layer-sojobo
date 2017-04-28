@@ -8,15 +8,12 @@ from pymongo.errors import DuplicateKeyError
 # USER FUNCTIONS
 ################################################################################
 def create_user(user_name, ssh_key=None):
-    try:
+    if not user_name in get_all_users():
         user = {'name' : user_name,
                 'access': [],
                 'ssh_keys': [ssh_key],
                 'active': True}
         app.MONGO.db.users.insert_one(user)
-        return True
-    except DuplicateKeyError:
-        return False
 
 
 def disable_user(user):
@@ -144,11 +141,6 @@ def get_all_controllers():
 ################################################################################
 # MODEL FUNCTIONS
 ################################################################################
-def create_model(controller, model, username):
-    app.MONGO.db.users.update_one(
-        {'name' : username},
-        {'$push': {'access' : {controller : {'models' : {model : 'admin'}}}}
-        })
 
 def delete_model(controller, model):
     users = get_all_users()
@@ -181,6 +173,7 @@ def get_model_access(controller, model, user):
             for mod in models:
                 if list(mod.keys())[0] == model:
                     return mod[model]
+    return None
 
 
 def set_model_access(controller, model, username, access):
@@ -220,3 +213,13 @@ def remove_models_access(controller, user):
         {'name' : user},
         {'$set': {'access' : new_access}}
         )
+
+def get_users_model(controller, model):
+    users = get_all_users()
+    result = []
+    for user in users:
+        mod_acc = get_model_access(controller, model, user)
+        if not mod_acc is None:
+            acc = {'user' : user, 'access' : mod_acc}
+            result.append(acc)
+    return result

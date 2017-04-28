@@ -235,10 +235,10 @@ def grant_to_controller(user, controller):
         usr = juju.check_input(user)
         u_exists = execute_task(juju.user_exists, usr)
         if u_exists:
-            if token.c_access == 'superuser' and user != 'admin':
+            if con.c_access == 'superuser' and user != 'admin':
                 execute_task(juju.controller_grant, con, usr, access)
                 mongo.set_controller_access(con.c_name, usr, access)
-                code, response = 200, execute_task(juju.get_controller_access, token, usr)
+                code, response = 200, execute_task(juju.get_controller_access, con, usr)
             else:
                 code, response = errors.no_permission()
         else:
@@ -335,7 +335,7 @@ def revoke_from_model(user, controller, model):
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
-                execute_task(juju.model_revoke, con, mod, usr)
+                execute_task(juju.model_revoke, mod, usr)
                 mongo.remove_model(con.c_name, mod.m_name, usr)
                 code, response = 200, 'Revoked access for user {} on model {}'.format(usr, model)
             else:

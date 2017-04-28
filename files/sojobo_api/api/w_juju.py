@@ -19,7 +19,7 @@ import tempfile
 import shutil
 import json
 import os
-from subprocess import check_output, STDOUT, CalledProcessError
+from subprocess import check_output, STDOUT, CalledProcessError, check_call
 import asyncio
 from bson.json_util import dumps
 import yaml
@@ -256,21 +256,22 @@ async def check_c_type(c_type):
         abort(error[0], error[1])
 
 
-
 async def create_controller(c_type, name, region, credentials):
     get_controller_types()[c_type].create_controller(name, region, credentials)
     pswd = settings.JUJU_ADMIN_PASSWORD
     check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
     mongo.create_controller(name)
-    if mongo.create_user('admin'):
-        mongo.add_user_to_controller(name, 'admin', 'superuser')
+    mongo.create_user('admin')
+    mongo.add_user_to_controller(name, 'admin', 'superuser')
     controller = Controller_Connection()
     return controller
 
 
 async def delete_controller(con):
-    controller = con.c_connection
-    await controller.destroy(True)
+    #controller = con.c_connection
+    #await controller.destroy(True)
+    check_output(['juju', 'login', settings.JUJU_ADMIN_USER, '-c', con.c_name], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
+    check_call(['juju', 'destroy-controller', '-y', con.c_name])
     mongo.destroy_controller(con.c_name)
 
 async def get_all_controllers():
@@ -428,10 +429,10 @@ async def create_model(token, controller, modelname, ssh_key=None):
     await model.set_model(token, controller, modelname)
     for user in cont:
         if not user == token.username:
-            await model_grant(controller, model, user, 'admin')
+            await model_grant(model, user, 'admin')
+            mongo.set_model_access(controller.c_name, modelname, user, 'admin')
     if ssh_key is not None:
         await add_ssh_key(token, model, ssh_key)
-    await model_grant(controller, model, token.username, 'admin')
     return model
 
 
@@ -483,11 +484,12 @@ async def get_machine_info(model, machine):
         model_con = model.m_connection
         data = model_con.state.state['machine']
         machine_data = data[machine][0]
+        print(machine_data)
         if machine_data['agent-status']['current'] == 'error' and machine_data['addresses'] is None:
             result = {'name': machine, 'Error': machine_data['agent-status']['message']}
             return result
         if machine_data is None:
-            result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
+            result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown', 'hardware-characteristics' : 'unknown'}
             return result
         containers = []
         if not 'lxd' in machine:
@@ -498,30 +500,31 @@ async def get_machine_info(model, machine):
             if lxd != []:
                 for cont in lxd:
                     cont_data = data[cont][0]
-                    ip = await get_machine_ip(cont_data, True)
+                    ip = await get_machine_ip(cont_data)
                     containers.append({'name': cont, 'instance-id': cont_data['instance-id'], 'ip': ip, 'series': cont_data['series']})
             mach_ip = await get_machine_ip(machine_data)
-            result = {'name': machine, 'instance-id': machine_data['instance-id'], 'ip': mach_ip, 'series': machine_data['series'], 'containers': containers}
+            result = {'name': machine, 'instance-id': machine_data['instance-id'], 'ip': mach_ip, 'series': machine_data['series'], 'hardware-characteristics' : machine_data['hardware-characteristics'], 'containers': containers}
         else:
             mach_ip = await get_machine_ip(machine_data)
-            result = {'name': machine, 'instance-id': machine_data['instance-id'], 'ip': mach_ip, 'series': machine_data['series']}
+            result = {'name': machine, 'instance-id': machine_data['instance-id'], 'ip': mach_ip, 'series': machine_data['series'], 'hardware-characteristics' : machine_data['hardware-characteristics']}
     except KeyError:
-        result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown'}
+        result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown', 'hardware-characteristics' : 'unknown'}
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
     return result
 
 
-async def get_machine_ip(machine_data, lxd=False):
-    mach_ips = {}
-    if not lxd:
-        mach_ips['internal_ip'] = machine_data['adresses']['local_cloud']
-        mach_ips['external_ip'] = machine_data['adresses']['public']
-    else:
-        mach_ips['internal_ip'] = machine_data['adresses']['local_cloud']
+async def get_machine_ip(machine_data):
+    mach_ips = {'internal_ip' : 'unknown', 'external_ip' : 'unknown'}
+    if machine_data['addresses'] is None:
+        return mach_ips
+    for machine in machine_data['addresses']:
+        if machine['scope'] == 'public':
+            mach_ips['external_ip'] = machine['value']
+        elif machine['scope'] == 'local-cloud':
+            mach_ips['internal_ip'] = machine['value']
     return mach_ips
-
 
 
 async def add_machine(model, ser=None, cont=None):
@@ -748,12 +751,7 @@ async def get_users_controller(controller):
 async def get_users_model(token, model, controller):
     try:
         if model.m_access == 'admin' or model.m_access == 'write':
-            data = json.loads(output_pass(['juju', 'models', '--format', 'json'], controller.c_name))
-            for mod in data['models']:
-                if mod['name'] == model.m_name:
-                    users_info = mod['users']
-                    break
-            users = [{'name': k, 'access': v['access']} for k, v in users_info.items()]
+            users = mongo.get_users_model(controller.c_name, model.m_name)
         elif model.m_access is not None:
             users = [{'name': token.username, 'access': model.m_access}]
         else:
@@ -774,12 +772,12 @@ async def controller_revoke(controller, username):
     await cont.revoke(username)
 
 
-async def model_grant(controller, model, username, access):
+async def model_grant(model, username, access):
     model_con = model.m_connection
     await model_con.grant(username, access)
 
 
-async def model_revoke(controller, model, username):
+async def model_revoke(model, username):
     model_con = model.m_connection
     await model_con.revoke(username)
 
