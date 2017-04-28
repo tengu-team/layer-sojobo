@@ -174,7 +174,7 @@ The User-API provides user management over all controllers.
   - api-key
   - Content-Type:application/json
 * **Required body**:
-  - access
+  - access = {login | add-model | superuser}
 * **Successful response**:
   - code: 200
   - message:
@@ -251,7 +251,7 @@ The User-API provides user management over all controllers.
   - api-key
   - Content-Type:application/json
 * **Required body**:
-  - access
+  - access = {read | write | admin}
 * **Successful response**:
   - code: 200
   - message:
