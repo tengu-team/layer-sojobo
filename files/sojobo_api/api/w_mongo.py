@@ -5,6 +5,13 @@ from sojobo_api import app
 from pymongo.errors import DuplicateKeyError
 
 ################################################################################
+# Database Fucntions
+################################################################################
+def disconnect():
+    app.MONGO.close()
+
+
+################################################################################
 # USER FUNCTIONS
 ################################################################################
 def create_user(user_name, ssh_key=None):
@@ -185,7 +192,7 @@ def set_model_access(controller, model, username, access):
             for modelname in models:
                 if list(modelname.keys())[0] == model:
                     models.remove(modelname)
-            new_model = {model : access}
+            new_model = {model: access}
             models.append(new_model)
             acc[controller]['models'] = models
         new_access.append(acc)

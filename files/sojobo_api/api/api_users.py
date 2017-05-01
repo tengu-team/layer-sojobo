@@ -17,6 +17,7 @@
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
+import os
 from flask import request, Blueprint
 
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
@@ -222,6 +223,7 @@ def get_ucontroller_access(user, controller):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('user')
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -230,22 +232,31 @@ def get_ucontroller_access(user, controller):
 @USERS.route('/<user>/controllers/<controller>', methods=['PUT'])
 def grant_to_controller(user, controller):
     try:
-        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         access = juju.check_access(request.json['access'])
         usr = juju.check_input(user)
+        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         u_exists = execute_task(juju.user_exists, usr)
         if u_exists:
             if con.c_access == 'superuser' and user != 'admin':
+                modellist = []
+                mongo.set_controller_access(controller, usr, access)
                 execute_task(juju.controller_grant, con, usr, access)
-                mongo.set_controller_access(con.c_name, usr, access)
-                code, response = 200, execute_task(juju.get_controller_access, con, usr)
+                if access == 'superuser':
+                    modellist = execute_task(juju.get_models_info, con)
+                    for model in modellist:
+                        mod_con = execute_task(juju.connect_to_model, token, con, model)
+                        execute_task(juju.model_grant, mod_con, usr, 'admin')
+                        mongo.set_model_access(controller, model, usr, 'admin')
+                        execute_task(mod_con.disconnect)
             else:
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('user')
+        execute_task(con.disconnect)
+        code, response = 200, execute_task(juju.get_controller_access, con, usr)
     except KeyError:
         code, response = errors.invalid_data()
-    return juju.create_response(code, response)
+    return juju.create_response(202, 'Process being handeled')
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['DELETE'])
@@ -263,6 +274,7 @@ def revoke_from_controller(user, controller):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('user')
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -280,6 +292,7 @@ def get_models_access(user, controller):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('user')
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors. invalid_data()
     return juju.create_response(code, response)
@@ -298,6 +311,8 @@ def get_model_access(user, controller, model):
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('user')
+        execute_task(con.disconnect)
+        execute_task(mod.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)

@@ -17,7 +17,7 @@
 import os
 import shutil
 from flask import send_file, request, Blueprint
-from sojobo_api.api import w_errors as errors, w_juju as juju
+from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
 from sojobo_api.api.w_juju import execute_task
 from datetime import datetime
 
@@ -61,15 +61,12 @@ def create_controller():
         if token.is_admin:
             if execute_task(juju.controller_exists, controller):
                 code, response = errors.already_exists('controller')
-            elif 'file' in request.files:
-                path = '{}/files/credentials/google-{}.json'.format(juju.get_api_dir(), controller)
-                request.files['file'].save(path)
-                con = execute_task(juju.create_controller, c_type, controller, data['region'], path)
-                execute_task(con.set_controller, token, controller)
-                code, response = 200, execute_task(juju.get_controller_info, con)
             else:
                 con = execute_task(juju.create_controller, c_type, controller, data['region'], data['credentials'])
                 execute_task(con.set_controller, token, controller)
+                models = execute_task(get_models_info, con)
+                for model in models:
+                    mongo.set_model_access(controller, model, token.username, 'admin')
                 code, response = 200, execute_task(juju.get_controller_info, con)
         else:
             code, response = errors.no_permission()

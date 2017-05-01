@@ -361,7 +361,7 @@ async def get_model_info(token, controller, model):
         applications = await get_applications_info(model)
         machines = await get_machines_info(model)
         result = {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
-                  'applications': applications, 'machines': machines}
+                  'applications': applications, 'machines': machines, 'juju-gui-url' : get_gui_url(controller, model)}
     else:
         result = None
     return result
@@ -454,6 +454,11 @@ async def remove_ssh_key(token, model, ssh_key):
     model_con = model.m_connection
     await model_con.remove_ssh_key(token.username, ssh_key)
 
+
+async def connect_to_model(token, controller, modelname):
+    model_con = Model_Connection()
+    await model_con.set_model(token, controller, modelname)
+    return model_con
 #####################################################################################
 # Machines FUNCTIONS
 #####################################################################################
