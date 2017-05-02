@@ -17,8 +17,9 @@
 import os
 import shutil
 from flask import send_file, request, Blueprint
-from sojobo_api.api import w_errors as errors, w_juju as juju
-
+from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
+from sojobo_api.api.w_juju import execute_task
+from datetime import datetime
 
 TENGU = Blueprint('tengu', __name__)
 
@@ -30,7 +31,7 @@ def get():
 @TENGU.route('/login', methods=['POST'])
 def login():
     try:
-        juju.authenticate(request.headers['api-key'], request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         code, response = 200, 'Success'
     except KeyError:
         code, response = errors.invalid_data()
@@ -38,10 +39,10 @@ def login():
 
 
 @TENGU.route('/controllers', methods=['GET'])
-def get_all_info():
+def get_all_controllers():
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization)
-        code, response = 200, juju.get_controllers_info(token)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        code, response = 200, execute_task(juju.get_all_controllers)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -54,22 +55,22 @@ def create_controller():
     else:
         data = request.json
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization)
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         controller = juju.check_input(data['controller'])
-        c_type = juju.check_c_type(data['type'])
+        c_type = execute_task(juju.check_c_type, data['type'])
         if token.is_admin:
-            if juju.controller_exists(controller):
+            if execute_task(juju.controller_exists, controller):
                 code, response = errors.already_exists('controller')
-            elif 'file' in request.files:
-                path = '{}/files/credentials/google-{}.json'.format(juju.get_api_dir(), controller)
-                request.files['file'].save(path)
-                juju.create_controller(c_type, controller, data['region'], path)
-                code, response = 200, juju.get_controller_info(token.set_controller(data['controller']))
             else:
-                juju.create_controller(c_type, controller, data['region'], data['credentials'])
-                code, response = 200, juju.get_controller_info(token.set_controller(controller))
+                con = execute_task(juju.create_controller, c_type, controller, data['region'], data['credentials'])
+                execute_task(con.set_controller, token, controller)
+                models = execute_task(juju.get_models_info, con)
+                for model in models:
+                    mongo.set_model_access(controller, model, token.username, 'admin')
+                code, response = 200, execute_task(juju.get_controller_info, con)
         else:
             code, response = errors.no_permission()
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -78,8 +79,9 @@ def create_controller():
 @TENGU.route('/controllers/<controller>', methods=['GET'])
 def get_controller_info(controller):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization, juju.check_input(controller))
-        code, response = 200, juju.get_controller_info(token)
+        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
+        code, response = 200, execute_task(juju.get_controller_info, con)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -88,12 +90,13 @@ def get_controller_info(controller):
 @TENGU.route('/controllers/<controller>', methods=['DELETE'])
 def delete_controller(controller):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization, juju.check_input(controller))
-        if token.c_access == 'superuser':
-            juju.delete_controller(token)
-            code, response = 200, juju.get_controllers_info(token)
+        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
+        if con.c_access == 'superuser':
+            execute_task(juju.delete_controller, con)
+            code, response = 200, execute_task(juju.get_all_controllers)
         else:
             code, response = errors.no_permission()
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -103,15 +106,17 @@ def delete_controller(controller):
 def create_model(controller):
     data = request.json
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization, juju.check_input(controller))
+        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         model = juju.check_input(data['model'])
-        if juju.model_exists(token, model):
+        if execute_task(juju.model_exists, con, model):
             code, response = errors.already_exists('model')
-        elif token.c_access == 'add-model' or token.c_access == 'superuser':
-            juju.create_model(token, model, data.get('ssh-key', None))
-            code, response = 200, juju.get_model_info(token.set_model(model))
+        elif con.c_access == 'add-model' or con.c_access == 'superuser':
+            model_con = execute_task(juju.create_model, token, con, model, data.get('ssh-key', None))
+            code, response = 200, execute_task(juju.get_model_info, token, con, model_con)
+            execute_task(model_con.disconnect)
         else:
             code, response = errors.no_permission()
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -120,8 +125,9 @@ def create_model(controller):
 @TENGU.route('/controllers/<controller>/models', methods=['GET'])
 def get_models_info(controller):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization, juju.check_input(controller))
-        code, response = 200, juju.get_models_info(token)
+        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
+        code, response = 200, execute_task(juju.get_models_info, con)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -130,9 +136,11 @@ def get_models_info(controller):
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_info(controller, model):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        code, response = 200, juju.get_model_info(token)
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        code, response = 200, execute_task(juju.get_model_info, token, con, mod)
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -141,13 +149,15 @@ def get_model_info(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['POST'])
 def add_bundle(controller, model):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        if token.m_access == 'admin' or token.m_access == 'write':
-            juju.deploy_bundle(token, request.json['bundle'])
-            code, response = 200, juju.get_model_info(token)
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'admin' or mod.m_access == 'write':
+            execute_task(juju.deploy_bundle, mod, request.json['bundle'])
+            code, response = 200, "Bundle is being deployed"
         else:
             code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -156,13 +166,30 @@ def add_bundle(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['DELETE'])
 def delete_model(controller, model):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        if token.m_access == 'admin':
-            juju.delete_model(token)
-            code, response = 200, juju.get_models_info(token)
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'admin':
+            execute_task(juju.delete_model, con, mod)
+            code, response = 200, "Model {} is being deleted".format(model)
         else:
             code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+@TENGU.route('/controllers/<controller>/models/<model>/gui', methods=['GET'])
+def get_gui_url(controller, model):
+    try:
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'admin':
+            code, response = 200, execute_task(juju.get_gui_url, con, mod)
+        else:
+            code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -171,12 +198,14 @@ def delete_model(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['GET'])
 def get_ssh_keys(controller, model):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        if token.m_access == 'admin':
-            code, response = 200, juju.get_ssh_keys
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'admin':
+            code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
         else:
             code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -186,13 +215,15 @@ def get_ssh_keys(controller, model):
 def add_ssh_key(controller, model):
     data = request.json
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        if token.m_access == 'admin':
-            juju.add_ssh_key(token, data['ssh-key'])
-            code, response = 200, juju.get_ssh_keys(token)
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'admin':
+            execute_task(juju.add_ssh_key, token, mod, data['ssh-key'])
+            code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
         else:
             code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -202,13 +233,15 @@ def add_ssh_key(controller, model):
 def remove_ssh_key(controller, model):
     data = request.json
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        if token.m_access == 'admin':
-            juju.remove_ssh_key(token, data['ssh-key'])
-            code, response = 200, juju.get_ssh_keys(token)
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'admin':
+            execute_task(juju.remove_ssh_key, token, mod, data['ssh-key'])
+            code, response = 200, execute_task(juju.get_ssh_keys, mod, con)
         else:
             code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -217,12 +250,14 @@ def remove_ssh_key(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['GET'])
 def get_applications_info(controller, model):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check(model))
-        if token.m_access is not None:
-            code, response = 200, juju.get_applications_info(token)
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access is not None:
+            code, response = 200, execute_task(juju.get_applications_info, mod)
         else:
             code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -232,26 +267,22 @@ def get_applications_info(controller, model):
 def add_application(controller, model):
     data = request.json
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        if juju.app_exists(token, data['application']):
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if execute_task(juju.app_exists, token, con, mod, data['application']):
             code, response = errors.already_exists('application')
         else:
-            if token.m_access == 'write' or token.m_access == 'admin':
+            if mod.m_access == 'write' or mod.m_access == 'admin':
                 series = juju.check_input(data.get('series', None))
-                machine = juju.check_input(data.get('target', None))
+                # machine = juju.check_input(data.get('target', None))
                 app = juju.check_input(data['application'])
-                if juju.app_supports_series(app, series) and juju.cloud_supports_series(token, series) and juju.machine_matches_series(token, machine, series):
-                    juju.deploy_app(token, app, series, machine)
-                    code, response = 200, juju.get_application_info(token, app)
-                elif juju.app_supports_series(app, series) and juju.cloud_supports_series(token, series):
-                    code, response = 400, 'Target machine and application series mismatch'
-                elif juju.cloud_supports_series(token, series) and juju.machine_matches_series(token, machine, series):
-                    code, response = 400, 'The application does not support this series'
-                else:
-                    code, response = 400, 'The cloud does not support this series, nor does the application'
+                execute_task(juju.deploy_app, mod, app, series, data.get('target', None))
+                code, response = 200, execute_task(juju.get_application_info, mod, app)
+
             else:
                 code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -260,13 +291,15 @@ def add_application(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['GET'])
 def get_application_info(controller, model, application):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         app = juju.check_input(application)
-        if juju.app_exists(token, app):
-            code, response = 200, juju.get_application_info(token, app)
+        if execute_task(juju.app_exists, token, con, mod, app):
+            code, response = 200, execute_task(juju.get_application_info, mod, app)
         else:
             code, response = errors.does_not_exist('application')
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -275,17 +308,19 @@ def get_application_info(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['DELETE'])
 def remove_app(controller, model, application):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         app = juju.check_input(application)
-        if juju.app_exists(token, app):
-            if token.m_access == 'write' or token.m_access == 'admin':
-                juju.remove_app(token, app)
-                code, response = 200, juju.get_applications_info(token)
+        if mod.m_access == 'write' or mod.m_access == 'admin':
+            if execute_task(juju.app_exists, token, con, mod, app):
+                execute_task(juju.remove_app, mod, app)
+                code, response = 200, execute_task(juju.get_applications_info, mod)
             else:
-                code, response = errors.no_permission()
+                code, response = errors.does_not_exist('application')
         else:
-            code, response = errors.does_not_exist('application')
+            code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -294,9 +329,11 @@ def remove_app(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/machines/', methods=['GET'])
 def get_machines_info(controller, model):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        code, response = 200, juju.get_machines_info(token)
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        code, response = 200, execute_task(juju.get_machines_info, mod)
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -305,13 +342,15 @@ def get_machines_info(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['GET'])
 def get_machine_info(controller, model, machine):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         mach = juju.check_input(machine)
-        if juju.machine_exists(token, mach):
-            code, response = 200, juju.get_machine_info(token, mach)
+        if execute_task(juju.machine_exists, mod, mach):
+            code, response = 200, execute_task(juju.get_machine_info, mod, mach)
         else:
             code, response = errors.does_not_exist('machine')
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -321,17 +360,20 @@ def get_machine_info(controller, model, machine):
 def add_machine(controller, model):
     data = request.json
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        if token.m_access == 'write' or token.m_access == 'admin':
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        if mod.m_access == 'write' or mod.m_access == 'admin':
             series = juju.check_input(data.get('series', None))
-            if juju.cloud_supports_series(token, series):
-                juju.add_machine(token, series)
-                code, response = 200, juju.get_machines_info(token)
+            constraints = juju.check_input(data.get('constraints', None))
+            if execute_task(juju.cloud_supports_series, con, series):
+                execute_task(juju.add_machine, mod, series, constraints)
+                code, response = 200, 'machine is being deployed'
             else:
                 code, response = 400, 'This cloud does not support this version of Ubuntu'
         else:
             code, response = errors.no_permission()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -340,17 +382,19 @@ def add_machine(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['DELETE'])
 def remove_machine(controller, model, machine):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         mach = juju.check_input(machine)
-        if juju.machine_exists(token, mach):
-            if token.m_access == 'write' or token.m_access == 'admin':
-                juju.remove_machine(token, mach)
-                code, response = 200, juju.get_machines_info(token)
+        if execute_task(juju.machine_exists, mod, mach):
+            if mod.m_access == 'write' or mod.m_access == 'admin':
+                execute_task(juju.remove_machine, mod, mach)
+                code, response = 200, execute_task(juju.get_machines_info, mod)
             else:
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('machine')
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -359,13 +403,15 @@ def remove_machine(controller, model, machine):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['GET'])
 def get_units_info(controller, model, application):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         app = juju.check_input(application)
-        if juju.app_exists(token, app):
-            code, response = 200, juju.get_units_info(token, app)
+        if execute_task(juju.app_exists, token, con, mod, app):
+            code, response = 200, execute_task(juju.get_units_info, mod, app)
         else:
             code, response = errors.does_not_exist('application')
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -375,17 +421,19 @@ def get_units_info(controller, model, application):
 def add_unit(controller, model, application):
     data = request.json
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         app = juju.check_input(application)
-        if juju.app_exists(token, app):
-            if token.m_access == 'write' or token.m_access == 'admin':
-                juju.add_unit(token, application, data.get('target', None))
-                code, response = 200, juju.get_units_info(token, app)
+        if execute_task(juju.app_exists, token, con, mod, app):
+            if mod.m_access == 'write' or mod.m_access == 'admin':
+                execute_task(juju.add_unit, mod, application, data.get('target', None))
+                code, response = 200, execute_task(juju.get_units_info, mod, app)
             else:
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('application')
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -394,18 +442,20 @@ def add_unit(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['DELETE'])
 def remove_unit(controller, model, application, unitnumber):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         app = juju.check_input(application)
         unum = juju.check_input(unitnumber)
-        if juju.unit_exists(token, app, unum):
-            if token.m_access == 'write' or token.m_access == 'admin':
-                juju.remove_unit(token, app, unum)
-                code, response = 200, juju.get_units_info(token, app)
+        if execute_task(juju.get_unit_info, mod, app, unum) is not {}:
+            if mod.m_access == 'write' or mod.m_access == 'admin':
+                execute_task(juju.remove_unit, mod, app, unum)
+                code, response = 200, execute_task(juju.get_units_info, mod, app)
             else:
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('unit')
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -414,14 +464,17 @@ def remove_unit(controller, model, application, unitnumber):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['GET'])
 def get_unit_info(controller, model, application, unitnumber):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         app = juju.check_input(application)
         unum = juju.check_input(unitnumber)
-        if juju.unit_exists(token, app, unum):
-            code, response = 200, juju.get_unit_info(token, app, unum)
+        unit = execute_task(juju.get_unit_info, mod, app, unum)
+        if unit is not {}:
+            code, response = 200, unit
         else:
             code, response = errors.does_not_exist('unit')
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -430,9 +483,11 @@ def get_unit_info(controller, model, application, unitnumber):
 @TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['GET'])
 def get_relations_info(controller, model):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
-        code, response = 200, juju.get_relations_info(token)
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        code, response = 200, execute_task(juju.get_relations_info, mod)
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -442,17 +497,19 @@ def get_relations_info(controller, model):
 def add_relation(controller, model):
     data = request.json
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         app1, app2 = juju.check_input(data['app1']), juju.check_input(data['app2'])
-        if juju.app_exists(token, app1) and juju.app_exists(token, app2):
-            if token.m_access == 'write' or token.m_access == 'admin':
-                juju.add_relation(token, app1, app2)
-                code, response = 200, juju.get_relations_info(token)
+        if execute_task(juju.app_exists, token, con, mod, app1) and execute_task(juju.app_exists, token, con, mod, app2):
+            if mod.m_access == 'write' or mod.m_access == 'admin':
+                execute_task(juju.add_relation, mod, app1, app2)
+                code, response = 200, execute_task(juju.get_relations_info, mod)
             else:
                 code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('application')
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -461,13 +518,15 @@ def add_relation(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/relations/<application>', methods=['GET'])
 def get_relations(controller, model, application):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         app = juju.check_input(application)
-        if juju.app_exists(token, app):
-            code, response = 200, juju.get_application_info(token, app)['relations']
+        if execute_task(juju.app_exists, token, con, mod, app):
+            code, response = 200, execute_task(juju.get_application_info, mod, app)['relations']
         else:
             code, response = errors.does_not_exist('application')
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -476,17 +535,19 @@ def get_relations(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/relations/<app1>/<app2>', methods=['DELETE'])
 def remove_relation(controller, model, app1, app2):
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization,
-                                  juju.check_input(controller), juju.check_input(model))
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
         appl1, appl2 = juju.check_input(app1), juju.check_input(app2)
-        if juju.app_exists(token, appl1) and juju.app_exists(token, appl2):
-            if token.m_access == 'write' or token.m_access == 'admin':
-                juju.remove_relation(token, appl1, appl2)
-                code, response = 200, juju.get_relations_info(token)
+        if execute_task(juju.app_exists, token, con, mod, appl1) and execute_task(juju.app_exists, token, con, mod, appl2):
+            if mod.m_access == 'write' or mod.m_access == 'admin':
+                execute_task(juju.remove_relation, mod, appl1, appl2)
+                code, response = 200, execute_task(juju.get_relations_info, mod)
             else:
                 code, response = errors.no_permission()
         else:
             code, response = errors.no_app()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -495,7 +556,7 @@ def remove_relation(controller, model, app1, app2):
 @TENGU.route('/backup', methods=['GET'])
 def backup_controllers():
     try:
-        token = juju.authenticate(request.headers['api-key'], request.authorization)
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         if token.is_admin:
             apidir = juju.get_api_dir()
             homedir = '/home/{}/.local/share/juju'.format(juju.get_api_user())

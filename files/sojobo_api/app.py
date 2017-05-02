@@ -19,6 +19,7 @@ import os
 from flask import Flask, redirect, request, abort
 from sojobo_api.api.w_juju import create_response, get_api_key
 from sojobo_api.api.w_errors import invalid_data, unauthorized
+from flask_pymongo import PyMongo
 ########################################################################################################################
 # INIT FLASK
 ########################################################################################################################
@@ -26,6 +27,7 @@ APP = Flask(__name__)
 APP.url_map.strict_slashes = False
 APP.debug = True
 APP.config.from_object('sojobo_api.settings')
+MONGO = PyMongo(APP)
 ########################################################################################################################
 # SETUP LOGGING
 ########################################################################################################################
