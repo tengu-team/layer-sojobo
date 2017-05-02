@@ -30,14 +30,14 @@ def get():
 
 @USERS.route('/', methods=['GET'])
 def get_users_info():
-    try:
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        if token.is_admin:
-            code, response = 200, execute_task(juju.get_users_info)
-        else:
-            code, response = errors.no_permission()
-    except KeyError:
-        code, response = errors.invalid_data()
+    #try:
+    token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+    if token.is_admin:
+        code, response = 200, execute_task(juju.get_users_info)
+    else:
+        code, response = errors.no_permission()
+    # except KeyError:
+    #     code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
 
@@ -213,19 +213,19 @@ def get_controllers_access(user):
 
 @USERS.route('/<user>/controllers/<controller>', methods=['GET'])
 def get_ucontroller_access(user, controller):
-    try:
-        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
-        usr = juju.check_input(user)
-        if execute_task(juju.user_exists, usr):
-            if token.is_admin or token.username == usr:
-                code, response = 200, execute_task(juju.get_controller_access, con, usr)
-            else:
-                code, response = errors.no_permission()
+    # try:
+    token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
+    usr = juju.check_input(user)
+    if execute_task(juju.user_exists, usr):
+        if token.is_admin or token.username == usr:
+            code, response = 200, execute_task(juju.get_ucontroller_access, con, usr)
         else:
-            code, response = errors.does_not_exist('user')
-        execute_task(con.disconnect)
-    except KeyError:
-        code, response = errors.invalid_data()
+            code, response = errors.no_permission()
+    else:
+        code, response = errors.does_not_exist('user')
+    execute_task(con.disconnect)
+    # except KeyError:
+    #     code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
 
@@ -306,7 +306,8 @@ def get_model_access(user, controller, model):
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
-                code, response = 200, execute_task(juju.get_model_access, mod.m_name, con.c_name, usr)
+                access = execute_task(juju.get_model_access, mod.m_name, con.c_name, usr)
+                code, response = 200, {'access' : access}
             else:
                 code, response = errors.no_permission()
         else:

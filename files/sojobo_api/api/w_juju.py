@@ -81,7 +81,8 @@ class Controller_Connection(object):
 
     async def set_controller(self, token, c_name):
         controllers = await get_controllers_info()
-        c_type, c_endpoint = controllers[c_name]['cloud'], controllers[c_name]['api-endpoints'][0]
+        c_type, c_endpoint = await get_controller_type(c_name), controllers[c_name]['api-endpoints'][0]
+        self.external_ip = controllers[c_name]['api-endpoints'][1]
         self.url = c_endpoint
         self.c_name = c_name
         self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, token.username, token.password)
@@ -260,7 +261,7 @@ async def create_controller(c_type, name, region, credentials):
     get_controller_types()[c_type].create_controller(name, region, credentials)
     pswd = settings.JUJU_ADMIN_PASSWORD
     check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
-    mongo.create_controller(name)
+    mongo.create_controller(name, c_type)
     mongo.create_user('admin')
     mongo.add_user_to_controller(name, 'admin', 'superuser')
     controller = Controller_Connection()
@@ -314,6 +315,11 @@ async def get_controller_superusers(controller):
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
+
+
+async def get_controller_type(c_name):
+    controllers = await get_controllers_info()
+    return controllers[c_name]['cloud']
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
@@ -360,8 +366,9 @@ async def get_model_info(token, controller, model):
         ssh = await get_ssh_keys(model, controller)
         applications = await get_applications_info(model)
         machines = await get_machines_info(model)
+        gui = await get_gui_url(controller, model)
         result = {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
-                  'applications': applications, 'machines': machines, 'juju-gui-url' : get_gui_url(controller, model)}
+                  'applications': applications, 'machines': machines, 'juju-gui-url' : gui}
     else:
         result = None
     return result
@@ -414,7 +421,7 @@ async def get_units_info(model, application):
 #libjuju geen manier om gui te verkrijgen of juju gui methode
 async def get_gui_url(controller, model):
     try:
-        return 'https://{}/gui/{}'.format(controller.url, model.m_uuid)
+        return 'https://{}/gui/{}'.format(controller.external_ip, model.m_uuid)
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
@@ -489,7 +496,6 @@ async def get_machine_info(model, machine):
         model_con = model.m_connection
         data = model_con.state.state['machine']
         machine_data = data[machine][0]
-        print(machine_data)
         if machine_data['agent-status']['current'] == 'error' and machine_data['addresses'] is None:
             result = {'name': machine, 'Error': machine_data['agent-status']['message']}
             return result
@@ -582,7 +588,9 @@ async def deploy_bundle(model, bundle):
     with open('{}/bundle/bundle.yaml'.format(dirpath), 'w+') as outfile:
         yaml.dump(bundle, outfile, default_flow_style=False)
     model_con = model.m_connection
-    await model_con.deploy('{}/bundle/'.format(dirpath), series=bundle['series'])
+    if 'series' in bundle.keys():
+        await model_con.deploy('{}/bundle/'.format(dirpath), series=bundle['series'])
+    await model_con.deploy('{}/bundle/'.format(dirpath))
     shutil.rmtree(dirpath)
 
 
@@ -613,7 +621,7 @@ async def get_application_info(model, applic):
             if application[0] == applic:
                 app = application[1]
                 res1 = {'name': app[0]['name'], 'relations': [], 'charm': app[0]['charm-url'], 'exposed': app[0]['exposed'],
-                        'series': app[0]['charm-url'].split(":")[1].split("/")[0], 'status': app[0]['status']['current']}
+                        'series': app[0]['charm-url'].split(":")[1].split("/")[0], 'status': app[0]['status']}
                 for rels in data['relation'].values():
                     keys = rels[0]['key'].split(" ")
                     if len(keys) == 1 and app[0]['name'] == keys[0].split(":")[0]:
@@ -711,7 +719,6 @@ async def create_user(con, username, password):
     try:
         await con.c_connection.add_user(username)
         await change_user_password(con, username, password)
-        await controller_grant(con, username, 'login')
         mongo.add_user_to_controller(con.c_name, username, 'login')
     except NotImplementedError:
         for controller in list(await get_all_controllers()):
@@ -757,7 +764,7 @@ async def get_users_model(token, model, controller):
     try:
         if model.m_access == 'admin' or model.m_access == 'write':
             users = mongo.get_users_model(controller.c_name, model.m_name)
-        elif model.m_access is not None:
+        elif model.m_access == 'read':
             users = [{'name': token.username, 'access': model.m_access}]
         else:
             users = None
@@ -809,12 +816,25 @@ async def get_users_info():
 
 
 async def get_user_info(username):
-    return json.loads(dumps(mongo.get_user(username)))
+    u_info = json.loads(dumps(mongo.get_user(username)))
+    for conts in u_info['access']:
+        con = list(conts.keys())[0]
+        c_type = await get_controller_type(con)
+        conts[con]['type'] = c_type
+    u_info.pop('_id', None)
+    return u_info
 
 
 async def get_controllers_access(usr):
-    user = json.loads(dumps(mongo.get_user(usr)))
+    user = await get_user_info(usr)
     return user['access']
+
+
+async def get_ucontroller_access(controller, username):
+    access =  await get_controllers_access(username)
+    for acc in access:
+        if list(acc.keys())[0] == controller.c_name:
+            return acc
 
 
 async def get_models_access(controller, name):

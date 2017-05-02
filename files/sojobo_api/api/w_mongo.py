@@ -67,9 +67,9 @@ def get_all_users():
 ################################################################################
 # CONTROLLER FUNCTIONS
 ################################################################################
-def create_controller(controller_name):
+def create_controller(controller_name, c_type):
     try:
-        controller = {'name' : controller_name, 'users': []}
+        controller = {'name' : controller_name, 'users': [], 'type' : c_type}
         app.MONGO.db.controllers.insert_one(controller)
         return True
     except DuplicateKeyError:
@@ -79,11 +79,20 @@ def create_controller(controller_name):
 def destroy_controller(c_name):
     app.MONGO.db.controllers.delete_one({'name': unquote(c_name)})
     for user in get_all_users():
-        app.MONGO.db.users.update_one(
-            {'name' : user},
-            {'$pull': {'access' : {c_name :{}}}
-            })
+        remove_controller(c_name, user)
 
+def remove_controller(c_name, username):
+    result = app.MONGO.db.users.find_one_or_404({'name': unquote(username)})
+    new_access = []
+    acc_list = result['access']
+    for acc in acc_list:
+        if list(acc.keys())[0] == c_name:
+            acc_list.remove(acc)
+    new_access = acc_list
+    app.MONGO.db.users.update_one(
+        {'name' : username},
+        {'$set': {'access' : new_access}}
+        )
 
 def get_controller(c_name):
     result = app.MONGO.db.controllers.find_one_or_404({'name': unquote(c_name)})

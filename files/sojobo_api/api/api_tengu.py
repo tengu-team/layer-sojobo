@@ -64,7 +64,7 @@ def create_controller():
             else:
                 con = execute_task(juju.create_controller, c_type, controller, data['region'], data['credentials'])
                 execute_task(con.set_controller, token, controller)
-                models = execute_task(get_models_info, con)
+                models = execute_task(juju.get_models_info, con)
                 for model in models:
                     mongo.set_model_access(controller, model, token.username, 'admin')
                 code, response = 200, execute_task(juju.get_controller_info, con)
@@ -113,6 +113,7 @@ def create_model(controller):
         elif con.c_access == 'add-model' or con.c_access == 'superuser':
             model_con = execute_task(juju.create_model, token, con, model, data.get('ssh-key', None))
             code, response = 200, execute_task(juju.get_model_info, token, con, model_con)
+            execute_task(model_con.disconnect)
         else:
             code, response = errors.no_permission()
         execute_task(con.disconnect)

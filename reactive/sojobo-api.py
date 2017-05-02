@@ -92,6 +92,11 @@ def connect_to_mongo(mongodb):
     uri = list(mongodb.connection())[-1]['uri']
     client = MongoClient(uri)
     db = client.sojobo
+    user = {'name' : 'admin',
+            'access': [],
+            'ssh_keys': [],
+            'active': True}
+    db.users.insert_one(user)
     generate_mongo_pwd()
     db.add_user('sojobo', get_mongo_pwd(), roles=[{'role': 'dbOwner', 'db': 'sojobo'}])
     sojobo_uri = 'mongodb://{}:{}@{}:{}/sojobo'.format('sojobo', get_mongo_pwd(), list(mongodb.connection())[-1]['host'],
@@ -104,6 +109,7 @@ def connect_to_mongo(mongodb):
                                                              'SOJOBO_USER': USER,
                                                              'MONGO_URI': sojobo_uri})
     set_state('api.running')
+    service_restart('nginx')
     status_set('active', 'The Sojobo-api is running, initial admin-password: {} and MongoDB password: {}'.format(get_password(), get_mongo_pwd()))
 
 
@@ -173,7 +179,6 @@ def get_mongo_pwd():
         return key.readline()
 
 
-
 def install_api():
     # Install pip pkgs
     for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'Flask-PyMongo', 'pymongo']:
@@ -190,6 +195,7 @@ def install_api():
     Repo.clone_from('https://github.com/juju/python-libjuju.git', '{}/libjuju'.format(API_DIR))
     mergecopytree('{}/libjuju/juju'.format(API_DIR), '/usr/local/lib/python3.5/dist-packages/juju/')
     shutil.copyfile('files/model.py', '/usr/local/lib/python3.5/dist-packages/juju/model.py')
+    shutil.copyfile('files/controller.py', '/usr/local/lib/python3.5/dist-packages/juju/controller.py')
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
