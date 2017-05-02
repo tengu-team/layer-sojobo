@@ -23,15 +23,17 @@ Actual generating of the certificates **requires that the service is exposed and
 Generating the certificates is a manual operation, requiring to ssh to the machine on which the service is deployed.
 The following command must be executed on that machine: ```sudo letsencrypt certonly -a webroot --webroot-path=[path_to_api] -d [fqdn] --rsa-key-size 4096```, with `fqdn` being the domain name.
 
-More info of the process can be found <a href="https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-16-04">here</a>.
-**Setting up the cronjob for automatic renewal of the certificates must also be done manually (see above url)!**
-When the certificates are generated, one can continue setting up https by running the command (on the host-machine, not the application machine) ```juju config sojobo-api setup=https```.
 
 ## https
 This option is used if the client already has its own SSL certifcates, or if they have been generated using LetsEncrypt.
 
 It also requires manual execution of the following command on the machine on which the service is deployed (**make sure the output directory exists!**): ```sudo openssl dhparam -out /etc/nginx/ssl/dhparam.pem 4096``` This creates a DH-group for extra security. At the time of writing, 4096 is sufficient enough, but as time goes by, this number should be increased.
 The output location can be changed, but then this must be passed to the config accordingly in the dhparam value. The charm itself will set the required permissions of the file.
+
+More info of the process can be found <a href="https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-16-04">here</a>.
+**Setting up the cronjob for automatic renewal of the certificates must also be done manually (see above url)!**
+When the certificates are generated, one can continue setting up https by running the command (on the host-machine, not the application machine) ```juju config sojobo-api setup=https```.
+
 ### Own SSL certificates
 For this the correct path for fullchain and privatekey must be provided in the config and the Nginx-user (www-data) must have read access to them.
 The correct `host` config must be set: ```juju config sojobo-api host=fqdn``` (without http:// or https:// prefix)

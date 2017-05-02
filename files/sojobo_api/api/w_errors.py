@@ -53,6 +53,10 @@ def does_not_exist(item):
     return 404, 'The {} does not exist!'.format(item)
 
 
+def key_does_not_exist(key):
+    return 400, 'KeyError was raised! The following keys was not found: {}'.format(key)
+
+
 def no_permission():
     return 405, 'You do not have permission to perform this operation!'
 

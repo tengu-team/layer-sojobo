@@ -8,4 +8,7 @@ subordinate: false
 provides:
   sojobo:
     interface: sojobo
+requires:
+  mongodb:
+    interface: mongodb
 series: [ 'xenial' ]
