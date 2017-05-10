@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,w0406,e0401
 import os
+import subprocess
 import shutil
 from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
@@ -149,15 +150,16 @@ def get_model_info(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['POST'])
 def add_bundle(controller, model):
     try:
+        data = request.json
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
-        if mod.m_access == 'admin' or mod.m_access == 'write':
-            execute_task(juju.deploy_bundle, mod, request.json['bundle'])
-            code, response = 200, "Bundle is being deployed"
-        else:
-            code, response = errors.no_permission()
         execute_task(mod.disconnect)
         execute_task(con.disconnect)
+        if mod.m_access == 'admin' or mod.m_access == 'write':
+            subprocess.Popen(["python3", "{}/scripts/bundle_deployment.py".format(juju.get_api_dir()), token.username, token.password, juju.get_api_dir(), controller, model, str(data['bundle'])])
+            code, response = 202, "Bundle is being deployed"
+        else:
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -566,10 +568,10 @@ def backup_controllers():
             except FileNotFoundError:
                 pass
             try:
-                shutil.copytree('{}/files/credentials'.format(apidir), '{}/backup/credentials'.format(apidir))
+                shutil.copytree('/home/{}/credentials'.format(juju.get_api_user()), '{}/backup/credentials'.format(apidir))
             except FileExistsError:
                 os.rmdir('{}/backup/credentials'.format(apidir))
-                shutil.copytree('{}/files/credentials'.format(apidir), '{}/backup/credentials'.format(apidir))
+                shutil.copytree('/home/{}/credentials'.format(juju.get_api_user()), '{}/backup/credentials'.format(apidir))
             except FileNotFoundError:
                 pass
             shutil.copy2('{}/credentials.yaml'.format(homedir), '{}/backup/credentials.yaml'.format(apidir))

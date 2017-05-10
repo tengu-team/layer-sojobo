@@ -17,9 +17,10 @@
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
-import os
+import subprocess
 from flask import request, Blueprint
 
+from sojobo_api import settings
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
 from sojobo_api.api.w_juju import execute_task, Controller_Connection
 
@@ -237,26 +238,19 @@ def grant_to_controller(user, controller):
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         u_exists = execute_task(juju.user_exists, usr)
         if u_exists:
-            if con.c_access == 'superuser' and user != 'admin':
-                modellist = []
-                mongo.set_controller_access(controller, usr, access)
-                execute_task(juju.controller_grant, con, usr, access)
-                if access == 'superuser':
-                    modellist = execute_task(juju.get_models_info, con)
-                    for model in modellist:
-                        mod_con = execute_task(juju.connect_to_model, token, con, model)
-                        execute_task(juju.model_grant, mod_con, usr, 'admin')
-                        mongo.set_model_access(controller, model, usr, 'admin')
-                        execute_task(mod_con.disconnect)
+            if execute_task(juju.check_same_access, usr, access, con):
+                code, response = 409, "Access level already set to {}".format(access)
+                execute_task(con.disconnect)
             else:
-                code, response = errors.no_permission()
+                execute_task(con.disconnect)
+                subprocess.Popen(["python3", "{}/scripts/set_user_acces.py".format(juju.get_api_dir()), token.username,
+                              token.password, juju.get_api_dir(),settings.MONGO_URI, usr, access, controller])
+                code, response = 202, 'Process being handeled'
         else:
             code, response = errors.does_not_exist('user')
-        execute_task(con.disconnect)
-        code, response = 200, execute_task(juju.get_controller_access, con, usr)
     except KeyError:
         code, response = errors.invalid_data()
-    return juju.create_response(202, 'Process being handeled')
+    return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['DELETE'])
