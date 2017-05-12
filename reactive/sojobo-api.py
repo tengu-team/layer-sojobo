@@ -105,7 +105,7 @@ def connect_to_mongo(mongodb):
                                                              'JUJU_ADMIN_PASSWORD': get_password(),
                                                              'SOJOBO_API_DIR': API_DIR,
                                                              'LOCAL_CHARM_DIR': config()['charm-dir'],
-                                                             'SOJOBO_IP': HOST,
+                                                             'SOJOBO_IP': '{}://{}'.format(SETUP, HOST),
                                                              'SOJOBO_USER': USER,
                                                              'MONGO_URI': sojobo_uri})
     set_state('api.running')

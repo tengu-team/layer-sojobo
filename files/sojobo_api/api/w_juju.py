@@ -91,7 +91,7 @@ class Controller_Connection(object):
         if self.c_connection is not None:
             await self.c_connection.disconnect()
         self.c_connection = await connect_controller(self, token)
-        self.public_ip = self.c_connection.connection.endpoint
+        self.public_ip = await get_public_ip_controller(self.c_connection)
         self.c_access = await get_controller_access(self, token.username)
         return self
 
@@ -424,6 +424,14 @@ async def get_units_info(model, application):
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
+
+async def get_public_ip_controller(controller):
+    servers = controller.connection.info['servers']
+    for server_list in servers:
+        for server in server_list:
+            if server['scope'] == 'public' and server['type'] == 'ipv4':
+                return server['value']
+
 
 
 #libjuju geen manier om gui te verkrijgen of juju gui methode
