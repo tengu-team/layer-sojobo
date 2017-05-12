@@ -15,13 +15,10 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401,C0302, R0914
 import asyncio
-import shutil
 from urllib.parse import unquote
-import os
 import sys
 import traceback
 import logging
-import yaml
 
 from pymongo import MongoClient
 from juju.client.connection import JujuData
@@ -71,7 +68,7 @@ async def set_user_acc(c_name, access, user, username, password, url):
                     logger.error('Model_Uuid could not be found. Can not connect to Model : %s', model_name)
         set_db_access(url, c_name, user, access, model_list)
         return True
-    except Exception as e:
+    except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
@@ -108,7 +105,7 @@ def set_db_access(url, c_name, user, acl, modellist):
             {'name' : user},
             {'$set': {'access' : new_access}}
             )
-    except Exception as e:
+    except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:

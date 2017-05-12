@@ -17,9 +17,11 @@
 import os
 import subprocess
 import shutil
+from requests.auth import HTTPBasicAuth
 from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
-from sojobo_api.api.w_juju import execute_task
+from sojobo_api.api.w_juju import execute_task, Model_Connection
+from sojobo_api import settings
 from datetime import datetime
 
 TENGU = Blueprint('tengu', __name__)
@@ -67,6 +69,8 @@ def create_controller():
                 execute_task(con.set_controller, token, controller)
                 models = execute_task(juju.get_models_info, con)
                 for model in models:
+                    mongo.add_model_to_controller(controller, model)
+                    mongo.set_model_state(controller, model, 'ready')
                     mongo.set_model_access(controller, model, token.username, 'admin')
                 code, response = 200, execute_task(juju.get_controller_info, con)
         else:
@@ -112,9 +116,13 @@ def create_model(controller):
         if execute_task(juju.model_exists, con, model):
             code, response = errors.already_exists('model')
         elif con.c_access == 'add-model' or con.c_access == 'superuser':
-            model_con = execute_task(juju.create_model, token, con, model, data.get('ssh-key', None))
-            code, response = 200, execute_task(juju.get_model_info, token, con, model_con)
-            execute_task(model_con.disconnect)
+        # Due to errors in libjuju only admins can add models
+            mongo.add_model_to_controller(controller, model)
+            mongo.set_model_access(controller, model, token.username, 'admin')
+            execute_task(con.disconnect)
+            subprocess.Popen(["python3", "{}/scripts/add_model.py".format(juju.get_api_dir()), settings.JUJU_ADMIN_USER,
+                              settings.JUJU_ADMIN_PASSWORD, juju.get_api_dir(), settings.MONGO_URI, controller, model])
+            code, response = 202, "Model is being deployed"
         else:
             code, response = errors.no_permission()
         execute_task(con.disconnect)
@@ -137,10 +145,29 @@ def get_models_info(controller):
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_info(controller, model):
     try:
-        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-                                       juju.check_input(controller), juju.check_input(model))
-        code, response = 200, execute_task(juju.get_model_info, token, con, mod)
-        execute_task(mod.disconnect)
+        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller))
+        state = mongo.check_model_state(controller, model)
+        mod_access = mongo.get_model_access(controller, model, token.username)
+        if mod_access == 'admin' or con.c_access == 'superuser':
+            if state == 'error':
+                code, response = errors.does_not_exist('model')
+            elif state == 'ready':
+                model_con = Model_Connection()
+                execute_task(model_con.set_model, token, con, model)
+                code, response = 200, execute_task(juju.get_model_info, token, con, model_con)
+                execute_task(model_con.disconnect)
+            else:
+                s_users = execute_task(juju.get_controller_superusers, controller)
+                u_list = []
+                for us in s_users:
+                    u_item = {"user" : us, "access" : "admin"}
+                    u_list.append(u_item)
+                if not token.username in s_users:
+                    u_item = {"user" : token.username, "access" : "admin"}
+                    u_list.append(u_item)
+                response = {model: {'status': state, 'users' : u_list}}
+                code = 200
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()

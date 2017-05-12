@@ -3,3 +3,4 @@ repo: git@github.com:Qrama/Sojobo-api.git
 options:
   apt:
     packages: ['maas-cli', 'python3-lxml', 'letsencrypt']
+    install_sources: 'deb http://ppa.launchpad.net/juju/stable/ubuntu xenial main'

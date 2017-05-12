@@ -19,6 +19,7 @@ import tempfile
 import shutil
 import json
 import os
+from juju import tag
 from subprocess import check_output, STDOUT, CalledProcessError, check_call
 import asyncio
 from bson.json_util import dumps
@@ -370,7 +371,8 @@ async def get_model_info(token, controller, model):
         machines = await get_machines_info(model)
         gui = await get_gui_url(controller, model)
         result = {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
-                  'applications': applications, 'machines': machines, 'juju-gui-url' : gui}
+                  'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
+                  'status': mongo.check_model_state(controller.c_name, model.m_name)}
     else:
         result = None
     return result
