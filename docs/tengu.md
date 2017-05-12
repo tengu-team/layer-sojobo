@@ -84,6 +84,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
   - controller
+  - type
   - region
   - credentials or file
 * **Succesful response**:
