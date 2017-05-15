@@ -19,6 +19,7 @@ import tempfile
 import shutil
 import json
 import os
+from juju import tag
 from subprocess import check_output, STDOUT, CalledProcessError, check_call
 import asyncio
 from bson.json_util import dumps
@@ -77,18 +78,20 @@ class Controller_Connection(object):
         self.c_access = None
         self.c_token = None
         self.c_connection = None
+        self.c_type = None
+        self.public_ip = None
 
 
     async def set_controller(self, token, c_name):
-        controllers = await get_controllers_info()
-        c_type, c_endpoint = await get_controller_type(c_name), controllers[c_name]['api-endpoints'][0]
-        self.external_ip = controllers[c_name]['api-endpoints'][1]
+        self.c_type = await get_controller_type(c_name)
+        c_endpoint = get_controller_types()[self.c_type].get_public_url(c_name)
         self.url = c_endpoint
         self.c_name = c_name
-        self.c_token = getattr(get_controller_types()[c_type], 'Token')(c_endpoint, token.username, token.password)
+        self.c_token = getattr(get_controller_types()[self.c_type], 'Token')(c_endpoint, token.username, token.password)
         if self.c_connection is not None:
             await self.c_connection.disconnect()
         self.c_connection = await connect_controller(self, token)
+        self.public_ip = await get_public_ip_controller(self.c_connection)
         self.c_access = await get_controller_access(self, token.username)
         return self
 
@@ -206,7 +209,7 @@ async def check_login(token):
         except JujuAPIError:
             return False
         finally:
-            controller.disconnect()
+            await controller.disconnect()
 
 
 async def authenticate(api_key, auth, controller=None, modelname=None):
@@ -272,7 +275,7 @@ async def delete_controller(con):
     #controller = con.c_connection
     #await controller.destroy(True)
     check_output(['juju', 'login', settings.JUJU_ADMIN_USER, '-c', con.c_name], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
-    check_call(['juju', 'destroy-controller', '-y', con.c_name])
+    check_call(['juju', 'destroy-controller', '-y', con.c_name, '--destroy-all-models'])
     mongo.destroy_controller(con.c_name)
 
 async def get_all_controllers():
@@ -368,7 +371,8 @@ async def get_model_info(token, controller, model):
         machines = await get_machines_info(model)
         gui = await get_gui_url(controller, model)
         result = {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
-                  'applications': applications, 'machines': machines, 'juju-gui-url' : gui}
+                  'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
+                  'status': mongo.check_model_state(controller.c_name, model.m_name)}
     else:
         result = None
     return result
@@ -410,18 +414,30 @@ async def get_units_info(model, application):
             ports = await get_unit_ports(u)
             result.append({'name': u['name'],
                            'machine': u['machine-id'],
-                           'ip': u['public-address'],
+                           'public-ip': u['public-address'],
+                           'private-ip': u['private-address'],
+                           'series': u['series'],
                            'ports': ports})
         return result
+    except KeyError:
+        return []
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
+
+async def get_public_ip_controller(controller):
+    servers = controller.connection.info['servers']
+    for server_list in servers:
+        for server in server_list:
+            if server['scope'] == 'public' and server['type'] == 'ipv4':
+                return server['value']
+
 
 
 #libjuju geen manier om gui te verkrijgen of juju gui methode
 async def get_gui_url(controller, model):
     try:
-        return 'https://{}/gui/{}'.format(controller.external_ip, model.m_uuid)
+        return 'https://{}:17070/gui/{}'.format(controller.public_ip, model.m_uuid)
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
@@ -621,7 +637,7 @@ async def get_application_info(model, applic):
             if application[0] == applic:
                 app = application[1]
                 res1 = {'name': app[0]['name'], 'relations': [], 'charm': app[0]['charm-url'], 'exposed': app[0]['exposed'],
-                        'series': app[0]['charm-url'].split(":")[1].split("/")[0], 'status': app[0]['status']}
+                        'status': app[0]['status']}
                 for rels in data['relation'].values():
                     keys = rels[0]['key'].split(" ")
                     if len(keys) == 1 and app[0]['name'] == keys[0].split(":")[0]:
@@ -776,7 +792,7 @@ async def get_users_model(token, model, controller):
 
 async def controller_grant(controller, username, access):
     cont = controller.c_connection
-    await cont.grant(username, access)
+    await cont.grant(username, acl=access)
 
 
 async def controller_revoke(controller, username):
@@ -786,7 +802,7 @@ async def controller_revoke(controller, username):
 
 async def model_grant(model, username, access):
     model_con = model.m_connection
-    await model_con.grant(username, access)
+    await model_con.grant(username, acl=access)
 
 
 async def model_revoke(model, username):
@@ -831,7 +847,7 @@ async def get_controllers_access(usr):
 
 
 async def get_ucontroller_access(controller, username):
-    access =  await get_controllers_access(username)
+    access = await get_controllers_access(username)
     for acc in access:
         if list(acc.keys())[0] == controller.c_name:
             return acc
@@ -857,3 +873,12 @@ def check_access(access):
     else:
         error = errors.invalid_access('access')
         abort(error[0], error[1])
+
+
+async def check_same_access(user, new_access, controller, model=None):
+    if model is None:
+        old_acc = await get_ucontroller_access(controller, user)
+        return old_acc == new_access
+    else:
+        old_acc = await get_model_access(model, controller, user)
+        return old_acc == new_access

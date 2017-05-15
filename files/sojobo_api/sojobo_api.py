@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103
 import os
+import logging
 
 from sojobo_api.app import APP, create_response, redirect
 ########################################################################################################################
@@ -63,4 +64,10 @@ def conflict(error):
 # START FLASK SERVER
 ########################################################################################################################
 if __name__ == '__main__':
+    logger = logging.getLogger('sojobo_api')
+    hdlr = logging.FileHandler('/opt/sojobo_api/log/sojobo_api.log')
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    hdlr.setFormatter(formatter)
+    logger.setLevel(logging.INFO)
+    APP.logger.addHandler(hdlr)
     APP.run(host='0.0.0.0', port=int(os.environ.get('SOJOBO_API_PORT')), threaded=True)

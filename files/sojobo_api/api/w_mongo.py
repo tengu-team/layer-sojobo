@@ -69,7 +69,7 @@ def get_all_users():
 ################################################################################
 def create_controller(controller_name, c_type):
     try:
-        controller = {'name' : controller_name, 'users': [], 'type' : c_type}
+        controller = {'name' : controller_name, 'users': [], 'type' : c_type, 'models' : []}
         app.MONGO.db.controllers.insert_one(controller)
         return True
     except DuplicateKeyError:
@@ -97,6 +97,38 @@ def remove_controller(c_name, username):
 def get_controller(c_name):
     result = app.MONGO.db.controllers.find_one_or_404({'name': unquote(c_name)})
     return result
+
+
+def add_model_to_controller(c_name, m_name):
+    model = {}
+    model[m_name] = "Model is being deployed"
+    app.MONGO.db.controllers.update_one(
+        {'name' : c_name},
+        {'$push': {'models' : model}
+        })
+
+
+def set_model_state(c_name, m_name, state):
+    con = get_controller(c_name)
+    new_access = []
+    for mod in con['models']:
+        if list(mod.keys())[0] == m_name:
+            new_mod = {}
+            new_mod[m_name] = state
+            mod = new_mod
+        new_access.append(mod)
+    app.MONGO.db.controllers.update_one(
+        {'name' : c_name},
+        {'$set': {'access' : new_access}}
+        )
+
+
+def check_model_state(c_name, m_name):
+    con = get_controller(c_name)
+    for mod in con['models']:
+        if list(mod.keys())[0] == m_name:
+            return mod[m_name]
+    return 'error'
 
 
 def get_controller_access(controller, user):
