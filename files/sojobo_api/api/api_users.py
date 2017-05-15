@@ -243,7 +243,7 @@ def grant_to_controller(user, controller):
                 execute_task(con.disconnect)
             else:
                 execute_task(con.disconnect)
-                subprocess.Popen(["python3", "{}/scripts/set_user_acces.py".format(juju.get_api_dir()), token.username,
+                subprocess.Popen(["python3", "{}/scripts/set_user_access.py".format(juju.get_api_dir()), token.username,
                               token.password, juju.get_api_dir(),settings.MONGO_URI, usr, access, controller])
                 code, response = 202, 'Process being handeled'
         else:
@@ -323,7 +323,9 @@ def grant_to_model(user, controller, model):
         u_exists = execute_task(juju.user_exists, user)
         if u_exists:
             if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
-                execute_task(juju.model_grant, con, mod, usr, access)
+                if not mongo.get_model_access(controller, model, user)is None:
+                    execute_task(juju.model_revoke, mod, user)
+                execute_task(juju.model_grant, mod, usr, access)
                 mongo.set_model_access(con.c_name, mod.m_name, usr, access)
                 code, response = 200, 'Granted access for user {} on model {}'.format(usr, model)
             else:

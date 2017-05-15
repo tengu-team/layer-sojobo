@@ -437,7 +437,7 @@ async def get_public_ip_controller(controller):
 #libjuju geen manier om gui te verkrijgen of juju gui methode
 async def get_gui_url(controller, model):
     try:
-        return 'https://{}/gui/{}'.format(controller.public_ip, model.m_uuid)
+        return 'https://{}:17070/gui/{}'.format(controller.public_ip, model.m_uuid)
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
