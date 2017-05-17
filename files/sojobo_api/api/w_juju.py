@@ -610,9 +610,26 @@ async def deploy_bundle(model, bundle):
     shutil.rmtree(dirpath)
 
 
-async def deploy_app(model, app_name, ser=None, tar=None):
+async def deploy_app(model, app_name, ser=None, tar=None, con=None):
     model_con = model.m_connection
-    await model_con.deploy(app_name, series=ser, to=tar)
+    await model_con.deploy(app_name, series=ser, to=tar, config=con)
+
+
+async def check_if_exposed(model, app_name, exposed=True):
+    app_info = await get_application_info(model, app_name)
+    if app_info['exposed'] == exposed:
+        return True
+    return False
+
+
+async def expose_app(model, app_name):
+    app = await get_application_entity(model, app_name)
+    await app.expose()
+
+
+async def unexpose_app(model, app_name):
+    app = await get_application_entity(model, app_name)
+    await app.expose()
 
 
 async def get_application_entity(model, app_name):

@@ -25,56 +25,18 @@ from juju.client.connection import JujuData
 from juju.model import Model
 from juju.controller import Controller
 
+################################################################################
+# Asyncio Wrapper
+################################################################################
 def execute_task(command, *args):
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     result = loop.run_until_complete(command(*args))
     return result
 
-async def set_user_acc(c_name, access, user, username, password, url):
-    try:
-        logger.info('Setting up Controllerconnection for model: %s', c_name)
-        controller = Controller()
-        jujudata = JujuData()
-        controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
-        await controller.connect(controller_endpoint, username, password)
-        logger.info('Connected to controller %s ', c_name)
-        try:
-            await controller.revoke(user)
-        except Exception:
-            pass
-        await controller.grant(user, acl=access)
-        logger.info('Controller access set for  %s ', c_name)
-        model_list = []
-        if access == 'superuser':
-            models = await controller.get_models()
-            model_list = [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
-            for mod in model_list:
-                model_name = mod['name']
-                logger.info('Setting up Modelconnection for model: %s', model_name)
-                model_uuid = mod['uuid']
-                model = Model()
-                if not model_uuid is None:
-                    await model.connect(controller_endpoint, model_uuid, username, password)
-                    try:
-                        await model.revoke(user)
-                    except Exception:
-                        pass
-                    await model.grant(user, acl='admin')
-                    logger.info('Admin Access granted for for %s:%s', controller_name, model_name)
-                    await model.disconnect()
-                    logger.info('Successfully disconnected %s', model_name)
-                else:
-                    logger.error('Model_Uuid could not be found. Can not connect to Model : %s', model_name)
-        set_db_access(url, c_name, user, access, model_list)
-        return True
-    except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            logger.error(l)
-
-
+################################################################################
+# Mongo Functions
+################################################################################
 def set_db_access(url, c_name, user, acl, modellist):
     try:
         logger.info('Setting up Mongo-db connection ')
@@ -105,6 +67,61 @@ def set_db_access(url, c_name, user, acl, modellist):
             {'name' : user},
             {'$set': {'access' : new_access}}
             )
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            logger.error(l)
+
+
+def get_ssh_keys(usr, url):
+    client = MongoClient(url)
+    db = client.sojobo
+    result = db.users.find_one({'name': unquote(username)})
+    return result['ssh_keys']
+################################################################################
+# Async Functions
+################################################################################
+async def set_user_acc(c_name, access, user, username, password, url):
+    try:
+        logger.info('Setting up Controllerconnection for model: %s', c_name)
+        controller = Controller()
+        jujudata = JujuData()
+        controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
+        await controller.connect(controller_endpoint, username, password)
+        logger.info('Connected to controller %s ', c_name)
+        try:
+            await controller.revoke(user)
+        except Exception:
+            pass
+        await controller.grant(user, acl=access)
+        logger.info('Controller access set for  %s ', c_name)
+        model_list = []
+        ssh_keys = get_ssh_keys(user, url)
+        if access == 'superuser':
+            models = await controller.get_models()
+            model_list = [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
+            for mod in model_list:
+                model_name = mod['name']
+                logger.info('Setting up Modelconnection for model: %s', model_name)
+                model_uuid = mod['uuid']
+                model = Model()
+                if not model_uuid is None:
+                    await model.connect(controller_endpoint, model_uuid, username, password)
+                    try:
+                        await model.revoke(user)
+                    except Exception:
+                        pass
+                    await model.grant(user, acl='admin')
+                    logger.info('Admin Access granted for for %s:%s', controller_name, model_name)
+                    for key in ssh_keys:
+                        model.add_ssh_key(user, key)
+                    await model.disconnect()
+                    logger.info('Successfully disconnected %s', model_name)
+                else:
+                    logger.error('Model_Uuid could not be found. Can not connect to Model : %s', model_name)
+        set_db_access(url, c_name, user, access, model_list)
+        return True
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

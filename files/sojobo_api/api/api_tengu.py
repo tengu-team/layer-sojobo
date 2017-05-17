@@ -305,9 +305,10 @@ def add_application(controller, model):
         else:
             if mod.m_access == 'write' or mod.m_access == 'admin':
                 series = juju.check_input(data.get('series', None))
-                # machine = juju.check_input(data.get('target', None))
+                config = juju.check_input(data.get('config', None))
+                machine = juju.check_input(data.get('target', None))
                 app = juju.check_input(data['application'])
-                execute_task(juju.deploy_app, mod, app, series, data.get('target', None))
+                execute_task(juju.deploy_app, mod, app, series, machine, config)
                 code, response = 200, execute_task(juju.get_application_info, mod, app)
 
             else:
@@ -335,6 +336,28 @@ def get_application_info(controller, model, application):
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
+
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['PUT'])
+def expose_application(controller, model, application):
+    data = request.json
+    try:
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        app = juju.check_input(application)
+        exposed = data['expose']
+        if execute_task(juju.check_if_exposed, mod, app, exposed):
+            code, response = execute_task(juju.get_application_info, mod, app)
+        elif exposed:
+            execute_task(juju.expose_app, mod, app)
+            code, response = 200, execute_task(juju.get_application_info, mod, app)
+        else:
+            execute_task(juju.unexpose_app, mod, app)
+            code, response = 200, execute_task(juju.get_application_info, mod, app)
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['DELETE'])
 def remove_app(controller, model, application):

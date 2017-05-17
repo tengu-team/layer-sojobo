@@ -33,10 +33,26 @@ def get():
 def get_users_info():
     #try:
     token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+    u_info = mongo.get_user(token.username)
+    access_list = []
     if token.is_admin:
         code, response = 200, execute_task(juju.get_users_info)
     else:
-        code, response = errors.unauthorized()
+        for controller in u_info['access']:
+            c_name = list(controller.keys())[0]
+            if u_info[c_name]['access'] == 'superuser':
+                c_users = mongo.get_controller_users(controller)
+                for usr in c_users:
+                    access_list.append(execute_task(get_user_info, usr['name']))
+        if access_list:
+            response_list = []
+            for ac in access_list:
+                if ac not in response_list:
+                    response_list.append(ac)
+            code, response = 200, response_list
+        else:
+            access_list.append(execute_task(get_user_info, token.username))
+            code, response = 200, access_list
     # except KeyError:
     #     code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -157,43 +173,47 @@ def delete_user(user):
     return juju.create_response(code, response)
 
 
-# @USERS.route('/<user>/ssh', methods=['GET'])
-# def get_ssh_keys(user):
-#     try:
-#         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-#         code, response = 200, execute_task(juju.get_ssh_keys, user)
-#     except KeyError:
-#         code, response = errors.invalid_data()
-#     return juju.create_response(code, response)
-#
-#
-# @USERS.route('/<user>/ssh', methods=['POST'])
-# def add_ssh_key(user):
-#     data = request.json
-#     try:
-#         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-#         execute_task(juju.add_ssh_key, user, data['ssh-key'])
-#         code, response = 200, execute_task(juju.get_ssh_keys, user)
-#     except KeyError:
-#         code, response = errors.invalid_data()
-#     return juju.create_response(code, response)
-#
-#
-# @USERS.route('/<user>/ssh', methods=['DELETE'])
-# def delete_ssh_key(user):
-#     try:
-#         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-#         usr = juju.check_input(user)
-#         if execute_task(juju.user_exists, usr):
-#             if token.is_admin or token.username == usr:
-#                 code, response = 200, juju.get_controllers_access(usr)
-#             else:
-#                 code, response = errors.unauthorized()
-#         else:
-#             code, response = errors.does_not_exist('user')
-#     except KeyError:
-#         code, response = errors.invalid_data()
-#     return juju.create_response(code, response)
+@USERS.route('/<user>/ssh', methods=['GET'])
+def get_ssh_keys(user):
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        if token.is_admin:
+            code, response = 200, mongo.get_ssh_key(user)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
+@USERS.route('/<user>/ssh', methods=['POST'])
+def add_ssh_key(user):
+    data = request.json
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        cons = mongo.get_all_controllers()
+        for con in cons:
+            if mongo.get_controller_access(con, token.username) == 'superuser':
+                subprocess.Popen(["python3", "{}/scripts/add_ssh_keys.py".format(juju.get_api_dir()), token.username,
+                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.MONGO_URI])
+        code, response = 202, 'Process being handeled'
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
+@USERS.route('/<user>/ssh', methods=['DELETE'])
+def delete_ssh_key(user):
+    data = request.json
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        cons = mongo.get_all_controllers()
+        for con in cons:
+            if mongo.get_controller_access(con, token.username) == 'superuser':
+                subprocess.Popen(["python3", "{}/scripts/remove_ssh_keys.py".format(juju.get_api_dir()), token.username,
+                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.MONGO_URI])
+        code, response = 202, 'Process being handeled'
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
 
 @USERS.route('/<user>/controllers', methods=['GET'])
 def get_controllers_access(user):
