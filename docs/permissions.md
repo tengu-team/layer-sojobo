@@ -2,7 +2,8 @@
 |-------------------------------|:-----------:|:---------:|:---------:|:-----:|:-----:|:-----:|:----:|:---------:|
 | create/remove user            |      X      |           |           |       |       |       |      |           |
 | change user password          |      X      |           |           |       |       |       |      |     X     |
-| get user info                 |      X      |     X     |           |       |       |       |      |     X     |
+| get user controller-info      |      X      |     X     |           |       |       |       |      |     X     |
+| get user model-info           |      X      |     X     |           |       |       |       |      |     X     |
 | bootstrap controller          |      X      |           |           |       |       |       |      |           |
 | add/remove user to controller |      X      |     X     |           |       |       |       |      |           |
 | remove controller             |      X      |     X     |           |       |       |       |      |           |
