@@ -177,8 +177,9 @@ def delete_user(user):
 def get_ssh_keys(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        if token.is_admin:
-            code, response = 200, mongo.get_ssh_key(user)
+        if token.is_admin or token.username == user:
+            print(mongo.get_ssh_keys(user))
+            code, response = 200, mongo.get_ssh_keys(user)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -190,10 +191,11 @@ def add_ssh_key(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         cons = mongo.get_all_controllers()
+        usr = juju.check_input(user)
         for con in cons:
             if mongo.get_controller_access(con, token.username) == 'superuser':
                 subprocess.Popen(["python3", "{}/scripts/add_ssh_keys.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.MONGO_URI])
+                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.MONGO_URI, usr])
         code, response = 202, 'Process being handeled'
     except KeyError:
         code, response = errors.invalid_data()
@@ -206,10 +208,11 @@ def delete_ssh_key(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         cons = mongo.get_all_controllers()
+        usr = juju.check_input(user)
         for con in cons:
             if mongo.get_controller_access(con, token.username) == 'superuser':
                 subprocess.Popen(["python3", "{}/scripts/remove_ssh_keys.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.MONGO_URI])
+                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.MONGO_URI, usr])
         code, response = 202, 'Process being handeled'
     except KeyError:
         code, response = errors.invalid_data()

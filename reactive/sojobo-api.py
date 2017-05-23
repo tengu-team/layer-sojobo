@@ -187,6 +187,7 @@ def install_api():
     mergecopytree('files/sojobo_api', API_DIR)
     os.mkdir('{}/files'.format(API_DIR))
     os.mkdir('{}/bundle'.format(API_DIR))
+    os.mkdir('{}/log'.format(API_DIR))
     os.mkdir('{}/backup'.format(API_DIR))
     adduser(USER)
     os.mkdir('/home/{}'.format(USER))

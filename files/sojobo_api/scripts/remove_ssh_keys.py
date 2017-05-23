@@ -56,7 +56,7 @@ def get_model_access(controller, model, user, mongo):
 
 
 def get_ssh_keys(usr, mongo):
-    result = mongo.users.find_one({'name': unquote(username)})
+    result = mongo.users.find_one({'name': unquote(usr)})
     return result['ssh_keys']
 
 
@@ -68,18 +68,21 @@ def remove_ssh_key(user, ssh_key, mongo):
 ################################################################################
 # Async Functions
 ################################################################################
-async def add_ssh_keys(c_name, usr, pwd, ssh_key, url):
+async def remove_ssh_keys(c_name, usrname, pwd, ssh_key, url, user):
     try:
         client = MongoClient(url)
         db = client.sojobo
+
+        if ssh_key in get_ssh_keys(user, db):
+            remove_ssh_key(user, ssh_key, db)
 
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller = Controller()
         jujudata = JujuData()
         controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
-        await controller.connect(controller_endpoint, usr, pwd)
+        await controller.connect(controller_endpoint, usrname, pwd)
 
-        acl_lvl = get_controller_access(c_name, usr, db)
+        acl_lvl = get_controller_access(c_name, user, db)
         models = await controller.get_models()
         model_list = [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
         if acl_lvl == 'superuser':
@@ -90,20 +93,21 @@ async def add_ssh_keys(c_name, usr, pwd, ssh_key, url):
                 model = Model()
                 if not model_uuid is None:
                     await model.connect(controller_endpoint, model_uuid, username, password)
-                    await model.remove_ssh_key(usr, ssh_key)
+                    await model.remove_ssh_key(user, ssh_key)
+                    await model.disconnect()
         else:
             for mod in model_list:
                 model_name = mod['name']
-                mod_lvl = get_model_access(c_name, model_name, usr, db)
+                mod_lvl = get_model_access(c_name, model_name, user, db)
                 if mod_lvl == 'admin' or mod_lvl == 'write':
                     logger.info('Setting up Modelconnection for model: %s', model_name)
                     model_uuid = mod['uuid']
                     model = Model()
                     if not model_uuid is None:
                         await model.connect(controller_endpoint, model_uuid, username, password)
-                        await model.remove_ssh_key(usr, ssh_key)
-        if ssh_key in get_ssh_keys(usr, db):
-            remove_ssh_key(usr, ssh_key, db)
+                        await model.remove_ssh_key(user, ssh_key)
+                        await model.disconnect()
+        await controller.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -113,11 +117,11 @@ async def add_ssh_keys(c_name, usr, pwd, ssh_key, url):
 
 
 if __name__ == '__main__':
-    username, password, api_dir, controller_name, ssh_key, mongo_url = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6]
-    logger = logging.getLogger('add_ssh_keys')
-    hdlr = logging.FileHandler('{}/log/add_ssh_keys.log'.format(api_dir))
+    username, password, api_dir, controller_name, ssh_key, mongo_url, user= sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7]
+    logger = logging.getLogger('remove_ssh_keys')
+    hdlr = logging.FileHandler('{}/log/remove_ssh_keys.log'.format(api_dir))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
-    execute_task(add_ssh_keys, controller_name, username, password, ssh_key, mongo_url)
+    execute_task(remove_ssh_keys, controller_name, username, password, ssh_key, mongo_url, user)

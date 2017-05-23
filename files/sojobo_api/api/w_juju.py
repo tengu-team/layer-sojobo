@@ -276,6 +276,7 @@ async def delete_controller(con):
     #await controller.destroy(True)
     check_output(['juju', 'login', settings.JUJU_ADMIN_USER, '-c', con.c_name], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
     check_call(['juju', 'destroy-controller', '-y', con.c_name, '--destroy-all-models'])
+    check_call(['juju', 'remove-credential', con.c_type, con.c_name])
     mongo.destroy_controller(con.c_name)
 
 async def get_all_controllers():
@@ -610,9 +611,9 @@ async def deploy_bundle(model, bundle):
     shutil.rmtree(dirpath)
 
 
-async def deploy_app(model, app_name, ser=None, tar=None, con=None):
+async def deploy_app(model, app_name, name=None, ser=None, tar=None, con=None):
     model_con = model.m_connection
-    await model_con.deploy(app_name, series=ser, to=tar, config=con)
+    await model_con.deploy(app_name, application_name=name, series=ser, to=tar, config=con)
 
 
 async def check_if_exposed(model, app_name, exposed=True):
@@ -730,6 +731,14 @@ async def remove_relation(model, app1, app2):
                 elif keys[1].startswith(app1):
                     await application.destroy_relation(keys[1].split(':')[1], keys[0])
 
+async def set_application_config(mod, app_name, config):
+    app = get_application_entity(mod, app_name)
+    await app.set_config(config)
+
+
+async def get_application_config(mod, app_name):
+    app = get_application_entity(mod, app_name)
+    return await app.get_config()
 
 # async def app_supports_series(app_name, series):
 #     if series is None:

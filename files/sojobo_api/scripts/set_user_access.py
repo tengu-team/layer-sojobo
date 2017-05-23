@@ -115,13 +115,13 @@ async def set_user_acc(c_name, access, user, username, password, url):
                     await model.grant(user, acl='admin')
                     logger.info('Admin Access granted for for %s:%s', controller_name, model_name)
                     for key in ssh_keys:
-                        model.add_ssh_key(user, key)
+                        await model.add_ssh_key(user, key)
                     await model.disconnect()
                     logger.info('Successfully disconnected %s', model_name)
                 else:
                     logger.error('Model_Uuid could not be found. Can not connect to Model : %s', model_name)
         set_db_access(url, c_name, user, access, model_list)
-        return True
+        await controller.disconnect()
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

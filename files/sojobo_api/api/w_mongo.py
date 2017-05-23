@@ -67,6 +67,7 @@ def remove_ssh_key(user, ssh_key):
 
 def get_ssh_keys(usr):
     result = app.MONGO.db.users.find_one_or_404({'name': unquote(usr)})
+    print(result)
     return result['ssh_keys']
 
 
@@ -131,7 +132,7 @@ def set_model_state(c_name, m_name, state):
         new_access.append(mod)
     app.MONGO.db.controllers.update_one(
         {'name' : c_name},
-        {'$set': {'access' : new_access}}
+        {'$set': {'models' : new_access}}
         )
 
 

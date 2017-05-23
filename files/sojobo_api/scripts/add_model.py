@@ -73,8 +73,8 @@ def get_superusers(c_name, mongo):
             result.append(user['name'])
     return result
 
-def set_model_access(c_name, m_name, mongo, access):
-    result = mongo.users.find_one({'name': unquote(username)})
+def set_model_access(c_name, m_name, usr, mongo, access):
+    result = mongo.users.find_one({'name': unquote(usr)})
     new_access = []
     for acc in result['access']:
         if list(acc.keys())[0] == c_name:
@@ -143,9 +143,12 @@ async def create_model(c_name, m_name, usr, pwd, url):
                     sshkey = get_ssh_keys(user, db)
                     for key in sshkey:
                         model.add_ssh_key(user, key)
-                set_model_access(c_name, m_name, db, 'admin')
+                set_model_access(c_name, m_name, user, db, 'admin')
                 logger.info('Admin Access granted for user %s on model %s', user, m_name)
         set_model_state(c_name, m_name, 'ready', db)
+        set_model_access(c_name, m_name, usr, db, 'admin')
+        await model.disconnect()
+        await controller.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
