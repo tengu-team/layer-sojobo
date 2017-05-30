@@ -37,32 +37,23 @@ def execute_task(command, *args):
 ################################################################################
 # Mongo Functions
 ################################################################################
-def set_db_access(url, c_name, user, acl, modellist):
+def set_db_access(url, c_name, m_name, user, acl):
     try:
         logger.info('Setting up Mongo-db connection ')
         client = MongoClient(url)
         db = client.sojobo
         result = db.users.find_one({'name': unquote(user)})
         new_access = []
-        if acl == 'superuser':
-            logger.info('Changing to Superuser Access for controller: %s', c_name)
-            for acc in result['access']:
-                if list(acc.keys())[0] == c_name:
-                    models = []
-                    for model in modellist:
-                        m_name = model['name']
-                        new_model = {m_name : 'admin'}
-                        models.append(new_model)
-                        logger.info('Changing to Admin Access for model: %s:%s', c_name, m_name)
-                    acc[c_name]['models'] = models
-                    acc[c_name]['access'] = acl
-                new_access.append(acc)
-        else:
-            logger.info('Changing to %s Access for controller: %s', acl, c_name)
-            for acc in result['access']:
-                if list(acc.keys())[0] == c_name:
-                    acc[c_name]['access'] = acl
-                new_access.append(acc)
+        for acc in result['access']:
+            if list(acc.keys())[0] == c_name:
+                models = acc[c_name]['models']
+                for modelname in models:
+                    if list(modelname.keys())[0] == m_name:
+                        models.remove(modelname)
+                new_model = {m_name: access}
+                models.append(new_model)
+                acc[c_name]['models'] = models
+            new_access.append(acc)
         db.users.update_one(
             {'name' : user},
             {'$set': {'access' : new_access}}
@@ -82,27 +73,20 @@ def get_ssh_keys(usr, url):
 ################################################################################
 # Async Functions
 ################################################################################
-async def set_user_acc(c_name, access, user, username, password, url):
+async def set_model_acc(c_name, m_name, access, user, username, password, url):
     try:
         logger.info('Setting up Controllerconnection for model: %s', c_name)
         controller = Controller()
         jujudata = JujuData()
         controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
-        await controller.connect(controller_endpoint, username, password)
-        logger.info('Connected to controller %s ', c_name)
-        try:
-            await controller.revoke(user)
-        except Exception:
-            pass
-        await controller.grant(user, acl=access)
-        logger.info('Controller access set for  %s ', c_name)
         model_list = []
         ssh_keys = get_ssh_keys(user, url)
-        if access == 'superuser':
-            models = await controller.get_models()
-            model_list = [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
-            for mod in model_list:
-                model_name = mod['name']
+        await controller.connect(controller_endpoint, username, password)
+        logger.info('Connected to controller %s ', c_name)
+        models = await controller.get_models()
+        model_list = [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
+        for mod in model_list:
+            if m_name == mod['name']:
                 logger.info('Setting up Modelconnection for model: %s', model_name)
                 model_uuid = mod['uuid']
                 model = Model()
@@ -112,15 +96,16 @@ async def set_user_acc(c_name, access, user, username, password, url):
                         await model.revoke(user)
                     except Exception:
                         pass
-                    await model.grant(user, acl='admin')
+                    await model.grant(user, acl=access)
                     logger.info('Admin Access granted for for %s:%s', controller_name, model_name)
-                    for key in ssh_keys:
-                        await model.add_ssh_key(user, key)
+                    if access in ['admin','write'] and ssh_keys:
+                        for key in ssh_keys:
+                            await model.add_ssh_key(user, key)
                     await model.disconnect()
                     logger.info('Successfully disconnected %s', model_name)
                 else:
                     logger.error('Model_Uuid could not be found. Can not connect to Model : %s', model_name)
-        set_db_access(url, c_name, user, access, model_list)
+        set_db_access(url, c_name, m_name, user, access)
         await controller.disconnect()
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -130,11 +115,11 @@ async def set_user_acc(c_name, access, user, username, password, url):
 
 
 if __name__ == '__main__':
-    username, password, api_dir, mongo_url, user, access, controller_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7]
-    logger = logging.getLogger('set_user_access')
-    hdlr = logging.FileHandler('{}/log/set_user_access.log'.format(api_dir))
+    username, password, api_dir, mongo_url, user, access, controller_name, model_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]
+    logger = logging.getLogger('set_model_access')
+    hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(api_dir))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
-    execute_task(set_user_acc, controller_name, access, user, username, password, mongo_url)
+    execute_task(set_model_acc, controller_name, model_name, access, user, username, password, mongo_url)

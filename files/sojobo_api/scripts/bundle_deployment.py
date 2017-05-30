@@ -28,21 +28,37 @@ from juju.client.connection import JujuData
 from juju.model import Model
 from juju.controller import Controller
 
+################################################################################
+# Asyncio Wrapper
+################################################################################
 def execute_task(command, *args):
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     result = loop.run_until_complete(command(*args))
     return result
 
+
+################################################################################
+# Helper Functions
+################################################################################
+def quoted_presenter(dumper, data):
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='"')
+
+################################################################################
+# Async Functions
+################################################################################
 async def deploy_bundle(username, password, controller_name, model_name, bundle):
     try:
         logger.info('Authenticated and starting bundle deployment!')
         dirpath = tempfile.mkdtemp()
         os.mkdir('{}/bundle'.format(dirpath))
         bundle_dict = ast.literal_eval(bundle)
+        yaml.add_representer(str, quoted_presenter)
         with open('{}/bundle/bundle.yaml'.format(dirpath), 'w+') as outfile:
             yaml.dump(bundle_dict, outfile, default_flow_style=False)
-        logger.info('Tmp file created and ready to be deployed!')
+        with open('{}/bundle/README.md'.format(dirpath), 'w+') as readmefile:
+            readmefile.write('##Overview')
+        logger.info('Tmp file created and ready to be deployed! %s', outfile)
 
         logger.info('Setting up Controllerconnection for model: %s', model_name)
         controller = Controller()
@@ -61,10 +77,10 @@ async def deploy_bundle(username, password, controller_name, model_name, bundle)
         model = Model()
         if not model_uuid is None:
             await model.connect(controller_endpoint, model_uuid, username, password)
-            logger.info('Deploying bundle')
+            logger.info('Deploying bundle from %s/bundle', dirpath)
             if 'series' in bundle_dict.keys():
-                await model.deploy('{}/bundle/'.format(dirpath), series=bundle_dict['series'])
-            await model.deploy('{}/bundle/'.format(dirpath))
+                await model.deploy('{}/bundle'.format(dirpath), series=bundle_dict['series'])
+            await model.deploy('{}/bundle'.format(dirpath))
             logger.info('Bundle successfully deployed for %s:%s', controller_name, model_name)
             await model.disconnect()
             logger.info('Successfully disconnected %s', model_name)

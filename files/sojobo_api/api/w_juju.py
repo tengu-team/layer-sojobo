@@ -29,7 +29,7 @@ from sojobo_api.api import w_errors as errors, w_mongo as mongo
 from sojobo_api import settings
 from juju.model import Model
 from juju.controller import Controller
-from juju.errors import JujuAPIError
+from juju.errors import JujuAPIError, JujuError
 # from datetime import datetime
 from juju.client.connection import JujuData
 ################################################################################
@@ -276,6 +276,7 @@ async def delete_controller(con):
     #await controller.destroy(True)
     check_output(['juju', 'login', settings.JUJU_ADMIN_USER, '-c', con.c_name], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
     check_call(['juju', 'destroy-controller', '-y', con.c_name, '--destroy-all-models'])
+    check_call(['juju', 'remove-credential', con.c_type, con.c_name])
     mongo.destroy_controller(con.c_name)
 
 async def get_all_controllers():
@@ -610,9 +611,31 @@ async def deploy_bundle(model, bundle):
     shutil.rmtree(dirpath)
 
 
-async def deploy_app(model, app_name, ser=None, tar=None):
-    model_con = model.m_connection
-    await model_con.deploy(app_name, series=ser, to=tar)
+async def deploy_app(model, app_name, name=None, ser=None, tar=None, con=None, num_of_units=1):
+    try:
+        model_con = model.m_connection
+        await model_con.deploy(app_name, application_name=name, series=ser, to=tar, config=con, num_units=num_of_units)
+    except JujuError as e:
+        if e == 'subordinate application must be deployed without units':
+            await model_con.deploy(app_name, application_name=name, series=ser, to=tar, config=con, num_units=0)
+
+
+
+async def check_if_exposed(model, app_name, exposed=True):
+    app_info = await get_application_info(model, app_name)
+    if app_info['exposed'] == exposed:
+        return True
+    return False
+
+
+async def expose_app(model, app_name):
+    app = await get_application_entity(model, app_name)
+    await app.expose()
+
+
+async def unexpose_app(model, app_name):
+    app = await get_application_entity(model, app_name)
+    await app.expose()
 
 
 async def get_application_entity(model, app_name):
@@ -713,6 +736,14 @@ async def remove_relation(model, app1, app2):
                 elif keys[1].startswith(app1):
                     await application.destroy_relation(keys[1].split(':')[1], keys[0])
 
+async def set_application_config(mod, app_name, config):
+    app = get_application_entity(mod, app_name)
+    await app.set_config(config)
+
+
+async def get_application_config(mod, app_name):
+    app = get_application_entity(mod, app_name)
+    return await app.get_config()
 
 # async def app_supports_series(app_name, series):
 #     if series is None:

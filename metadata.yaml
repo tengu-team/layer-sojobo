@@ -8,6 +8,8 @@ subordinate: false
 provides:
   sojobo:
     interface: sojobo
+  reverseproxy:
+    interface: http
 requires:
   mongodb:
     interface: mongodb

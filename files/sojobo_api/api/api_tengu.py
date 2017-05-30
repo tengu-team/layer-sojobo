@@ -68,6 +68,7 @@ def create_controller():
                 con = execute_task(juju.create_controller, c_type, controller, data['region'], data['credentials'])
                 execute_task(con.set_controller, token, controller)
                 models = execute_task(juju.get_models_info, con)
+                print(models)
                 for model in models:
                     mongo.add_model_to_controller(controller, model)
                     mongo.set_model_state(controller, model, 'ready')
@@ -120,14 +121,13 @@ def create_model(controller):
             else:
         # Due to errors in libjuju only admins can add models
                 mongo.add_model_to_controller(controller, model)
-                mongo.set_model_access(controller, model, token.username, 'admin')
+                mongo.set_model_access(controller, model, token.username, 'accepted')
                 execute_task(con.disconnect)
                 subprocess.Popen(["python3", "{}/scripts/add_model.py".format(juju.get_api_dir()), settings.JUJU_ADMIN_USER,
                                   settings.JUJU_ADMIN_PASSWORD, juju.get_api_dir(), settings.MONGO_URI, controller, model])
                 code, response = 202, "Model is being deployed"
         else:
             code, response = errors.unauthorized()
-        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -151,25 +151,27 @@ def get_model_info(controller, model):
                                        juju.check_input(controller))
         state = mongo.check_model_state(controller, model)
         mod_access = mongo.get_model_access(controller, model, token.username)
-        if mod_access == 'admin' or con.c_access == 'superuser':
-            if state == 'error':
+        if mod_access in ['admin', 'read', 'write']:
+            if state == 'error' and con.c_access == 'superuser':
                 code, response = errors.does_not_exist('model')
             elif state == 'ready':
                 model_con = Model_Connection()
                 execute_task(model_con.set_model, token, con, model)
                 code, response = 200, execute_task(juju.get_model_info, token, con, model_con)
                 execute_task(model_con.disconnect)
-            else:
-                s_users = execute_task(juju.get_controller_superusers, controller)
-                u_list = []
-                for us in s_users:
-                    u_item = {"user" : us, "access" : "admin"}
-                    u_list.append(u_item)
-                if not token.username in s_users:
-                    u_item = {"user" : token.username, "access" : "admin"}
-                    u_list.append(u_item)
-                response = {model: {'status': state, 'users' : u_list}}
-                code = 200
+        elif mod_access == 'accepted':
+            s_users = execute_task(juju.get_controller_superusers, controller)
+            u_list = []
+            for us in s_users:
+                u_item = {"user" : us, "access" : "admin"}
+                u_list.append(u_item)
+            if not token.username in s_users:
+                u_item = {"user" : token.username, "access" : "admin"}
+                u_list.append(u_item)
+            response = {model: {'status': state, 'users' : u_list}}
+            code = 200
+        else:
+            code, response = errors.unauthorized()
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
@@ -305,9 +307,12 @@ def add_application(controller, model):
         else:
             if mod.m_access == 'write' or mod.m_access == 'admin':
                 series = juju.check_input(data.get('series', None))
-                # machine = juju.check_input(data.get('target', None))
+                config = juju.check_input(data.get('config', None))
+                machine = juju.check_input(data.get('target', None))
+                app_name = juju.check_input(data.get('app_name', None))
+                units = juju.check_input(data.get('units', 1))
                 app = juju.check_input(data['application'])
-                execute_task(juju.deploy_app, mod, app, series, data.get('target', None))
+                execute_task(juju.deploy_app, mod, app, name=app_name, ser=series, tar=machine, con=config, num_of_units=units)
                 code, response = 200, execute_task(juju.get_application_info, mod, app)
 
             else:
@@ -336,6 +341,28 @@ def get_application_info(controller, model, application):
     return juju.create_response(code, response)
 
 
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['PUT'])
+def expose_application(controller, model, application):
+    data = request.json
+    try:
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        app = juju.check_input(application)
+        exposed = data['expose']
+        if execute_task(juju.check_if_exposed, mod, app, exposed):
+            code, response = execute_task(juju.get_application_info, mod, app)
+        elif exposed:
+            execute_task(juju.expose_app, mod, app)
+            code, response = 200, execute_task(juju.get_application_info, mod, app)
+        else:
+            execute_task(juju.unexpose_app, mod, app)
+            code, response = 200, execute_task(juju.get_application_info, mod, app)
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['DELETE'])
 def remove_app(controller, model, application):
     try:
@@ -350,6 +377,37 @@ def remove_app(controller, model, application):
                 code, response = errors.does_not_exist('application')
         else:
             code, response = errors.unauthorized()
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/config', methods=['GET'])
+def get_application_config(controller, model, application):
+    data = request.json
+    try:
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        app = juju.check_input(application)
+        config = juju.check_input(data.get('config', None))
+        code, response = execute_task(juju.set_application_config, mod, app, config)
+        execute_task(mod.disconnect)
+        execute_task(con.disconnect)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/config', methods=['PUT'])
+def set_application_config(controller, model, application):
+    data = request.json
+    try:
+        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller), juju.check_input(model))
+        app = juju.check_input(application)
+        config = juju.check_input(data.get('config', None))
+        code, response = execute_task(juju.set_application_config, mod, app, config)
         execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:

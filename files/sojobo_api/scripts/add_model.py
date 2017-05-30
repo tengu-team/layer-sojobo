@@ -54,6 +54,11 @@ def get_controller_users(controller, mongo):
     return result
 
 
+def get_ssh_keys(usr, mongo):
+    result = mongo.users.find_one({'name': unquote(username)})
+    return result['ssh_keys']
+
+
 def get_controller_access(c_name, user, mongo):
     result = mongo.users.find_one({'name': unquote(user)})
     for acc in result['access']:
@@ -68,8 +73,8 @@ def get_superusers(c_name, mongo):
             result.append(user['name'])
     return result
 
-def set_model_access(c_name, m_name, mongo, access):
-    result = mongo.users.find_one({'name': unquote(username)})
+def set_model_access(c_name, m_name, usr, mongo, access):
+    result = mongo.users.find_one({'name': unquote(usr)})
     new_access = []
     for acc in result['access']:
         if list(acc.keys())[0] == c_name:
@@ -108,13 +113,15 @@ async def create_model(c_name, m_name, usr, pwd, url):
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller = Controller()
         jujudata = JujuData()
-        controller_endpoint = jujudata.controllers()[controller_name]['api-endpoints'][0]
+        controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
         await controller.connect(controller_endpoint, usr, pwd)
         await controller.add_model(m_name)
 
         client = MongoClient(url)
         db = client.sojobo
         s_users = get_superusers(c_name, db)
+        userkeys = get_ssh_keys(usr, db)
+        adminkeys = get_ssh_keys('admin', db)
 
         logger.info('Setting up Modelconnection for model: %s', m_name)
         models = await controller.get_models()
@@ -126,12 +133,22 @@ async def create_model(c_name, m_name, usr, pwd, url):
         model = Model()
         if not model_uuid is None:
             await model.connect(controller_endpoint, model_uuid, username, password)
+            for key in userkeys:
+                model.add_ssh_key(usr, key)
+            for key in adminkeys:
+                model.add_ssh_key('admin', key)
             for user in s_users:
                 if user != 'admin':
                     await model.grant(user, acl='admin')
-                set_model_access(c_name, m_name, db, 'admin')
+                    sshkey = get_ssh_keys(user, db)
+                    for key in sshkey:
+                        model.add_ssh_key(user, key)
+                set_model_access(c_name, m_name, user, db, 'admin')
                 logger.info('Admin Access granted for user %s on model %s', user, m_name)
         set_model_state(c_name, m_name, 'ready', db)
+        set_model_access(c_name, m_name, usr, db, 'admin')
+        await model.disconnect()
+        await controller.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

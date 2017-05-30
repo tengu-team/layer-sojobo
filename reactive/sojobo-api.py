@@ -32,7 +32,6 @@ API_DIR = config()['api-dir']
 USER = config()['api-user']
 GROUP = config()['nginx-group']
 HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_private_ip()
-SETUP = config()['setup']
 ###############################################################################
 # INSTALLATION AND UPGRADES
 ###############################################################################
@@ -57,22 +56,9 @@ def upgrade_charm():
 @when('api.installed', 'nginx.passenger.available')
 @when_not('api.configured')
 def configure_webapp():
-    if SETUP == 'https':
-        close_port(80)
-        close_port(443)
-        render_httpsclient()
-        open_port(443)
-        open_port(80)
-    elif SETUP == 'letsencrypt':
-        close_port(80)
-        close_port(443)
-        render_httpsletsencrypt()
-        open_port(80)
-    else:
-        close_port(80)
-        close_port(443)
-        render_http()
-        open_port(80)
+    close_port(80)
+    render_http()
+    open_port(80)
     restart_api()
     set_state('api.configured')
     status_set('blocked', 'Waiting for a connection with MongoDB')
@@ -105,7 +91,7 @@ def connect_to_mongo(mongodb):
                                                              'JUJU_ADMIN_PASSWORD': get_password(),
                                                              'SOJOBO_API_DIR': API_DIR,
                                                              'LOCAL_CHARM_DIR': config()['charm-dir'],
-                                                             'SOJOBO_IP': '{}://{}'.format(SETUP, HOST),
+                                                             'SOJOBO_IP': 'http://{}'.format(HOST),
                                                              'SOJOBO_USER': USER,
                                                              'MONGO_URI': sojobo_uri})
     set_state('api.running')
@@ -120,12 +106,16 @@ def mongo_db_removed():
     status_set('blocked', 'Waiting for a connection with MongoDB')
 
 
-
 @when('sojobo.available')
 def configure(sojobo):
-    prefix = 'https://' if SETUP == 'https' else 'http://'
+    prefix = 'https://'
     with open("/{}/api-key".format(API_DIR), "r") as key:
         sojobo.configure('{}{}'.format(prefix, HOST), API_DIR, key.readline(), config()['api-user'])
+
+@when('reverseproxy.available', 'api.running')
+def configure_proxy(reverseproxy):
+    reverseproxy.configure(80)
+    set_state('api.reverseproxy-configured')
 
 ###############################################################################
 # UTILS
@@ -187,6 +177,7 @@ def install_api():
     mergecopytree('files/sojobo_api', API_DIR)
     os.mkdir('{}/files'.format(API_DIR))
     os.mkdir('{}/bundle'.format(API_DIR))
+    os.mkdir('{}/log'.format(API_DIR))
     os.mkdir('{}/backup'.format(API_DIR))
     adduser(USER)
     os.mkdir('/home/{}'.format(USER))
@@ -207,28 +198,28 @@ def render_http():
     render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
 
 
-def render_httpsclient():
-    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR, 'dhparam': config()['dhparam']}
-    chownr(context['dhparam'], GROUP, 'root')
-    if config()['fullchain'] == '' and config()['privatekey'] == '':
-        chownr('/etc/letsencrypt/live/{}'.format(HOST), GROUP, 'root', chowntopdir=True)
-        context['fullchain'] = '/etc/letsencrypt/live/{}/fullchain.pem'.format(HOST)
-        context['privatekey'] = '/etc/letsencrypt/live/{}/privkey.pem'.format(HOST)
-        render('https.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
-    elif config()['fullchain'] != '' and config()['privatekey'] != '':
-        context['fullchain'] = config()['fullchain']
-        context['privatekey'] = config()['privatekey']
-        render('https.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
-    else:
-        status_set('blocked', 'Invalid fullchain and privatekey config')
-
-
-def render_httpsletsencrypt():
-    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
-    if not os.path.isdir('{}/.well-known'.format(API_DIR)):
-        os.mkdir('{}/.well-known'.format(API_DIR))
-    chownr('{}/.well-known'.format(API_DIR), USER, GROUP, chowntopdir=True)
-    render('letsencrypt.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+# def render_httpsclient():
+#     context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR, 'dhparam': config()['dhparam']}
+#     chownr(context['dhparam'], GROUP, 'root')
+#     if config()['fullchain'] == '' and config()['privatekey'] == '':
+#         chownr('/etc/letsencrypt/live/{}'.format(HOST), GROUP, 'root', chowntopdir=True)
+#         context['fullchain'] = '/etc/letsencrypt/live/{}/fullchain.pem'.format(HOST)
+#         context['privatekey'] = '/etc/letsencrypt/live/{}/privkey.pem'.format(HOST)
+#         render('https.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+#     elif config()['fullchain'] != '' and config()['privatekey'] != '':
+#         context['fullchain'] = config()['fullchain']
+#         context['privatekey'] = config()['privatekey']
+#         render('https.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
+#     else:
+#         status_set('blocked', 'Invalid fullchain and privatekey config')
+#
+#
+# def render_httpsletsencrypt():
+#     context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
+#     if not os.path.isdir('{}/.well-known'.format(API_DIR)):
+#         os.mkdir('{}/.well-known'.format(API_DIR))
+#     chownr('{}/.well-known'.format(API_DIR), USER, GROUP, chowntopdir=True)
+#     render('letsencrypt.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
 
 
 def restart_api():
