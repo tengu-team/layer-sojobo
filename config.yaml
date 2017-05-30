@@ -16,7 +16,7 @@ options:
       The linux group of which nginx is a member
   charm-dir:
     type: string
-    default: '/home/ubuntu/local_charms'
+    default: '/home/ubuntu/qrama-charms'
     description: |
       The location where the api will search for local charms, when the app_name is prefixed with "local:<app_name>"
   setup:

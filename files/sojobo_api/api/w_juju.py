@@ -29,7 +29,7 @@ from sojobo_api.api import w_errors as errors, w_mongo as mongo
 from sojobo_api import settings
 from juju.model import Model
 from juju.controller import Controller
-from juju.errors import JujuAPIError
+from juju.errors import JujuAPIError, JujuError
 # from datetime import datetime
 from juju.client.connection import JujuData
 ################################################################################
@@ -611,9 +611,14 @@ async def deploy_bundle(model, bundle):
     shutil.rmtree(dirpath)
 
 
-async def deploy_app(model, app_name, name=None, ser=None, tar=None, con=None):
-    model_con = model.m_connection
-    await model_con.deploy(app_name, application_name=name, series=ser, to=tar, config=con)
+async def deploy_app(model, app_name, name=None, ser=None, tar=None, con=None, num_of_units=1):
+    try:
+        model_con = model.m_connection
+        await model_con.deploy(app_name, application_name=name, series=ser, to=tar, config=con, num_units=num_of_units)
+    except JujuError as e:
+        if e == 'subordinate application must be deployed without units':
+            await model_con.deploy(app_name, application_name=name, series=ser, to=tar, config=con, num_units=0)
+
 
 
 async def check_if_exposed(model, app_name, exposed=True):

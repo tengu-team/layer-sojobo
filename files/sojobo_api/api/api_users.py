@@ -329,8 +329,8 @@ def get_model_access(user, controller, model):
                 code, response = errors.unauthorized()
         else:
             code, response = errors.does_not_exist('user')
-        execute_task(con.disconnect)
         execute_task(mod.disconnect)
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -339,24 +339,21 @@ def get_model_access(user, controller, model):
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['PUT'])
 def grant_to_model(user, controller, model):
     try:
-        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-                                       juju.check_input(controller), juju.check_input(model))
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         access = juju.check_access(request.json['access'])
         usr = juju.check_input(user)
+        mod_access = mongo.get_model_access(controller, model, usr)
+        con_access = mongo.get_controller_access(controller, usr)
         u_exists = execute_task(juju.user_exists, user)
         if u_exists:
-            if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
-                if not mongo.get_model_access(controller, model, user)is None:
-                    execute_task(juju.model_revoke, mod, user)
-                execute_task(juju.model_grant, mod, usr, access)
-                mongo.set_model_access(con.c_name, mod.m_name, usr, access)
-                code, response = 200, 'Granted access for user {} on model {}'.format(usr, model)
+            if (mod_access == 'admin' or con_access == 'superuser') and user != 'admin':
+                subprocess.Popen(["python3", "{}/scripts/set_model_access.py".format(juju.get_api_dir()), token.username,
+                              token.password, juju.get_api_dir(),settings.MONGO_URI, usr, access, controller, model])
+                code, response = 202, 'Process being handeled'
             else:
                 code, response =  errors.unauthorized()
         else:
             code, response = errors.does_not_exist('user')
-        execute_task(con.disconnect)
-        execute_task(mod.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)

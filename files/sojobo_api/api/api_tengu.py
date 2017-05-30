@@ -309,9 +309,10 @@ def add_application(controller, model):
                 series = juju.check_input(data.get('series', None))
                 config = juju.check_input(data.get('config', None))
                 machine = juju.check_input(data.get('target', None))
-                name = juju.check_input(data.get('app_name', None))
+                app_name = juju.check_input(data.get('app_name', None))
+                units = juju.check_input(data.get('units', 1))
                 app = juju.check_input(data['application'])
-                execute_task(juju.deploy_app, mod, app, name, series, machine, config)
+                execute_task(juju.deploy_app, mod, app, name=app_name, ser=series, tar=machine, con=config, num_of_units=units)
                 code, response = 200, execute_task(juju.get_application_info, mod, app)
 
             else:
