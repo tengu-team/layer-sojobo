@@ -17,6 +17,8 @@
 import os
 import subprocess
 import shutil
+import tempfile
+import zipfile
 from requests.auth import HTTPBasicAuth
 from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
@@ -148,7 +150,7 @@ def get_models_info(controller):
 def get_model_info(controller, model):
     try:
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-                                       juju.check_input(controller))
+                                  juju.check_input(controller))
         state = mongo.check_model_state(controller, model)
         mod_access = mongo.get_model_access(controller, model, token.username)
         if mod_access in ['admin', 'read', 'write']:
@@ -310,9 +312,9 @@ def add_application(controller, model):
                 config = juju.check_input(data.get('config', None))
                 machine = juju.check_input(data.get('target', None))
                 app_name = juju.check_input(data.get('app_name', None))
-                units = juju.check_input(data.get('units', 1))
+                units = juju.check_input(data.get('units', "1"))
                 app = juju.check_input(data['application'])
-                execute_task(juju.deploy_app, mod, app, name=app_name, ser=series, tar=machine, con=config, num_of_units=units)
+                execute_task(juju.deploy_app, mod, app, name=app_name, ser=series, tar=machine, con=config, num_of_units=int(units))
                 code, response = 200, execute_task(juju.get_application_info, mod, app)
 
             else:
@@ -649,22 +651,50 @@ def backup_controllers():
         if token.is_admin:
             apidir = juju.get_api_dir()
             homedir = '/home/{}/.local/share/juju'.format(juju.get_api_user())
-            # shutil.copy2('{}/install_credentials.py'.format(apidir), '{}/backup/install_credentials.py'.format(apidir))
-            try:
-                shutil.copy2('{}/clouds.yaml'.format(homedir), '{}/backup/clouds.yaml'.format(apidir))
-            except FileNotFoundError:
-                pass
             try:
                 shutil.copytree('/home/{}/credentials'.format(juju.get_api_user()), '{}/backup/credentials'.format(apidir))
+                shutil.copytree(homedir, '{}/backup/juju'.format(apidir))
             except FileExistsError:
                 os.rmdir('{}/backup/credentials'.format(apidir))
+                os.rmdir(homedir)
                 shutil.copytree('/home/{}/credentials'.format(juju.get_api_user()), '{}/backup/credentials'.format(apidir))
+                shutil.copytree(homedir, '{}/backup/juju'.format(apidir))
             except FileNotFoundError:
                 pass
-            shutil.copy2('{}/credentials.yaml'.format(homedir), '{}/backup/credentials.yaml'.format(apidir))
-            shutil.copy2('{}/controllers.yaml'.format(homedir), '{}/backup/controllers.yaml'.format(apidir))
             shutil.make_archive('{}/backup'.format(apidir), 'zip', '{}/backup/'.format(apidir))
             return send_file('{}/backup.zip'.format(apidir))
+        else:
+            code, response = errors.unauthorized()
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
+@TENGU.route('/restore', methods=['POST'])
+def restore_controllers():
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        if token.is_admin:
+            apidir = juju.get_api_dir()
+            homedir = '/home/{}/.local/share/juju'.format(juju.get_api_user())
+            # shutil.copy2('{}/install_credentials.py'.format(apidir), '{}/backup/install_credentials.py'.format(apidir))
+            print(request.files)
+            if 'backup' in request.files:
+                file = request.files['backup']
+                filename = file.filename
+                tmpdir = tempfile.mkdtemp()
+                saved_loc = os.path.join(tmpdir, filename)
+                file.save(saved_loc)
+                zip_ref = zipfile.ZipFile(saved_loc, 'r')
+                zip_ref.extractall(tmpdir)
+                zip_ref.close()
+                shutil.rmtree(homedir)
+                shutil.rmtree('/home/{}/credentials'.format(juju.get_api_user()))
+                shutil.copytree('{}/juju'.format(tmpdir), homedir)
+                shutil.copytree('{}/credentials'.format(tmpdir), '/home/{}/credentials'.format(juju.get_api_user()))
+                code, response = 200, 'succesfully restored backup'
+            else:
+                code, response = 400, 'No backup file found'
         else:
             code, response = errors.unauthorized()
     except KeyError:

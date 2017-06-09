@@ -122,7 +122,7 @@ def get_controller_types():
             c_list[name.split('_')[1]] = import_module('sojobo_api.controllers.{}'.format(name))
     return c_list
 
-def execute_task(command, *args):
+def execute_task(command, *args, **kwargs):
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     result = loop.run_until_complete(command(*args))
@@ -242,6 +242,18 @@ async def authenticate(api_key, auth, controller=None, modelname=None):
         return token, cont_con
     else:
         return token
+
+
+async def authorize(auth, controller=None, modelname=None, acl_lvls=None):
+    token = JuJu_Token(auth)
+    if controller is None:
+        return token.is_admin
+    elif modelname is None:
+        c_access = mongo.get_controller_access(controller, token.username)
+        return c_access in acl_lvls
+    else:
+        m_access = mongo.get_models_access(controller, modelname, token.username)
+        return m_access in acl_lvls
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
