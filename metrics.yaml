@@ -1,0 +1,9 @@
+metrics:
+  cores:
+    type: gauge
+    description: count machine cores
+    command: scripts/machine_cores_count.py
+  memory:
+    type: gauge
+    description: count machine memory
+    command: scripts/machine_memory_count.py

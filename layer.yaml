@@ -1,4 +1,4 @@
-includes: ['layer:basic', 'layer:apt', 'layer:juju2-client', 'layer:nginx-passenger', 'interface:sojobo', 'interface:mongodb']
+includes: ['layer:basic', 'layer:apt', 'layer:juju2-client', 'layer:nginx-passenger', 'layer:metrics', 'interface:sojobo', 'interface:mongodb']
 repo: git@github.com:Qrama/Sojobo-api.git
 options:
   apt:
