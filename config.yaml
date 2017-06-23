@@ -55,7 +55,7 @@ options:
     type: string
     default: |
       - "deb https://oss-binaries.phusionpassenger.com/apt/passenger xenial main"
-      - "deb http://ppa.launchpad.net/juju/stable/ubuntu xenial main"
+      - "deb http://ppa.launchpad.net/juju/stable/ubuntu precise main"
   install_keys:
     description: |
       list of signing keys for install_sources package sources, per

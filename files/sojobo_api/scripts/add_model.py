@@ -114,14 +114,15 @@ async def create_model(c_name, m_name, usr, pwd, url):
         controller = Controller()
         jujudata = JujuData()
         controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
-        await controller.connect(controller_endpoint, usr, pwd)
-        await controller.add_model(m_name)
 
         client = MongoClient(url)
         db = client.sojobo
         s_users = get_superusers(c_name, db)
         userkeys = get_ssh_keys(usr, db)
         adminkeys = get_ssh_keys('admin', db)
+
+        await controller.connect(controller_endpoint, usr, pwd)
+        await controller.add_model(m_name)
 
         logger.info('Setting up Modelconnection for model: %s', m_name)
         models = await controller.get_models()
@@ -150,11 +151,16 @@ async def create_model(c_name, m_name, usr, pwd, url):
         await model.disconnect()
         await controller.disconnect()
     except Exception as e:
+        models = await controller.get_models()
+        list_models = [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
-        set_model_state(c_name, m_name, 'ERROR: {}'.format(e), db)
+        if m_name in list_models:
+            set_model_state(c_name, m_name, 'ready', db)
+        else:
+            set_model_state(c_name, m_name, 'ERROR: {}'.format(e), db)
 
 
 if __name__ == '__main__':

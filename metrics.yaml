@@ -7,3 +7,4 @@ metrics:
     type: gauge
     description: count machine memory
     command: scripts/machine_memory_count.py
+  juju-units: {}
