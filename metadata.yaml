@@ -11,6 +11,6 @@ provides:
   reverseproxy:
     interface: http
 requires:
-  mongodb:
-    interface: mongodb
+  redis:
+    interface: redis
 series: [ 'xenial' ]

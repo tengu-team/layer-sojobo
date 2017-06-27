@@ -21,7 +21,7 @@ import tempfile
 import zipfile
 from requests.auth import HTTPBasicAuth
 from flask import send_file, request, Blueprint
-from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
+from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task, Model_Connection
 from sojobo_api import settings
 from datetime import datetime
@@ -72,9 +72,9 @@ def create_controller():
                 models = execute_task(juju.get_models_info, con)
                 print(models)
                 for model in models:
-                    mongo.add_model_to_controller(controller, model)
-                    mongo.set_model_state(controller, model, 'ready')
-                    mongo.set_model_access(controller, model, token.username, 'admin')
+                    datastore.add_model_to_controller(controller, model)
+                    datastore.set_model_state(controller, model, 'ready')
+                    datastore.set_model_access(controller, model, token.username, 'admin')
                 code, response = 200, execute_task(juju.get_controller_info, con)
         else:
             code, response = errors.unauthorized()
@@ -116,17 +116,17 @@ def create_model(controller):
     try:
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         model = juju.check_input(data['model'])
-        state = mongo.check_model_state(controller, model)
+        state = datastore.check_model_state(controller, model)
         if con.c_access == 'add-model' or con.c_access == 'superuser':
             if state != "error":
                 code, response = errors.already_exists('model')
             else:
         # Due to errors in libjuju only admins can add models
-                mongo.add_model_to_controller(controller, model)
-                mongo.set_model_access(controller, model, token.username, 'accepted')
+                datastore.add_model_to_controller(controller, model)
+                datastore.set_model_access(controller, model, token.username, 'accepted')
                 execute_task(con.disconnect)
                 subprocess.Popen(["python3", "{}/scripts/add_model.py".format(juju.get_api_dir()), settings.JUJU_ADMIN_USER,
-                                  settings.JUJU_ADMIN_PASSWORD, juju.get_api_dir(), settings.MONGO_URI, controller, model])
+                                  settings.JUJU_ADMIN_PASSWORD, juju.get_api_dir(), settings.REDIS_HOST, settings.REDIS_PORT, controller, model])
                 code, response = 202, "Model is being deployed"
         else:
             code, response = errors.unauthorized()
@@ -151,8 +151,8 @@ def get_model_info(controller, model):
     try:
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                   juju.check_input(controller))
-        state = mongo.check_model_state(controller, model)
-        mod_access = mongo.get_model_access(controller, model, token.username)
+        state = datastore.check_model_state(controller, model)
+        mod_access = datastore.get_model_access(controller, model, token.username)
         if mod_access in ['admin', 'read', 'write']:
             if state == 'error' and con.c_access == 'superuser':
                 code, response = errors.does_not_exist('model')

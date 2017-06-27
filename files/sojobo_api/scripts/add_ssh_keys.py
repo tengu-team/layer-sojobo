@@ -20,7 +20,7 @@ import sys
 import traceback
 import logging
 
-from pymongo import MongoClient
+import redis
 from juju.client.connection import JujuData
 from juju.model import Model
 from juju.controller import Controller
@@ -35,17 +35,17 @@ def execute_task(command, *args):
     return result
 
 ################################################################################
-# Mongo Functions
+# Datastore Functions
 ################################################################################
-def get_controller_access(controller_name, username, mongo):
-    result = mongo.users.find_one({'name': unquote(username)})
+def get_controller_access(c_name, user, connection):
+    result = connection.get(user)
     for acc in result['access']:
-        if list(acc.keys())[0] == controller_name:
-            return acc[controller_name]['access']
+        if list(acc.keys())[0] == c_name:
+            return acc[c_name]['access']
 
 
-def get_model_access(controller, model, user, mongo):
-    result = mongo.users.find_one({'name': unquote(user)})
+def get_model_access(controller, model, user, connection):
+    result = connection.get(user)
     for acc in result['access']:
         if list(acc.keys())[0] == controller:
             models = acc[controller]['models']
@@ -55,34 +55,29 @@ def get_model_access(controller, model, user, mongo):
     return None
 
 
-def get_ssh_keys(usr, mongo):
-    result = mongo.users.find_one({'name': unquote(usr)})
-    return result['ssh_keys']
+def get_ssh_keys(user, connection):
+    data = connection.get(user)
+    return data['ssh_keys']
 
 
-def write_ssh_key(usr, ssh_key, mongo):
-    new_ssh = []
-    for key in get_ssh_keys(usr, mongo):
-        if not key is None:
-            new_ssh.append(key)
-    new_ssh.append(ssh_key)
-    mongo.users.update_one(
-        {'name' : usr},
-        {'$set': {'ssh_keys' : new_ssh}}
-        )
+def write_ssh_key(user, ssh_key, connection):
+    result = connection.get(user)
+    keys = data['ssh_keys']
+    keys.append(ssh_key)
+    data['ssh_keys'] = keys
+    con.set(user, data)
 
 ################################################################################
 # Async Functions
 ################################################################################
-async def add_ssh_keys(c_name, usrname, pwd, ssh_key, url, user):
+async def add_ssh_keys(c_name, usrname, pwd, ssh_key, url, port, user):
     try:
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller = Controller()
         jujudata = JujuData()
         controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
         await controller.connect(controller_endpoint, usrname, pwd)
-        client = MongoClient(url)
-        db = client.sojobo
+        db = redis.StrictRedis(host=url, port=port, db=11)
         if not ssh_key in get_ssh_keys(user, db):
             write_ssh_key(user, ssh_key, db)
         acl_lvl = get_controller_access(c_name, user, db)
@@ -122,11 +117,10 @@ async def add_ssh_keys(c_name, usrname, pwd, ssh_key, url, user):
 
 
 if __name__ == '__main__':
-    username, password, api_dir, controller_name, ssh_key, mongo_url, user = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7]
-    logger = logging.getLogger('add_ssh_keys')
+username, password, api_dir, controller_name, ssh_key, url, port, user= sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]    logger = logging.getLogger('add_ssh_keys')
     hdlr = logging.FileHandler('{}/log/add_ssh_keys.log'.format(api_dir))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
-    execute_task(add_ssh_keys, controller_name, username, password, ssh_key, mongo_url, user)
+    execute_task(add_ssh_keys, controller_name, username, password, ssh_key, url, port, user)

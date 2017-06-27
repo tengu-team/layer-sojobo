@@ -25,7 +25,7 @@ import asyncio
 from bson.json_util import dumps
 import yaml
 from flask import abort, Response
-from sojobo_api.api import w_errors as errors, w_mongo as mongo
+from sojobo_api.api import w_errors as errors, w_datastore as datastore
 from sojobo_api import settings
 from juju.model import Model
 from juju.controller import Controller
@@ -249,10 +249,10 @@ async def authorize(auth, controller=None, modelname=None, acl_lvls=None):
     if controller is None:
         return token.is_admin
     elif modelname is None:
-        c_access = mongo.get_controller_access(controller, token.username)
+        c_access = datastore.get_controller_access(controller, token.username)
         return c_access in acl_lvls
     else:
-        m_access = mongo.get_models_access(controller, modelname, token.username)
+        m_access = datastore.get_models_access(controller, modelname, token.username)
         return m_access in acl_lvls
 ###############################################################################
 # CONTROLLER FUNCTIONS
@@ -276,9 +276,9 @@ async def create_controller(c_type, name, region, credentials):
     get_controller_types()[c_type].create_controller(name, region, credentials)
     pswd = settings.JUJU_ADMIN_PASSWORD
     check_output(['juju', 'change-user-password', 'admin', '-c', name], input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
-    mongo.create_controller(name, c_type)
-    mongo.create_user('admin')
-    mongo.add_user_to_controller(name, 'admin', 'superuser')
+    datastore.create_controller(name, c_type)
+    datastore.create_user('admin')
+    datastore.add_user_to_controller(name, 'admin', 'superuser')
     controller = Controller_Connection()
     return controller
 
@@ -289,10 +289,10 @@ async def delete_controller(con):
     check_output(['juju', 'login', settings.JUJU_ADMIN_USER, '-c', con.c_name], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
     check_call(['juju', 'destroy-controller', '-y', con.c_name, '--destroy-all-models'])
     check_call(['juju', 'remove-credential', con.c_type, con.c_name])
-    mongo.destroy_controller(con.c_name)
+    datastore.destroy_controller(con.c_name)
 
 async def get_all_controllers():
-    return mongo.get_all_controllers()
+    return datastore.get_all_controllers()
 
 
 async def controller_exists(c_name):
@@ -300,7 +300,7 @@ async def controller_exists(c_name):
 
 
 async def get_controller_access(con, username):
-    return mongo.get_controller_access(con.c_name, username)
+    return datastore.get_controller_access(con.c_name, username)
 
 
 async def get_controllers_info():
@@ -322,10 +322,10 @@ async def get_controller_info(controller):
 
 async def get_controller_superusers(controller):
     try:
-        users = mongo.get_controller_users(controller)
+        users = datastore.get_controller_users(controller)
         result = []
         for user in users:
-            if mongo.get_controller_access(controller, user['name']) == 'superuser':
+            if datastore.get_controller_access(controller, user['name']) == 'superuser':
                 result.append(user['name'])
         return result
     except json.decoder.JSONDecodeError as e:
@@ -366,7 +366,7 @@ async def get_model_uuid(controller, model):
 
 async def get_model_access(model, controller, username):
     try:
-        return mongo.get_model_access(controller, model, username)
+        return datastore.get_model_access(controller, model, username)
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
@@ -385,7 +385,7 @@ async def get_model_info(token, controller, model):
         gui = await get_gui_url(controller, model)
         result = {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
                   'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
-                  'status': mongo.check_model_state(controller.c_name, model.m_name)}
+                  'status': datastore.check_model_state(controller.c_name, model.m_name)}
     else:
         result = None
     return result
@@ -459,14 +459,14 @@ async def get_gui_url(controller, model):
 async def create_model(token, controller, modelname, ssh_key=None):
     con_con = controller.c_connection
     await con_con.add_model(modelname)
-    mongo.set_model_access(controller.c_name, modelname, token.username, 'admin')
+    datastore.set_model_access(controller.c_name, modelname, token.username, 'admin')
     model = Model_Connection()
     cont = await get_controller_superusers(controller.c_name)
     await model.set_model(token, controller, modelname)
     for user in cont:
         if not user == token.username:
             await model_grant(model, user, 'admin')
-            mongo.set_model_access(controller.c_name, modelname, user, 'admin')
+            datastore.set_model_access(controller.c_name, modelname, user, 'admin')
     if ssh_key is not None:
         await add_ssh_key(token, model, ssh_key)
     return model
@@ -475,7 +475,7 @@ async def create_model(token, controller, modelname, ssh_key=None):
 async def delete_model(controller, model):
     try:
         controller_con = controller.c_connection
-        mongo.delete_model(controller.c_name, model.m_name)
+        datastore.delete_model(controller.c_name, model.m_name)
         await controller_con.destroy_models(model.m_uuid)
     except NotImplementedError:
         output_pass(['juju', 'destroy-model', '-y', '{}:{}'.format(controller.c_name, model.m_name)])
@@ -778,7 +778,7 @@ async def create_user(con, username, password):
     try:
         await con.c_connection.add_user(username)
         await change_user_password(con, username, password)
-        mongo.add_user_to_controller(con.c_name, username, 'login')
+        datastore.add_user_to_controller(con.c_name, username, 'login')
     except NotImplementedError:
         for controller in list(await get_all_controllers()):
             output_pass(['juju', 'add-user', username], controller)
@@ -789,13 +789,13 @@ async def create_user(con, username, password):
 
 async def delete_user(controller, username):
     con = controller.c_connection
-    mongo.remove_user_from_controller(controller.c_name, username)
+    datastore.remove_user_from_controller(controller.c_name, username)
     await con.disable_user(username)
 
 
 async def enable_user(controller, username):
     con = controller.c_connection
-    mongo.add_user_to_controller(controller.c_name, username, 'login')
+    datastore.add_user_to_controller(controller.c_name, username, 'login')
     await con.enable_user(username)
 
 
@@ -810,19 +810,15 @@ async def change_user_password(controller, username, password):
 
 
 async def get_users_controller(controller):
-    cont_info = mongo.get_controller(controller)
-    users = cont_info['users']
-    result = []
-    for user_id in users:
-        user = mongo.get_user_by_id(user_id)
-        result.append(user['name'])
-    return result
+    cont_info = datastore.get_controller(controller)
+    return cont_info['users']
+
 
 
 async def get_users_model(token, model, controller):
     try:
         if model.m_access == 'admin' or model.m_access == 'write':
-            users = mongo.get_users_model(controller.c_name, model.m_name)
+            users = datastore.get_users_model(controller.c_name, model.m_name)
         elif model.m_access == 'read':
             users = [{'name': token.username, 'access': model.m_access}]
         else:
@@ -859,7 +855,7 @@ async def user_exists(username):
 #libjuju: geen andere methode om users op te vragen atm
 async def get_all_users():
     try:
-        return mongo.get_all_users()
+        return datastore.get_all_users()
     except json.decoder.JSONDecodeError as e:
         error = errors.cmd_error(e)
         abort(error[0], error[1])
@@ -875,7 +871,7 @@ async def get_users_info():
 
 
 async def get_user_info(username):
-    u_info = json.loads(dumps(mongo.get_user(username)))
+    u_info = datastore.get_user(username)
     for conts in u_info['access']:
         con = list(conts.keys())[0]
         c_type = await get_controller_type(con)
@@ -897,7 +893,7 @@ async def get_ucontroller_access(controller, username):
 
 
 async def get_models_access(controller, name):
-    return json.loads(dumps(mongo.get_models_access(controller.c_name, name)))
+    return datastore.get_models_access(controller.c_name, name)
 #########################
 # extra Acces checks
 #########################

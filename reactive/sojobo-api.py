@@ -61,49 +61,49 @@ def configure_webapp():
     open_port(80)
     restart_api()
     set_state('api.configured')
-    status_set('blocked', 'Waiting for a connection with MongoDB')
+    status_set('blocked', 'Waiting for a connection with Redis')
 
 
 @when('config.changed', 'api.running')
 def config_changed():
     configure_webapp()
-    status_set('active', 'The Sojobo-api is running, initial admin-password: {} and MongoDB password: {}'.format(get_password(), get_mongo_pwd()))
+    status_set('active', 'The Sojobo-api is running, initial admin-password: {}'.format(get_password()))
 
 
 # Handeling changed configs
-@when('api.configured', 'mongodb.available')
+@when('api.configured', 'redis.available')
 @when_not('api.running')
-def connect_to_mongo(mongodb):
-    from pymongo import MongoClient
-    uri = list(mongodb.connection())[-1]['uri']
-    client = MongoClient(uri)
-    db = client.sojobo
-    user = {'name' : 'admin',
-            'access': [],
-            'ssh_keys': [],
-            'active': True}
-    db.users.insert_one(user)
-    generate_mongo_pwd()
-    db.add_user('sojobo', get_mongo_pwd(), roles=[{'role': 'dbOwner', 'db': 'sojobo'}])
-    sojobo_uri = 'mongodb://{}:{}@{}:{}/sojobo'.format('sojobo', get_mongo_pwd(), list(mongodb.connection())[-1]['host'],
-                                                       list(mongodb.connection())[-1]['port'])
+def connect_to_redis(redis):
+    redis_db = redis.redis_data()
+    # client = MongoClient(uri)
+    # db = client.sojobo
+    # user = {'name' : 'admin',
+    #         'access': [],
+    #         'ssh_keys': [],
+    #         'active': True}
+    # db.users.insert_one(user)
+    # generate_mongo_pwd()
+    # db.add_user('sojobo', get_mongo_pwd(), roles=[{'role': 'dbOwner', 'db': 'sojobo'}])
+    # sojobo_uri = 'mongodb://{}:{}@{}:{}/sojobo'.format('sojobo', get_mongo_pwd(), list(mongodb.connection())[-1]['host'],
+    #                                                    list(mongodb.connection())[-1]['port'])
     render('settings.py', '{}/settings.py'.format(API_DIR), {'JUJU_ADMIN_USER': 'admin',
                                                              'JUJU_ADMIN_PASSWORD': get_password(),
                                                              'SOJOBO_API_DIR': API_DIR,
                                                              'LOCAL_CHARM_DIR': config()['charm-dir'],
                                                              'SOJOBO_IP': 'http://{}'.format(HOST),
                                                              'SOJOBO_USER': USER,
-                                                             'MONGO_URI': sojobo_uri})
+                                                             'REDIS_HOST': redis_db['host'],
+                                                             'REDIS_PORT': redis_db['port']})
     set_state('api.running')
     service_restart('nginx')
-    status_set('active', 'The Sojobo-api is running, initial admin-password: {} and MongoDB password: {}'.format(get_password(), get_mongo_pwd()))
+    status_set('active', 'The Sojobo-api is running, initial admin-password: {}'.format(get_password()))
 
 
 @when('api.running')
-@when_not('mongodb.available')
-def mongo_db_removed():
+@when_not('redis.available')
+def redis_db_removed():
     remove_state('api.running')
-    status_set('blocked', 'Waiting for a connection with MongoDB')
+    status_set('blocked', 'Waiting for a connection with redis')
 
 
 @when('sojobo.available')
@@ -158,20 +158,20 @@ def get_password():
         return key.readline()
 
 
-def generate_mongo_pwd():
-    pwd = str(binascii.b2a_hex(os.urandom(16)).decode('utf-8'))
-    with open("{}/mongo_cred".format(API_DIR), "w+") as key:
-        key.write(pwd)
-
-
-def get_mongo_pwd():
-    with open("{}/mongo_cred".format(API_DIR), "r") as key:
-        return key.readline()
+# def generate_mongo_pwd():
+#     pwd = str(binascii.b2a_hex(os.urandom(16)).decode('utf-8'))
+#     with open("{}/mongo_cred".format(API_DIR), "w+") as key:
+#         key.write(pwd)
+#
+#
+# def get_mongo_pwd():
+#     with open("{}/mongo_cred".format(API_DIR), "r") as key:
+#         return key.readline()
 
 
 def install_api():
     # Install pip pkgs
-    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'Flask-PyMongo', 'pymongo']:
+    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'redis']:
         pip_install(pkg)
     subprocess.check_call(['pip', 'install', 'juju==0.3.0'])
     mergecopytree('files/sojobo_api', API_DIR)

@@ -21,7 +21,7 @@ import subprocess
 from flask import request, Blueprint
 
 from sojobo_api import settings
-from sojobo_api.api import w_errors as errors, w_juju as juju, w_mongo as mongo
+from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task, Controller_Connection
 
 USERS = Blueprint('users', __name__)
@@ -33,7 +33,7 @@ def get():
 def get_users_info():
     #try:
     token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-    u_info = mongo.get_user(token.username)
+    u_info = datastore.get_user(token.username)
     access_list = []
     if token.is_admin:
         code, response = 200, execute_task(juju.get_users_info)
@@ -41,7 +41,7 @@ def get_users_info():
         for controller in u_info['access']:
             c_name = list(controller.keys())[0]
             if u_info[c_name]['access'] == 'superuser':
-                c_users = mongo.get_controller_users(controller)
+                c_users = datastore.get_controller_users(controller)
                 for usr in c_users:
                     access_list.append(execute_task(get_user_info, usr['name']))
         if access_list:
@@ -72,7 +72,7 @@ def reactivate_user():
                     execute_task(controller.set_controller, token, con)
                     execute_task(juju.enable_user, controller, user)
                     execute_task(controller.disconnect)
-                mongo.enable_user(user)
+                datastore.enable_user(user)
                 code, response = 200, 'User {} succesfully activated'.format(user)
         else:
             code, response = errors.unauthorized()
@@ -90,7 +90,7 @@ def create_user():
             if execute_task(juju.user_exists, user):
                 code, response = errors.already_exists('user')
             else:
-                mongo.create_user(user)
+                datastore.create_user(user)
                 controllers = execute_task(juju.get_all_controllers)
                 for con in controllers:
                     controller = Controller_Connection()
@@ -161,7 +161,7 @@ def delete_user(user):
                         execute_task(juju.delete_user, controller, usr)
                         execute_task(controller.disconnect)
                     code, response = 200, 'User {} succesfully removed'.format(usr)
-                    mongo.disable_user(usr)
+                    datastore.disable_user(usr)
                 else:
                     code, response = 403, 'This would remove the admin from the system!'
             else:
@@ -178,8 +178,7 @@ def get_ssh_keys(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         if token.is_admin or token.username == user:
-            print(mongo.get_ssh_keys(user))
-            code, response = 200, mongo.get_ssh_keys(user)
+            code, response = 200, datastore.get_ssh_keys(user)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -190,12 +189,12 @@ def add_ssh_key(user):
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        cons = mongo.get_all_controllers()
+        cons = datastore.get_all_controllers()
         usr = juju.check_input(user)
         for con in cons:
-            if mongo.get_controller_access(con, token.username) == 'superuser':
+            if datastore.get_controller_access(con, token.username) == 'superuser':
                 subprocess.Popen(["python3", "{}/scripts/add_ssh_keys.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.MONGO_URI, usr])
+                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.REDIS_HOST, settings.REDIS_PORT, usr])
         code, response = 202, 'Process being handeled'
     except KeyError:
         code, response = errors.invalid_data()
@@ -207,12 +206,12 @@ def delete_ssh_key(user):
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        cons = mongo.get_all_controllers()
+        cons = datastore.get_all_controllers()
         usr = juju.check_input(user)
         for con in cons:
-            if mongo.get_controller_access(con, token.username) == 'superuser':
+            if datastore.get_controller_access(con, token.username) == 'superuser':
                 subprocess.Popen(["python3", "{}/scripts/remove_ssh_keys.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.MONGO_URI, usr])
+                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.REDIS_HOST, settings.REDIS_PORT, usr])
         code, response = 202, 'Process being handeled'
     except KeyError:
         code, response = errors.invalid_data()
@@ -267,7 +266,7 @@ def grant_to_controller(user, controller):
             else:
                 execute_task(con.disconnect)
                 subprocess.Popen(["python3", "{}/scripts/set_user_access.py".format(juju.get_api_dir()), token.username,
-                              token.password, juju.get_api_dir(),settings.MONGO_URI, usr, access, controller])
+                              token.password, juju.get_api_dir(),settings.REDIS_HOST, settings.REDIS_PORT, usr, access, controller])
                 code, response = 202, 'Process being handeled'
         else:
             code, response = errors.does_not_exist('user')
@@ -284,8 +283,8 @@ def revoke_from_controller(user, controller):
         if execute_task(juju.user_exists, usr):
             if con.c_access == 'superuser' and user != 'admin':
                 execute_task(juju.controller_revoke, con, usr)
-                mongo.set_controller_access(con.c_name, usr, 'login')
-                mongo.remove_models_access(con.c_name, usr)
+                datastore.set_controller_access(con.c_name, usr, 'login')
+                datastore.remove_models_access(con.c_name, usr)
                 code, response = 200, execute_task(juju.get_controller_access, con, usr)
             else:
                 code, response = errors.unauthorized()
@@ -342,13 +341,13 @@ def grant_to_model(user, controller, model):
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         access = juju.check_access(request.json['access'])
         usr = juju.check_input(user)
-        mod_access = mongo.get_model_access(controller, model, usr)
-        con_access = mongo.get_controller_access(controller, usr)
+        mod_access = datastore.get_model_access(controller, model, usr)
+        con_access = datastore.get_controller_access(controller, usr)
         u_exists = execute_task(juju.user_exists, user)
         if u_exists:
             if (mod_access == 'admin' or con_access == 'superuser') and user != 'admin':
                 subprocess.Popen(["python3", "{}/scripts/set_model_access.py".format(juju.get_api_dir()), token.username,
-                              token.password, juju.get_api_dir(),settings.MONGO_URI, usr, access, controller, model])
+                              token.password, juju.get_api_dir(),settings.REDIS_HOST, settings.REDIS_PORT, usr, access, controller, model])
                 code, response = 202, 'Process being handeled'
             else:
                 code, response =  errors.unauthorized()
@@ -368,7 +367,7 @@ def revoke_from_model(user, controller, model):
         if execute_task(juju.user_exists, usr):
             if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
                 execute_task(juju.model_revoke, mod, usr)
-                mongo.remove_model(con.c_name, mod.m_name, usr)
+                datastore.remove_model(con.c_name, mod.m_name, usr)
                 code, response = 200, 'Revoked access for user {} on model {}'.format(usr, model)
             else:
                 code, response = errors.unauthorized()
