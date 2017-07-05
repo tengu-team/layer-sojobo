@@ -217,6 +217,51 @@ def delete_ssh_key(user):
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
+
+@USERS.route('/<user>/credentials', methods=['GET'])
+def get_credentials(user):
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        if token.is_admin or token.username == user:
+            code, response = 200, datastore.get_credentials(user)
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
+@USERS.route('/<user>/credentials', methods=['POST'])
+def add_credentials(user):
+    data = request.json
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        cons = datastore.get_all_controllers()
+        usr = juju.check_input(user)
+        for con in cons:
+            if datastore.get_controller_access(con, token.username) == 'superuser':
+                subprocess.Popen(["python3", "{}/scripts/add_credentials.py".format(juju.get_api_dir()), token.username,
+                                  token.password, juju.get_api_dir(), con, data['credential'], settings.REDIS_HOST, settings.REDIS_PORT, usr])
+        code, response = 202, 'Process being handeled'
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
+@USERS.route('/<user>/crecentials', methods=['DELETE'])
+def delete_credentials(user):
+    data = request.json
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        cons = datastore.get_all_controllers()
+        usr = juju.check_input(user)
+        for con in cons:
+            if datastore.get_controller_access(con, token.username) == 'superuser':
+                subprocess.Popen(["python3", "{}/scripts/remove_credentials.py".format(juju.get_api_dir()), token.username,
+                                  token.password, juju.get_api_dir(), con, data['credential'], settings.REDIS_HOST, settings.REDIS_PORT, usr])
+        code, response = 202, 'Process being handeled'
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
 @USERS.route('/<user>/controllers', methods=['GET'])
 def get_controllers_access(user):
     try:

@@ -20,7 +20,7 @@ import sys
 import traceback
 import logging
 
-from pymongo import MongoClient
+import redis
 from juju.client.connection import JujuData
 from juju.model import Model
 from juju.controller import Controller
@@ -35,14 +35,13 @@ def execute_task(command, *args):
     return result
 
 ################################################################################
-# Mongo Functions
+# Redis Functions
 ################################################################################
-def set_db_access(url, c_name, user, acl, modellist):
+def set_db_access(url, port, c_name, user, acl, modellist):
     try:
-        logger.info('Setting up Mongo-db connection ')
-        client = MongoClient(url)
-        db = client.sojobo
-        result = db.users.find_one({'name': unquote(user)})
+        logger.info('Setting up Redis connection ')
+        db = redis.StrictRedis(host=url, port=port, db=11)
+        result = db.get(user)
         new_access = []
         if acl == 'superuser':
             logger.info('Changing to Superuser Access for controller: %s', c_name)
@@ -63,10 +62,8 @@ def set_db_access(url, c_name, user, acl, modellist):
                 if list(acc.keys())[0] == c_name:
                     acc[c_name]['access'] = acl
                 new_access.append(acc)
-        db.users.update_one(
-            {'name' : user},
-            {'$set': {'access' : new_access}}
-            )
+        result['access'] = new_access
+        db.set(user, result)
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -74,15 +71,14 @@ def set_db_access(url, c_name, user, acl, modellist):
             logger.error(l)
 
 
-def get_ssh_keys(usr, url):
-    client = MongoClient(url)
-    db = client.sojobo
-    result = db.users.find_one({'name': unquote(username)})
-    return result['ssh_keys']
+def get_ssh_keys(usr, url, port):
+    db = redis.StrictRedis(host=url, port=port, db=11)
+    data = db.get(user)
+    return data['ssh_keys']
 ################################################################################
 # Async Functions
 ################################################################################
-async def set_user_acc(c_name, access, user, username, password, url):
+async def set_user_acc(c_name, access, user, username, password, url, port):
     try:
         logger.info('Setting up Controllerconnection for model: %s', c_name)
         controller = Controller()
@@ -97,7 +93,7 @@ async def set_user_acc(c_name, access, user, username, password, url):
         await controller.grant(user, acl=access)
         logger.info('Controller access set for  %s ', c_name)
         model_list = []
-        ssh_keys = get_ssh_keys(user, url)
+        ssh_keys = get_ssh_keys(user, url, port)
         if access == 'superuser':
             models = await controller.get_models()
             model_list = [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
@@ -120,7 +116,7 @@ async def set_user_acc(c_name, access, user, username, password, url):
                     logger.info('Successfully disconnected %s', model_name)
                 else:
                     logger.error('Model_Uuid could not be found. Can not connect to Model : %s', model_name)
-        set_db_access(url, c_name, user, access, model_list)
+        set_db_access(url, port, c_name, user, access, model_list)
         await controller.disconnect()
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -130,11 +126,11 @@ async def set_user_acc(c_name, access, user, username, password, url):
 
 
 if __name__ == '__main__':
-    username, password, api_dir, mongo_url, user, access, controller_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7]
+    username, password, api_dir, url, port, user, access, controller_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]
     logger = logging.getLogger('set_user_access')
     hdlr = logging.FileHandler('{}/log/set_user_access.log'.format(api_dir))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
-    execute_task(set_user_acc, controller_name, access, user, username, password, mongo_url)
+    execute_task(set_user_acc, controller_name, access, user, username, password, url, port)

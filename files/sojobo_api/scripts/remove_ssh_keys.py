@@ -13,9 +13,8 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401,C0302, R0914
+# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
-from urllib.parse import unquote
 import sys
 import traceback
 import logging
@@ -66,7 +65,7 @@ def remove_ssh_key(user, ssh_key, connection):
     if ssh_key in keys:
         keys.remove(ssh_key)
     data['ssh_keys'] = keys
-    con.set(user, data)
+    connection.set(user, data)
 ################################################################################
 # Async Functions
 ################################################################################
@@ -118,7 +117,7 @@ async def remove_ssh_keys(c_name, usrname, pwd, ssh_key, url, port, user):
 
 
 if __name__ == '__main__':
-    username, password, api_dir, controller_name, ssh_key, url, port, user= sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]
+    username, password, api_dir, controller_name, ssh_key, url, port, user = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]
     logger = logging.getLogger('remove_ssh_keys')
     hdlr = logging.FileHandler('{}/log/remove_ssh_keys.log'.format(api_dir))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')

@@ -23,6 +23,7 @@ def create_user(user_name, ssh_key=None):
         user = {'name' : user_name,
                 'access': [],
                 'ssh_keys': [ssh_key],
+                'credentials': [],
                 'active': True}
         con = connect_to_users()
         con.set(user_name, user)
@@ -67,6 +68,28 @@ def get_ssh_keys(user):
     data = con.get(user)
     return data['ssh_keys']
 
+def add_credential(user, cred):
+    con = connect_to_users()
+    data = con.get(user)
+    creds = data['credentials']
+    creds.append(cred)
+    data['credentials'] = creds
+    con.set(user, data)
+
+def remove_credential(user, cred):
+    con = connect_to_users()
+    data = con.get(user)
+    creds = data['credentials']
+    if cred in creds:
+        creds.remove(cred)
+    data['credentials'] = creds
+    con.set(user, data)
+
+
+def get_credentials(user):
+    con = connect_to_users()
+    data = con.get(user)
+    return data['credentials']
 
 def get_all_users():
     con = connect_to_users()

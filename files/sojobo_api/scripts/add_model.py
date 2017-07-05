@@ -20,7 +20,7 @@ import sys
 import traceback
 import logging
 
-from pymongo import MongoClient
+import redis
 from juju.client.connection import JujuData
 from juju.model import Model
 from juju.controller import Controller

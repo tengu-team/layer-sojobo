@@ -61,22 +61,22 @@ def get_ssh_keys(user, connection):
 
 
 def write_ssh_key(user, ssh_key, connection):
-    result = connection.get(user)
+    data = connection.get(user)
     keys = data['ssh_keys']
     keys.append(ssh_key)
     data['ssh_keys'] = keys
-    con.set(user, data)
+    connection.set(user, data)
 
 ################################################################################
 # Async Functions
 ################################################################################
-async def add_ssh_keys(c_name, usrname, pwd, ssh_key, url, port, user):
+async def add_ssh_keys(c_name, username, pwd, ssh_key, url, port, user):
     try:
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller = Controller()
         jujudata = JujuData()
         controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
-        await controller.connect(controller_endpoint, usrname, pwd)
+        await controller.connect(controller_endpoint, username, pwd)
         db = redis.StrictRedis(host=url, port=port, db=11)
         if not ssh_key in get_ssh_keys(user, db):
             write_ssh_key(user, ssh_key, db)
@@ -117,7 +117,8 @@ async def add_ssh_keys(c_name, usrname, pwd, ssh_key, url, port, user):
 
 
 if __name__ == '__main__':
-username, password, api_dir, controller_name, ssh_key, url, port, user= sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]    logger = logging.getLogger('add_ssh_keys')
+    username, password, api_dir, controller_name, ssh_key, url, port, user = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]
+    logger = logging.getLogger('add_ssh_keys')
     hdlr = logging.FileHandler('{}/log/add_ssh_keys.log'.format(api_dir))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)

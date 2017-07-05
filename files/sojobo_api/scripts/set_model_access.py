@@ -1,4 +1,4 @@
-# !/usr/bin/env python3
+#!/usr/bin/env python3
 # Copyright (C) 2017  Qrama
 #
 # This program is free software: you can redistribute it and/or modify
@@ -35,14 +35,13 @@ def execute_task(command, *args):
     return result
 
 ################################################################################
-# Mongo Functions
+# Redis Functions
 ################################################################################
-def set_db_access(url, c_name, m_name, user, acl):
+def set_db_access(url, port, c_name, m_name, user, acl):
     try:
         logger.info('Setting up Mongo-db connection ')
-        client = MongoClient(url)
-        db = client.sojobo
-        result = db.users.find_one({'name': unquote(user)})
+        db = redis.StrictRedis(host=url, port=port, db=11)
+        result = db.get(user)
         new_access = []
         for acc in result['access']:
             if list(acc.keys())[0] == c_name:
@@ -54,10 +53,8 @@ def set_db_access(url, c_name, m_name, user, acl):
                 models.append(new_model)
                 acc[c_name]['models'] = models
             new_access.append(acc)
-        db.users.update_one(
-            {'name' : user},
-            {'$set': {'access' : new_access}}
-            )
+        result['access'] = new_access
+        db.set(user, result)
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -65,22 +62,21 @@ def set_db_access(url, c_name, m_name, user, acl):
             logger.error(l)
 
 
-def get_ssh_keys(usr, url):
-    client = MongoClient(url)
-    db = client.sojobo
-    result = db.users.find_one({'name': unquote(username)})
-    return result['ssh_keys']
+def get_ssh_keys(usr, url, port):
+    db = redis.StrictRedis(host=url, port=port, db=11)
+    data = db.get(user)
+    return data['ssh_keys']
 ################################################################################
 # Async Functions
 ################################################################################
-async def set_model_acc(c_name, m_name, access, user, username, password, url):
+async def set_model_acc(c_name, m_name, access, user, username, password, url, port):
     try:
         logger.info('Setting up Controllerconnection for model: %s', c_name)
         controller = Controller()
         jujudata = JujuData()
         controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
         model_list = []
-        ssh_keys = get_ssh_keys(user, url)
+        ssh_keys = get_ssh_keys(user, url, port)
         await controller.connect(controller_endpoint, username, password)
         logger.info('Connected to controller %s ', c_name)
         models = await controller.get_models()
@@ -105,7 +101,7 @@ async def set_model_acc(c_name, m_name, access, user, username, password, url):
                     logger.info('Successfully disconnected %s', model_name)
                 else:
                     logger.error('Model_Uuid could not be found. Can not connect to Model : %s', model_name)
-        set_db_access(url, c_name, m_name, user, access)
+        set_db_access(url, port, c_name, m_name, user, access)
         await controller.disconnect()
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -115,11 +111,11 @@ async def set_model_acc(c_name, m_name, access, user, username, password, url):
 
 
 if __name__ == '__main__':
-    username, password, api_dir, mongo_url, user, access, controller_name, model_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]
+    username, password, api_dir, url, user, access, controller_name, model_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9]
     logger = logging.getLogger('set_model_access')
     hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(api_dir))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
-    execute_task(set_model_acc, controller_name, model_name, access, user, username, password, mongo_url)
+    execute_task(set_model_acc, controller_name, model_name, access, user, username, password, url, port)

@@ -116,18 +116,21 @@ def create_model(controller):
     try:
         token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         model = juju.check_input(data['model'])
+        credentials = juju.check_input(data['credentials'])
         state = datastore.check_model_state(controller, model)
         if con.c_access == 'add-model' or con.c_access == 'superuser':
             if state != "error":
                 code, response = errors.already_exists('model')
-            else:
+            elif credentials in datastore.get_credentials(token.username).keys():
         # Due to errors in libjuju only admins can add models
                 datastore.add_model_to_controller(controller, model)
                 datastore.set_model_access(controller, model, token.username, 'accepted')
                 execute_task(con.disconnect)
-                subprocess.Popen(["python3", "{}/scripts/add_model.py".format(juju.get_api_dir()), settings.JUJU_ADMIN_USER,
-                                  settings.JUJU_ADMIN_PASSWORD, juju.get_api_dir(), settings.REDIS_HOST, settings.REDIS_PORT, controller, model])
+                subprocess.Popen(["python3", "{}/scripts/add_model.py".format(juju.get_api_dir()), token.username,
+                                token.password, juju.get_api_dir(), settings.REDIS_HOST, settings.REDIS_PORT, controller, model, credentials])
                 code, response = 202, "Model is being deployed"
+            else:
+                code, response = 404, "Credentials {} not found!".format(credentials)
         else:
             code, response = errors.unauthorized()
     except KeyError:
