@@ -13,14 +13,15 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401,C0302, R0914
+# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
 from urllib.parse import unquote
 import sys
 import traceback
 import logging
+import json
 
-from pymongo import MongoClient
+import redis
 from juju.client.connection import JujuData
 from juju.model import Model
 from juju.controller import Controller
@@ -40,8 +41,9 @@ def execute_task(command, *args):
 def set_db_access(url, port, c_name, m_name, user, acl):
     try:
         logger.info('Setting up Mongo-db connection ')
-        db = redis.StrictRedis(host=url, port=port, db=11)
-        result = db.get(user)
+        db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
+        result_json = db.get(user)
+        result = json.loads(result_json)
         new_access = []
         for acc in result['access']:
             if list(acc.keys())[0] == c_name:
@@ -54,7 +56,8 @@ def set_db_access(url, port, c_name, m_name, user, acl):
                 acc[c_name]['models'] = models
             new_access.append(acc)
         result['access'] = new_access
-        db.set(user, result)
+        json_result = json.dumps(result)
+        db.set(user, json_result)
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -63,9 +66,9 @@ def set_db_access(url, port, c_name, m_name, user, acl):
 
 
 def get_ssh_keys(usr, url, port):
-    db = redis.StrictRedis(host=url, port=port, db=11)
+    db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
     data = db.get(user)
-    return data['ssh_keys']
+    return json.loads(data)['ssh_keys']
 ################################################################################
 # Async Functions
 ################################################################################
@@ -111,7 +114,7 @@ async def set_model_acc(c_name, m_name, access, user, username, password, url, p
 
 
 if __name__ == '__main__':
-    username, password, api_dir, url, user, access, controller_name, model_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9]
+    username, password, api_dir, url, port, user, access, controller_name, model_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9]
     logger = logging.getLogger('set_model_access')
     hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(api_dir))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')

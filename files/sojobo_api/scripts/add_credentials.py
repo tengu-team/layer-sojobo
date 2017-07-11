@@ -19,6 +19,8 @@ import sys
 import traceback
 import logging
 
+import ast
+import json
 import redis
 ################################################################################
 # Asyncio Wrapper
@@ -32,17 +34,23 @@ def execute_task(command, *args):
 ################################################################################
 # Datastore Functions
 ################################################################################
-def get_credentials(user, connection):
+def get_credential_names(user, connection):
     data = connection.get(user)
-    return data['credentials']
+    items = json.loads(data)['credentials']
+    result = []
+    for item in items:
+        result.append(item["name"])
+    return result
 
 
 def write_credentials(user, creds, connection):
-    data = connection.get(user)
+    j_data = connection.get(user)
+    data = json.loads(j_data)
     credlist = data['credentials']
     credlist.append(creds)
     data['credentials'] = credlist
-    connection.set(user, data)
+    json_data = json.dumps(data)
+    connection.set(user, json_data)
     logger.info('Succesfully added credentials for %s', username)
 
 ################################################################################
@@ -50,12 +58,13 @@ def write_credentials(user, creds, connection):
 ################################################################################
 async def add_credentials(username, credentials, url, port):
     try:
+        creds = ast.literal_eval(credentials)
         logger.info('Setting up connection with Redis')
-        db = redis.StrictRedis(host=url, port=port, db=11)
-        #checken op name en dan anders toevoegen
-        for cred in get_credentials(username, db):
-            if not credentials['tag'] == cred['tag']:
-                write_credentials(username, credentials, db)
+        db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
+        if creds['name'] in get_credential_names(username, db):
+            logger.info('Credentials %s already found for user %s!', creds['name'], username)
+        else:
+            write_credentials(username, creds, db)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

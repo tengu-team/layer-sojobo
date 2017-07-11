@@ -237,9 +237,10 @@ def add_credentials(user):
         cons = datastore.get_all_controllers()
         usr = juju.check_input(user)
         for con in cons:
-            if datastore.get_controller_access(con, token.username) == 'superuser':
-                subprocess.Popen(["python3", "{}/scripts/add_credentials.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(), con, data['credential'], settings.REDIS_HOST, settings.REDIS_PORT, usr])
+            if datastore.get_controller_access(con, token.username) == 'superuser' or token.is_admin:
+                result_cred =  execute_task(juju.generate_cred_file, data['c_type'], data['name'], data['credentials'])
+                subprocess.Popen(["python3", "{}/scripts/add_credentials.py".format(juju.get_api_dir()), usr,
+                juju.get_api_dir(), str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
         code, response = 202, 'Process being handeled'
     except KeyError:
         code, response = errors.invalid_data()
@@ -255,8 +256,9 @@ def delete_credentials(user):
         usr = juju.check_input(user)
         for con in cons:
             if datastore.get_controller_access(con, token.username) == 'superuser':
-                subprocess.Popen(["python3", "{}/scripts/remove_credentials.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(), con, data['credential'], settings.REDIS_HOST, settings.REDIS_PORT, usr])
+                result_cred =  execute_task(juju.generate_cred_file, data['c_type'], data['name'], data['credentials'])
+                subprocess.Popen(["python3", "{}/scripts/remove_credentials.py".format(juju.get_api_dir()), usr,
+                juju.get_api_dir(), str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
         code, response = 202, 'Process being handeled'
     except KeyError:
         code, response = errors.invalid_data()

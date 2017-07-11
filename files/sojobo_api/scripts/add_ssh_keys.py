@@ -13,12 +13,13 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401,C0302, R0914
+# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302,R0914
 import asyncio
 from urllib.parse import unquote
 import sys
 import traceback
 import logging
+import json
 
 import redis
 from juju.client.connection import JujuData
@@ -38,14 +39,16 @@ def execute_task(command, *args):
 # Datastore Functions
 ################################################################################
 def get_controller_access(c_name, user, connection):
-    result = connection.get(user)
+    j_result = connection.get(user)
+    result = json.loads(j_result)
     for acc in result['access']:
         if list(acc.keys())[0] == c_name:
             return acc[c_name]['access']
 
 
 def get_model_access(controller, model, user, connection):
-    result = connection.get(user)
+    j_result = connection.get(user)
+    result = json.loads(j_result)
     for acc in result['access']:
         if list(acc.keys())[0] == controller:
             models = acc[controller]['models']
@@ -56,15 +59,18 @@ def get_model_access(controller, model, user, connection):
 
 
 def get_ssh_keys(user, connection):
-    data = connection.get(user)
-    return data['ssh_keys']
+    j_result = connection.get(user)
+    result = json.loads(j_result)
+    return result['ssh_keys']
 
 
 def write_ssh_key(user, ssh_key, connection):
-    data = connection.get(user)
-    keys = data['ssh_keys']
+    j_result = connection.get(user)
+    result = json.loads(j_result)
+    keys = result['ssh_keys']
     keys.append(ssh_key)
-    data['ssh_keys'] = keys
+    result['ssh_keys'] = keys
+    data = json.dumps(result)
     connection.set(user, data)
 
 ################################################################################
@@ -77,7 +83,7 @@ async def add_ssh_keys(c_name, username, pwd, ssh_key, url, port, user):
         jujudata = JujuData()
         controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
         await controller.connect(controller_endpoint, username, pwd)
-        db = redis.StrictRedis(host=url, port=port, db=11)
+        db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
         if not ssh_key in get_ssh_keys(user, db):
             write_ssh_key(user, ssh_key, db)
         acl_lvl = get_controller_access(c_name, user, db)

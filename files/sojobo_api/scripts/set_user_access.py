@@ -19,6 +19,7 @@ from urllib.parse import unquote
 import sys
 import traceback
 import logging
+import json
 
 import redis
 from juju.client.connection import JujuData
@@ -40,8 +41,9 @@ def execute_task(command, *args):
 def set_db_access(url, port, c_name, user, acl, modellist):
     try:
         logger.info('Setting up Redis connection ')
-        db = redis.StrictRedis(host=url, port=port, db=11)
-        result = db.get(user)
+        db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
+        j_result = db.get(user)
+        result = json.loads(j_result)
         new_access = []
         if acl == 'superuser':
             logger.info('Changing to Superuser Access for controller: %s', c_name)
@@ -63,7 +65,8 @@ def set_db_access(url, port, c_name, user, acl, modellist):
                     acc[c_name]['access'] = acl
                 new_access.append(acc)
         result['access'] = new_access
-        db.set(user, result)
+        result_j = json.dumps(result)
+        db.set(user, result_j)
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -72,9 +75,10 @@ def set_db_access(url, port, c_name, user, acl, modellist):
 
 
 def get_ssh_keys(usr, url, port):
-    db = redis.StrictRedis(host=url, port=port, db=11)
+    db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
     data = db.get(user)
-    return data['ssh_keys']
+    dictdata = json.loads(data)
+    return dictdata['ssh_keys']
 ################################################################################
 # Async Functions
 ################################################################################
@@ -111,7 +115,8 @@ async def set_user_acc(c_name, access, user, username, password, url, port):
                     await model.grant(user, acl='admin')
                     logger.info('Admin Access granted for for %s:%s', controller_name, model_name)
                     for key in ssh_keys:
-                        await model.add_ssh_key(user, key)
+                        if key:
+                            await model.add_ssh_key(user, key)
                     await model.disconnect()
                     logger.info('Successfully disconnected %s', model_name)
                 else:

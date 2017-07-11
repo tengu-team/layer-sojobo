@@ -18,6 +18,7 @@ import asyncio
 import sys
 import traceback
 import logging
+import json
 
 import redis
 from juju.client.connection import JujuData
@@ -37,14 +38,16 @@ def execute_task(command, *args):
 # Datastore Functions
 ################################################################################
 def get_controller_access(c_name, user, connection):
-    result = connection.get(user)
+    j_result = connection.get(user)
+    result = json.loads(j_result)
     for acc in result['access']:
         if list(acc.keys())[0] == c_name:
             return acc[c_name]['access']
 
 
 def get_model_access(controller, model, user, connection):
-    result = connection.get(user)
+    j_result = connection.get(user)
+    result = json.loads(j_result)
     for acc in result['access']:
         if list(acc.keys())[0] == controller:
             models = acc[controller]['models']
@@ -56,22 +59,23 @@ def get_model_access(controller, model, user, connection):
 
 def get_ssh_keys(user, connection):
     data = connection.get(user)
-    return data['ssh_keys']
+    return json.loads(data)['ssh_keys']
 
 
 def remove_ssh_key(user, ssh_key, connection):
     data = connection.get(user)
-    keys = data['ssh_keys']
+    keys = json.loads(data)['ssh_keys']
     if ssh_key in keys:
         keys.remove(ssh_key)
     data['ssh_keys'] = keys
-    connection.set(user, data)
+    j_data = json.dumps(data)
+    connection.set(user, j_data)
 ################################################################################
 # Async Functions
 ################################################################################
 async def remove_ssh_keys(c_name, usrname, pwd, ssh_key, url, port, user):
     try:
-        db = redis.StrictRedis(host=url, port=port, db=11)
+        db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
 
         if ssh_key in get_ssh_keys(user, db):
             remove_ssh_key(user, ssh_key, db)

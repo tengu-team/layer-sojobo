@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401,C0302
+# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302
 from importlib import import_module
 import tempfile
 import shutil
@@ -22,7 +22,6 @@ import os
 from juju import tag
 from subprocess import check_output, STDOUT, CalledProcessError, check_call
 import asyncio
-from bson.json_util import dumps
 import yaml
 from flask import abort, Response
 from sojobo_api.api import w_errors as errors, w_datastore as datastore
@@ -282,6 +281,9 @@ async def create_controller(c_type, name, region, credentials):
     controller = Controller_Connection()
     return controller
 
+async def generate_cred_file(c_type, name, credentials):
+    return get_controller_types()[c_type].generate_cred_file(name, credentials)
+
 
 async def delete_controller(con):
     #controller = con.c_connection
@@ -383,12 +385,27 @@ async def get_model_info(token, controller, model):
         applications = await get_applications_info(model)
         machines = await get_machines_info(model)
         gui = await get_gui_url(controller, model)
+        credentials =  await get_model_creds(model)
         result = {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
                   'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
-                  'status': datastore.check_model_state(controller.c_name, model.m_name)}
+                  'status': datastore.check_model_state(controller.c_name, model.m_name), 'credentials' : credentials}
     else:
         result = None
     return result
+
+async def get_model_creds(model):
+    model_con = model.m_connection
+    info = await model_con.get_info()
+    cloud_cred = info.serialize()['cloud-credential-tag']
+    cloud_result = tag.untag('cloudcred-', cloud_cred)
+    return get_cloud_response(cloud_result)
+
+def get_cloud_response(data):
+    values = data.split('_')
+    if len(values) == 3:
+        result = {'cloud' : values[0], 'user' : values[1], 'credential-name' : values[2]}
+        return result
+    return None
 
 
 async def get_ssh_keys(model, controller):

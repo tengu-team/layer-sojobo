@@ -70,6 +70,8 @@ def create_controller():
                 con = execute_task(juju.create_controller, c_type, controller, data['region'], data['credentials'])
                 execute_task(con.set_controller, token, controller)
                 models = execute_task(juju.get_models_info, con)
+                result_cred =  execute_task(juju.generate_cred_file, c_type, 'admin', data['credentials'])
+                datastore.add_credential('admin', result_cred)
                 print(models)
                 for model in models:
                     datastore.add_model_to_controller(controller, model)
@@ -121,8 +123,7 @@ def create_model(controller):
         if con.c_access == 'add-model' or con.c_access == 'superuser':
             if state != "error":
                 code, response = errors.already_exists('model')
-            elif credentials in datastore.get_credentials(token.username).keys():
-        # Due to errors in libjuju only admins can add models
+            elif credentials in datastore.get_credential_keys(token.username):
                 datastore.add_model_to_controller(controller, model)
                 datastore.set_model_access(controller, model, token.username, 'accepted')
                 execute_task(con.disconnect)
@@ -206,7 +207,7 @@ def delete_model(controller, model):
     try:
         token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
                                        juju.check_input(controller), juju.check_input(model))
-        if mod.m_access == 'admin':
+        if mod.m_access == 'admin'or token.is_admin:
             execute_task(juju.delete_model, con, mod)
             code, response = 200, "Model {} is being deleted".format(model)
         else:
