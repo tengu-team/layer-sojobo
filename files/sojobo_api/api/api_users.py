@@ -24,7 +24,10 @@ from sojobo_api import settings
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task, Controller_Connection
 
+
 USERS = Blueprint('users', __name__)
+
+
 def get():
     return USERS
 
@@ -241,7 +244,7 @@ def add_credentials(user):
             if datastore.get_controller_access(con, token.username) == 'superuser' or token.is_admin:
                 result_cred =  execute_task(juju.generate_cred_file, data['c_type'], data['name'], data['credentials'])
                 subprocess.Popen(["python3", "{}/scripts/add_credentials.py".format(juju.get_api_dir()), usr,
-                juju.get_api_dir(), str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
+                                  juju.get_api_dir(), str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
         code, response = 202, 'Process being handeled'
     except KeyError:
         code, response = errors.invalid_data()
@@ -259,11 +262,12 @@ def delete_credentials(user):
             if datastore.get_controller_access(con, token.username) == 'superuser':
                 result_cred =  execute_task(juju.generate_cred_file, data['c_type'], data['name'], data['credentials'])
                 subprocess.Popen(["python3", "{}/scripts/remove_credentials.py".format(juju.get_api_dir()), usr,
-                juju.get_api_dir(), str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
+                                  juju.get_api_dir(), str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
         code, response = 202, 'Process being handeled'
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
+
 
 @USERS.route('/<user>/controllers', methods=['GET'])
 def get_controllers_access(user):
@@ -284,28 +288,30 @@ def get_controllers_access(user):
 
 @USERS.route('/<user>/controllers/<controller>', methods=['GET'])
 def get_ucontroller_access(user, controller):
-    # try:
-    token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
-    usr = juju.check_input(user)
-    if execute_task(juju.user_exists, usr):
-        if token.is_admin or token.username == usr:
-            code, response = 200, execute_task(juju.get_ucontroller_access, con, usr)
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        con = execute_task(juju.authorize, token, juju.check_input(controller))
+        usr = juju.check_input(user)
+        if execute_task(juju.user_exists, usr):
+            if token.is_admin or token.username == usr:
+                code, response = 200, execute_task(juju.get_ucontroller_access, con, usr)
+            else:
+                code, response = errors.unauthorized()
         else:
-            code, response = errors.unauthorized()
-    else:
-        code, response = errors.does_not_exist('user')
-    execute_task(con.disconnect)
-    # except KeyError:
-    #     code, response = errors.invalid_data()
+            code, response = errors.does_not_exist('user')
+        execute_task(con.disconnect)
+    except KeyError:
+        code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['PUT'])
 def grant_to_controller(user, controller):
     try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        con = execute_task(juju.authorize, token, juju.check_input(controller))
         access = juju.check_access(request.json['access'])
         usr = juju.check_input(user)
-        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
         u_exists = execute_task(juju.user_exists, usr)
         if u_exists:
             if execute_task(juju.check_same_access, usr, access, con):
@@ -314,7 +320,7 @@ def grant_to_controller(user, controller):
             else:
                 execute_task(con.disconnect)
                 subprocess.Popen(["python3", "{}/scripts/set_user_access.py".format(juju.get_api_dir()), token.username,
-                              token.password, juju.get_api_dir(),settings.REDIS_HOST, settings.REDIS_PORT, usr, access, controller])
+                                  token.password, juju.get_api_dir(),settings.REDIS_HOST, settings.REDIS_PORT, usr, access, controller])
                 code, response = 202, 'Process being handeled'
         else:
             code, response = errors.does_not_exist('user')
@@ -326,7 +332,8 @@ def grant_to_controller(user, controller):
 @USERS.route('/<user>/controllers/<controller>', methods=['DELETE'])
 def revoke_from_controller(user, controller):
     try:
-        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        con = execute_task(juju.authorize, token, juju.check_input(controller))
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if con.c_access == 'superuser' and user != 'admin':
@@ -347,7 +354,8 @@ def revoke_from_controller(user, controller):
 @USERS.route('/<user>/controllers/<controller>/models', methods=['GET'])
 def get_models_access(user, controller):
     try:
-        token, con = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, juju.check_input(controller))
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        con = execute_task(juju.authorize, token, juju.check_input(controller))
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
@@ -365,8 +373,8 @@ def get_models_access(user, controller):
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_access(user, controller, model):
     try:
-        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-                                       juju.check_input(controller), juju.check_input(model))
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
@@ -395,7 +403,7 @@ def grant_to_model(user, controller, model):
         if u_exists:
             if (mod_access == 'admin' or con_access == 'superuser') and user != 'admin':
                 subprocess.Popen(["python3", "{}/scripts/set_model_access.py".format(juju.get_api_dir()), token.username,
-                              token.password, juju.get_api_dir(),settings.REDIS_HOST, settings.REDIS_PORT, usr, access, controller, model])
+                                  token.password, juju.get_api_dir(),settings.REDIS_HOST, settings.REDIS_PORT, usr, access, controller, model])
                 code, response = 202, 'Process being handeled'
             else:
                 code, response =  errors.unauthorized()
@@ -409,8 +417,8 @@ def grant_to_model(user, controller, model):
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['DELETE'])
 def revoke_from_model(user, controller, model):
     try:
-        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-                                       juju.check_input(controller), juju.check_input(model))
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
