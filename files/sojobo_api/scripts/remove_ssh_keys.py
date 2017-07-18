@@ -63,12 +63,13 @@ def get_ssh_keys(user, connection):
 
 
 def remove_ssh_key(user, ssh_key, connection):
-    data = connection.get(user)
-    keys = json.loads(data)['ssh_keys']
+    j_result = connection.get(user)
+    result = json.loads(j_result)
+    keys = result['ssh_keys']
     if ssh_key in keys:
         keys.remove(ssh_key)
-    data['ssh_keys'] = keys
-    j_data = json.dumps(data)
+    result['ssh_keys'] = keys
+    j_data = json.dumps(result)
     connection.set(user, j_data)
 ################################################################################
 # Async Functions

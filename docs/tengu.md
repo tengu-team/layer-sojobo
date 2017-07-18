@@ -17,7 +17,6 @@ excluding calls handling users.
 - [/tengu/controllers/[controller]](#controller)
 - [/tengu/controllers/[controller]/models](#models)
 - [/tengu/controllers/[controller]/models/[model]](#model)
-- [/tengu/controllers/[controller]/models/[model]/sshkey](#sshkey)
 - [/tengu/controllers/[controller]/models/[model]/applications](#applications)
 - [/tengu/controllers/[controller]/models/[model]/applications/[application]](#application)
 - [/tengu/controllers/[controller]/models/[model]/applications/[application]/units](#units)
@@ -187,7 +186,8 @@ excluding calls handling users.
             "user": "admin",
             "access": "admin"
         }
-    ]
+    ],
+    "credentials":[<credential JSON>]
 }          
   ```
 #### **Request type**: POST

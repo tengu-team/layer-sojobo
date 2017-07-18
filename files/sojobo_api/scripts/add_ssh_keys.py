@@ -68,6 +68,8 @@ def write_ssh_key(user, ssh_key, connection):
     j_result = connection.get(user)
     result = json.loads(j_result)
     keys = result['ssh_keys']
+    if None in keys:
+        keys.remove(None)
     keys.append(ssh_key)
     result['ssh_keys'] = keys
     data = json.dumps(result)

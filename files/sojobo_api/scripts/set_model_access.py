@@ -40,7 +40,7 @@ def execute_task(command, *args):
 ################################################################################
 def set_db_access(url, port, c_name, m_name, user, acl):
     try:
-        logger.info('Setting up Mongo-db connection ')
+        logger.info('Setting up Redis connection ')
         db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
         result_json = db.get(user)
         result = json.loads(result_json)
@@ -96,10 +96,11 @@ async def set_model_acc(c_name, m_name, access, user, username, password, url, p
                     except Exception:
                         pass
                     await model.grant(user, acl=access)
-                    logger.info('Admin Access granted for for %s:%s', controller_name, model_name)
+                    logger.info('Admin Access granted for for %s:%s for user %s', controller_name, model_name, user)
                     if access in ['admin','write'] and ssh_keys:
                         for key in ssh_keys:
-                            await model.add_ssh_key(user, key)
+                            if key:
+                                await model.add_ssh_key(user, key)
                     await model.disconnect()
                     logger.info('Successfully disconnected %s', model_name)
                 else:

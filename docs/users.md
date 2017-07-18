@@ -7,6 +7,8 @@ The User-API provides user management over all controllers.
 ## API Calls
 - [/users](#users)
 - [/users/[user]](#user)
+- [/users/[user]/ssh](#ssh)
+- [/users/[user]/credentials](#credentials)
 - [/users/[user]/controllers](#controllers)
 - [/users/[user]/controllers/[controller]](#controller)
 - [/users/[user]/controllers/[controller]/models](#models)
@@ -25,14 +27,38 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  [{"name": "username",
-    "controllers": [{"name": "controller-name",
-                     "type": "controller-type",
-                     "access": "controller access",
-                     "models": [{"name": "model-name",
-                                 "access": "model access"}]
-                   }]
-  }]
+  {
+          "name": "admin",
+          "active": true,
+          "credentials": [
+              {
+                  "name": "admin",
+                  "type": "jsonfile",
+                  "key": {
+                      "file": "{"google_cred_file"}"
+                  }
+              }
+          ],
+          "ssh_keys": [
+              null
+          ],
+          "access": [
+              {
+                  "testcontroller": {
+                      "access": "superuser",
+                      "models": [
+                          {
+                              "controller": "admin"
+                          },
+                          {
+                              "default": "admin"
+                          }
+                      ],
+                      "type": "google"
+                  }
+              }
+          ]
+      }
   ```
 
 #### **Request type**: POST
@@ -48,14 +74,7 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  {"name": "username",
-   "controllers": [{"name": "controller-name",
-                    "type": "controller-type",
-                    "access": "controller access",
-                    "models": [{"name": "model-name",
-                                "access": "model access"}]
-                  }]
-  }
+"User <username> succesfully created."
   ```
 
 ## **/users/[user]** <a name="user"></a>
@@ -71,14 +90,38 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  {"name": "username",
-   "controllers": [{"name": "controller-name",
-                    "type": "controller-type",
-                    "access": "controller access",
-                    "models": [{"name": "model-name",
-                                "access": "model access"}]
-                  }]
-  }
+  {
+          "name": "admin",
+          "active": true,
+          "credentials": [
+              {
+                  "name": "admin",
+                  "type": "jsonfile",
+                  "key": {
+                      "file": "{"google_cred_file"}"
+                  }
+              }
+          ],
+          "ssh_keys": [
+              null
+          ],
+          "access": [
+              {
+                  "testcontroller": {
+                      "access": "superuser",
+                      "models": [
+                          {
+                              "controller": "admin"
+                          },
+                          {
+                              "default": "admin"
+                          }
+                      ],
+                      "type": "google"
+                  }
+              }
+          ]
+      }
   ```
 
 #### **Request type**: PUT
@@ -93,14 +136,7 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  {"name": "username",
-   "controllers": [{"name": "controller-name",
-                    "type": "controller-type",
-                    "access": "controller access",
-                    "models": [{"name": "model-name",
-                                "access": "model access"}]
-                  }]
-  }
+"succesfully changed password for user admin"
   ```
 
 #### **Request type**: DELETE
@@ -114,7 +150,7 @@ The User-API provides user management over all controllers.
 * **Successful response**:
   - code: 200
   - message:
-  ```json
+```json
   [{"name": "username",
     "controllers": [{"name": "controller-name",
                      "type": "controller-type",
@@ -123,7 +159,118 @@ The User-API provides user management over all controllers.
                                  "access": "model access"}]
                    }]
   }]
+```
+
+## **/users/[user]/ssh** <a name="ssh"></a>
+#### **Request type**: GET
+* **Description**:
+  Gets the SSH-keys of a user.
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+
+* **Successful response**:
+  - code: 202
+  - message:
+  ```json
+  [
+      "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDJK2Cw67ZVIUF8XpYUHDY9jzCw7yH9LP4s501pgXQgFUn8ziyovNMdAST8XutgIYi0VVTjNhj4ZuQkwdqfpXBxibNIO9VTowqG0dsgsBLrJs7MhkMk0h/QxdyaV217yD0TSJdJo8X499rPvEuLVDFZzt2SSByuYESYJAuntDaEtMutA7Y2GtbwfCrSyNGqQa4YdbEcvMGWzlzQnQ8urIEljKFk95k+oV1m1GXqhAkai/qrfRGLmGUUreUIJgO06iWdrNfa6YVDMe5jM95YoDSzINLIbjm/+BV41BuLOJxdVLCz43d0zDhbBF4TJEpQUnNCv7V2FeWh3IC/atyB0SBD sebastien@sebastien-PC"
+  ]
   ```
+
+#### **Request type**: POST
+* **Description**:
+  Adds an SSH-key for a user.
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+  - ssh-key
+* **Successful response**:
+  - code: 202
+  - message:
+  ```json
+"Process being handeled"
+  ```
+
+#### **Request type**: DELETE
+* **Description**:
+  Removes the users given SSH.
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+  - ssh-key
+* **Successful response**:
+  - code: 202
+  - message:
+  ```json
+"Process being handeled"
+  ```
+
+## **/users/[user]/credentials** <a name="credentials"></a>
+#### **Request type**: GET
+* **Description**:
+  Gets the credentials of a user.
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+
+* **Successful response**:
+  - code: 202
+  - message:
+  ```json
+  [
+      {
+          "name": "credential1",
+          "type": "jsonfile",
+          "key": {
+              "file": "{"credential_file1"}"
+          }
+      },
+      {
+          "name": "credential2",
+          "type": "jsonfile",
+          "key": {
+              "file": "{"credential_file2"}"
+          }
+      }
+  ]
+  ```
+
+#### **Request type**: POST
+* **Description**:
+  Adds an credential for a user.
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+  - credentials
+  - name
+  - c_type
+* **Successful response**:
+  - code: 202
+  - message:
+  ```json
+"Process being handeled"
+  ```
+
+  #### **Request type**: DELETE
+  * **Description**:
+    Removes the users given SSH.
+  * **Required headers**:
+    - api-key
+    - Content-Type:application/json
+  * **Required body**:
+    - ssh-key
+  * **Successful response**:
+    - code: 202
+    - message:
+    ```json
+  "Process being handeled"
+    ```
 
 ## **/users/[user]/controllers** <a name="controllers"></a>
 #### **Request type**: GET
@@ -138,12 +285,22 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  [{"name": "controller-name",
-    "type": "controller-type",
-    "access": "controller access",
-    "models": [{"name": "model-name",
-                "access": "model access"}]
-  }]
+  [
+      {
+          "controller_name": {
+              "access": "superuser",
+              "models": [
+                  {
+                      "controller": "admin"
+                  },
+                  {
+                      "default": "admin"
+                  }
+              ],
+              "type": "google"
+          }
+      }
+  ]
   ```
 
 ## **/users/[user]/controllers/[controller]** <a name="controller"></a>
@@ -159,11 +316,19 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  {"name": "controller-name",
-   "type": "controller-type",
-   "access": "controller access",
-   "models": [{"name": "model-name",
-               "access": "model access"}]
+  {
+      "controller_name": {
+          "access": "superuser",
+          "models": [
+              {
+                  "controller": "admin"
+              },
+              {
+                  "default": "admin"
+              }
+          ],
+          "type": "google"
+      }
   }
   ```
 
@@ -176,37 +341,10 @@ The User-API provides user management over all controllers.
 * **Required body**:
   - access = {login | add-model | superuser}
 * **Successful response**:
-  - code: 200
+  - code: 202
   - message:
   ```json
-  {"name": "controller-name",
-   "type": "controller-type",
-   "access": "controller access",
-   "models": [{"name": "model-name",
-               "access": "model access"}]
-  }
-  ```
-
-#### **Request type**: DELETE
-* **Description**:
-  Removes the user from the controller.
-* **Required headers**:
-  - api-key
-  - Content-Type:application/json
-* **Required body**:
-
-* **Successful response**:
-  - code: 200
-  - message:
-  ```json
-  [{"name": "username",
-    "controllers": [{"name": "controller-name",
-                     "type": "controller-type",
-                     "access": "controller access",
-                     "models": [{"name": "model-name",
-                                 "access": "model access"}]
-                   }]
-  }]
+  "Process being handeled"
   ```
 
 ## **/users/[user]/controllers/[controller]/models** <a name="models"></a>

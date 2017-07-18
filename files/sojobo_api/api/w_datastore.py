@@ -186,6 +186,7 @@ def check_model_state(c_name, m_name):
     con = get_controller(c_name)
     for mod in con['models']:
         if list(mod.keys())[0] == m_name:
+            print(mod)
             return mod[m_name]
     return 'error'
 
@@ -288,6 +289,7 @@ def remove_model(controller, model, user):
 def get_model_access(controller, model, user):
     result = get_user(user)
     for acc in result['access']:
+        print(acc)
         if list(acc.keys())[0] == controller:
             models = acc[controller]['models']
             for mod in models:

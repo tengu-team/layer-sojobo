@@ -40,10 +40,11 @@ def get_users_info():
     else:
         for controller in u_info['access']:
             c_name = list(controller.keys())[0]
-            if u_info[c_name]['access'] == 'superuser':
-                c_users = datastore.get_controller_users(controller)
+            if controller[c_name]['access'] == 'superuser':
+                c_users = datastore.get_controller_users(c_name)
                 for usr in c_users:
-                    access_list.append(execute_task(get_user_info, usr['name']))
+                    data = execute_task(juju.get_user_info, usr['name'])
+                    access_list.append(data)
         if access_list:
             response_list = []
             for ac in access_list:

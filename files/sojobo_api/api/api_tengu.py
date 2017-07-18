@@ -157,25 +157,28 @@ def get_model_info(controller, model):
                                   juju.check_input(controller))
         state = datastore.check_model_state(controller, model)
         mod_access = datastore.get_model_access(controller, model, token.username)
-        if mod_access in ['admin', 'read', 'write']:
-            if state == 'error' and con.c_access == 'superuser':
-                code, response = errors.does_not_exist('model')
-            elif state == 'ready':
-                model_con = Model_Connection()
-                execute_task(model_con.set_model, token, con, model)
-                code, response = 200, execute_task(juju.get_model_info, token, con, model_con)
-                execute_task(model_con.disconnect)
-        elif mod_access == 'accepted':
-            s_users = execute_task(juju.get_controller_superusers, controller)
-            u_list = []
-            for us in s_users:
-                u_item = {"user" : us, "access" : "admin"}
-                u_list.append(u_item)
-            if not token.username in s_users:
-                u_item = {"user" : token.username, "access" : "admin"}
-                u_list.append(u_item)
-            response = {model: {'status': state, 'users' : u_list}}
-            code = 200
+        modelex = execute_task(juju.model_exists, con, model)
+        print(state, mod_access)
+        if modelex or state != 'error':
+            if mod_access in ['admin', 'read', 'write']:
+                if state == 'ready':
+                    model_con = Model_Connection()
+                    execute_task(model_con.set_model, token, con, model)
+                    code, response = 200, execute_task(juju.get_model_info, token, con, model_con)
+                    execute_task(model_con.disconnect)
+            elif mod_access == 'accepted'or con.c_access == 'superuser':
+                s_users = execute_task(juju.get_controller_superusers, controller)
+                u_list = []
+                for us in s_users:
+                    u_item = {"user" : us, "access" : "admin"}
+                    u_list.append(u_item)
+                if not token.username in s_users:
+                    u_item = {"user" : token.username, "access" : "admin"}
+                    u_list.append(u_item)
+                response = {model: {'status': state, 'users' : u_list}}
+                code = 200
+        elif con.c_access == 'superuser' and state == 'error':
+            code, response = errors.does_not_exist('model')
         else:
             code, response = errors.unauthorized()
         execute_task(con.disconnect)
@@ -205,14 +208,25 @@ def add_bundle(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['DELETE'])
 def delete_model(controller, model):
     try:
-        token, con, mod = execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
-                                       juju.check_input(controller), juju.check_input(model))
-        if mod.m_access == 'admin'or token.is_admin:
-            execute_task(juju.delete_model, con, mod)
-            code, response = 200, "Model {} is being deleted".format(model)
+        token, con= execute_task(juju.authenticate, request.headers['api-key'], request.authorization,
+                                       juju.check_input(controller))
+        mod_ex = execute_task(juju.model_exists, con, model)
+        state = datastore.check_model_state(controller, model)
+        if mod_ex:
+            mod = Model_Connection()
+            execute_task(mod.set_model, token, con, model)
+            if mod.m_access == 'admin' or con.c_access == 'superuser':
+                execute_task(juju.delete_model, con, mod)
+                code, response = 200, "Model {} is being deleted".format(model)
+            else:
+                code, response = errors.unauthorized()
+            execute_task(mod.disconnect)
+        elif con.c_access == 'superuser' and state == 'error':
+            code, response = errors.does_not_exist('model')
+        elif con.c_access == 'superuser' and state != 'error':
+            datastore.delete_model(controller, model)
         else:
             code, response = errors.unauthorized()
-        execute_task(mod.disconnect)
         execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
