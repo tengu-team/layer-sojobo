@@ -1,10 +1,3 @@
-# ToDo
-- Finish small ToDo's and testing mentioned below.
-- Output charm name/info with application info
-- Prevent KeyErrors in w_juju.py to ensure correct html status codes
-- Proper json output: no longer output empty keys
-- Copy a model from one controller and deploy it to another, with the correct configs
-
 # Tengu-API Documentation
 
 The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-API. It contains all the calls to use JuJu,
@@ -13,6 +6,7 @@ excluding calls handling users.
 **Currently, all the calls must be made with BasicAuth in the request!**
 
 ## API Calls
+- [/login](#login)
 - [/tengu/controllers](#controllers)
 - [/tengu/controllers/[controller]](#controller)
 - [/tengu/controllers/[controller]/models](#models)
@@ -28,6 +22,21 @@ excluding calls handling users.
 - [/tengu/controllers/[controller]/models/[model]/relations/[app1]/[app2]](#relation-del)
 - [/tengu/backup](#backup)
 
+## **/login** <a name="login"></a>
+#### **Request Type**: POST
+* **Description**:
+  Verifies the provided BasicAuth.
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**
+
+* **Successful response**:
+  - code: 200
+  - message:
+  ```json
+  "Success"
+  ```
 ## **/tengu/controllers** <a name="controllers"></a>
 #### **Request type**: GET
 * **Description**:
@@ -37,7 +46,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -59,7 +68,7 @@ excluding calls handling users.
   - type
   - region
   - credentials
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -85,7 +94,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -110,7 +119,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -129,7 +138,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -151,7 +160,7 @@ excluding calls handling users.
   - model
 * **Optional body**:
   - ssh-key
-* **Succesful response**:
+* **Successful response**:
   - code: 202
   - message:
   ```json
@@ -167,7 +176,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -199,7 +208,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
   - bundle
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -214,7 +223,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -230,7 +239,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -282,7 +291,7 @@ excluding calls handling users.
 * **Optional body**:
   - series
   - target
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -324,7 +333,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -365,7 +374,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -409,7 +418,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -441,7 +450,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -474,7 +483,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -496,7 +505,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -521,7 +530,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -576,7 +585,7 @@ excluding calls handling users.
 
 * **Optional body**:
   - series
-* **Succesful response**:
+* **Successful response**:
     - code: 200
     - message:
     ```json
@@ -592,7 +601,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -677,7 +686,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -713,7 +722,7 @@ excluding calls handling users.
 * **Required body**:
   - app1
   - app2
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -756,7 +765,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -781,7 +790,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message:
   ```json
@@ -824,6 +833,6 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
 
-* **Succesful response**:
+* **Successful response**:
   - code: 200
   - message: Zipfile
