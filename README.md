@@ -79,5 +79,5 @@ Documentation of the api can be found under [docs](docs).
 Report bugs on [Github](https://github.com/Qrama/Sojobo-api/issues)
 
 # Authors
-Mathijs Moerman <mathijs.moerman@tengu.io>
-Sébastien Pattyn <sebastien.pattyn@tengu.io>
+- Mathijs Moerman <mathijs.moerman@tengu.io>
+- Sébastien Pattyn <sebastien.pattyn@tengu.io>
