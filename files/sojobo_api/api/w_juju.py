@@ -191,11 +191,11 @@ async def authorize(token, controller, model=None):
         else:
             con = Controller_Connection()
             await con.set_controller(token, controller)
-    if model and not await model_exists(controller, model):
+    if model and not await model_exists(con, model):
         error = errors.does_not_exist('controller')
         abort(error[0], error[1])
     elif model:
-        mod_access = datastore.get_models_access(controller, model, token.username)
+        mod_access = datastore.get_model_access(controller, model, token.username)
         if mod_access not in ['read', 'write', 'admin']:
             error = errors.does_not_exist('model')
             abort(error[0], error[1])
