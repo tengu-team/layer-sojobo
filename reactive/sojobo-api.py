@@ -99,7 +99,7 @@ def redis_db_removed():
 def configure(sojobo):
     with open("{}/settings.py".format(API_DIR), "r") as settings:
         api_key = settings.readline().split(' = ')[1][1:-1]
-    sojobo.configure('https://{}'.format(HOST), API_DIR, api_key, config()['api-user'])
+    sojobo.configure('https://{}'.format(HOST), API_DIR, api_key, USER)
 
 
 @when('reverseproxy.available', 'api.running')
