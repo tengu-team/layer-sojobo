@@ -33,6 +33,7 @@ def execute_task(command, *args):
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     result = loop.run_until_complete(command(*args))
+    loop.close()
     return result
 
 ################################################################################
@@ -77,8 +78,7 @@ def set_db_access(url, port, c_name, user, acl, modellist):
 def get_ssh_keys(usr, url, port):
     db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
     data = db.get(user)
-    dictdata = json.loads(data)
-    return dictdata['ssh_keys']
+    return [k for k in json.loads(data)['ssh_keys'] if k is not None]
 ################################################################################
 # Async Functions
 ################################################################################
@@ -115,8 +115,7 @@ async def set_user_acc(c_name, access, user, username, password, url, port):
                     await model.grant(user, acl='admin')
                     logger.info('Admin Access granted for for %s:%s', controller_name, model_name)
                     for key in ssh_keys:
-                        if key:
-                            await model.add_ssh_key(user, key)
+                        await model.add_ssh_key(user, key)
                     await model.disconnect()
                     logger.info('Successfully disconnected %s', model_name)
                 else:

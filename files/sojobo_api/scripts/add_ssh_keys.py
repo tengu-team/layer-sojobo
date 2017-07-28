@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302,R0914
 import asyncio
-from urllib.parse import unquote
 import sys
 import traceback
 import logging
@@ -33,6 +32,7 @@ def execute_task(command, *args):
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     result = loop.run_until_complete(command(*args))
+    loop.close()
     return result
 
 ################################################################################

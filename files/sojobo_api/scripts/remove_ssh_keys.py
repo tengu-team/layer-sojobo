@@ -32,6 +32,7 @@ def execute_task(command, *args):
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     result = loop.run_until_complete(command(*args))
+    loop.close()
     return result
 
 ################################################################################
@@ -59,7 +60,7 @@ def get_model_access(controller, model, user, connection):
 
 def get_ssh_keys(user, connection):
     data = connection.get(user)
-    return json.loads(data)['ssh_keys']
+    return [k for k in json.loads(data)['ssh_keys'] if k is not None]
 
 
 def remove_ssh_key(user, ssh_key, connection):

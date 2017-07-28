@@ -26,9 +26,9 @@ from charmhelpers.contrib.python.packages import pip_install
 from charms.reactive import hook, when, when_not, set_state, remove_state
 
 
-API_DIR = config()['api-dir']
-USER = config()['api-user']
-GROUP = config()['nginx-group']
+API_DIR = '/opt/sojobo_api'
+USER = 'sojobo'
+GROUP = 'www-data'
 HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_private_ip()
 ###############################################################################
 # INSTALLATION AND UPGRADES
@@ -89,16 +89,15 @@ def connect_to_redis(redis):
     status_set('active', 'admin-password: {} api-key: {}'.format(password, api_key))
 
 
-@when('api.running')
 @when_not('redis.available')
 def redis_db_removed():
     remove_state('api.running')
     status_set('blocked', 'Waiting for a connection with redis')
 
 
-@when('sojobo.available')
+@when('sojobo.available', 'api.running')
 def configure(sojobo):
-    with open("/{}/settings.py".format(API_DIR), "r") as settings:
+    with open("{}/settings.py".format(API_DIR), "r") as settings:
         api_key = settings.readline().split(' = ')[1][1:-1]
     sojobo.configure('https://{}'.format(HOST), API_DIR, api_key, config()['api-user'])
 
@@ -136,7 +135,7 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 def install_api():
     for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'redis']:
         pip_install(pkg)
-    subprocess.check_call(['pip', 'install', 'juju==0.3.0'])
+    subprocess.check_call(['pip3', 'install', 'juju==0.6.0'])
     mergecopytree('files/sojobo_api', API_DIR)
     os.mkdir('{}/files'.format(API_DIR))
     os.mkdir('{}/bundle'.format(API_DIR))
@@ -146,11 +145,6 @@ def install_api():
     os.mkdir('/home/{}'.format(USER))
     chownr('/home/{}'.format(USER), USER, USER, chowntopdir=True)
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
-    from git import Repo
-    Repo.clone_from('https://github.com/tengu-team/python-libjuju.git', '{}/libjuju'.format(API_DIR))
-    mergecopytree('{}/libjuju/juju'.format(API_DIR), '/usr/local/lib/python3.5/dist-packages/juju/')
-    shutil.copyfile('files/model.py', '/usr/local/lib/python3.5/dist-packages/juju/model.py')
-    shutil.copyfile('files/controller.py', '/usr/local/lib/python3.5/dist-packages/juju/controller.py')
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')

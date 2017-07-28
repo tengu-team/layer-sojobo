@@ -3,7 +3,6 @@
 import redis
 import json
 from sojobo_api import settings
-
 ################################################################################
 # Database Fucntions
 ################################################################################
@@ -11,11 +10,10 @@ def connect_to_controllers():
     con = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, charset="utf-8", decode_responses=True, db=10)
     return con
 
+
 def connect_to_users():
     con = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, charset="utf-8", decode_responses=True, db=11)
     return con
-
-
 ################################################################################
 # USER FUNCTIONS
 ################################################################################
@@ -30,6 +28,7 @@ def create_user(user_name, ssh_key=None):
         json_user = json.dumps(user)
         con.set(user_name, json_user)
 
+
 def disable_user(user):
     con = connect_to_users()
     user_data = con.get(user)
@@ -39,6 +38,7 @@ def disable_user(user):
     json_data = json.dumps(data)
     con.set(user, json_data)
 
+
 def enable_user(user):
     con = connect_to_users()
     user_data = con.get(user)
@@ -47,10 +47,12 @@ def enable_user(user):
     json_data = json.dumps(data)
     con.set(user, json_data)
 
+
 def get_user(user):
     con = connect_to_users()
     data = con.get(user)
     return json.loads(data)
+
 
 def add_ssh_key(user, ssh_key):
     con = connect_to_users()
@@ -61,6 +63,7 @@ def add_ssh_key(user, ssh_key):
     data['ssh_keys'] = keys
     json_data = json.dumps(data)
     con.set(user, json_data)
+
 
 def remove_ssh_key(user, ssh_key):
     con = connect_to_users()
@@ -79,6 +82,7 @@ def get_ssh_keys(user):
     data = con.get(user)
     return json.loads(data)['ssh_keys']
 
+
 def add_credential(user, cred):
     con = connect_to_users()
     user_data = con.get(user)
@@ -88,6 +92,7 @@ def add_credential(user, cred):
     data['credentials'] = creds
     json_data = json.dumps(data)
     con.set(user, json_data)
+
 
 def remove_credential(user, cred):
     con = connect_to_users()
@@ -106,12 +111,14 @@ def get_credentials(user):
     data = con.get(user)
     return json.loads(data)['credentials']
 
+
 def get_credential_keys(user):
     creds = get_credentials(user)
     cred_keys = []
     for cred in creds:
         cred_keys.append(cred['name'])
     return cred_keys
+
 
 def get_all_users():
     con = connect_to_users()
@@ -129,11 +136,13 @@ def create_controller(controller_name, c_type):
         con.set(controller_name, json_data)
         return True
 
+
 def destroy_controller(c_name):
     con = connect_to_controllers()
     con.delete(c_name)
     for user in get_all_users():
         remove_controller(c_name, user)
+
 
 def remove_controller(c_name, user):
     con = connect_to_users()
@@ -146,6 +155,7 @@ def remove_controller(c_name, user):
     data['access'] = acc_list
     json_data = json.dumps(data)
     con.set(user, json_data)
+
 
 def get_controller(c_name):
     con = connect_to_controllers()
@@ -186,7 +196,6 @@ def check_model_state(c_name, m_name):
     con = get_controller(c_name)
     for mod in con['models']:
         if list(mod.keys())[0] == m_name:
-            print(mod)
             return mod[m_name]
     return 'error'
 
@@ -221,7 +230,6 @@ def add_user_to_controller(c_name, user, access):
     data['users'] = users
     json_data = json.dumps(data)
     con.set(c_name, json_data)
-
     con2 = connect_to_users()
     user_data = con2.get(user)
     data2 = json.loads(user_data)
@@ -231,6 +239,7 @@ def add_user_to_controller(c_name, user, access):
     data2['access'] = new_access
     json_data2 = json.dumps(data2)
     con2.set(user, json_data2)
+
 
 def remove_user_from_controller(c_name, user):
     con = connect_to_controllers()
@@ -261,7 +270,6 @@ def get_all_controllers():
 ################################################################################
 # MODEL FUNCTIONS
 ################################################################################
-
 def delete_model(controller, model):
     users = get_all_users()
     for user in users:
@@ -289,7 +297,6 @@ def remove_model(controller, model, user):
 def get_model_access(controller, model, user):
     result = get_user(user)
     for acc in result['access']:
-        print(acc)
         if list(acc.keys())[0] == controller:
             models = acc[controller]['models']
             for mod in models:
@@ -337,6 +344,7 @@ def remove_models_access(controller, user):
     data['access'] = new_access
     json_data = json.dumps(data)
     con.set(user, json_data)
+
 
 def get_users_model(controller, model):
     users = get_all_users()

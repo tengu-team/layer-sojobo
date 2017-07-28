@@ -29,6 +29,7 @@ def execute_task(command, *args):
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     result = loop.run_until_complete(command(*args))
+    loop.close()
     return result
 
 ################################################################################

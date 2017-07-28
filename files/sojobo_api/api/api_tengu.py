@@ -79,9 +79,9 @@ def create_controller():
                     datastore.set_model_state(controller, model, 'ready')
                     datastore.set_model_access(controller, model, token.username, 'admin')
                 code, response = 200, execute_task(juju.get_controller_info, con)
+                execute_task(con.disconnect)
         else:
             code, response = errors.unauthorized()
-        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -130,14 +130,14 @@ def create_model(controller):
             elif credentials in datastore.get_credential_keys(token.username):
                 datastore.add_model_to_controller(controller, model)
                 datastore.set_model_access(controller, model, token.username, 'accepted')
-                execute_task(con.disconnect)
-                subprocess.Popen(["python3", "{}/scripts/add_model.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(), settings.REDIS_HOST, settings.REDIS_PORT, controller, model, credentials])
+                subprocess.Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), token.username,
+                                  token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT, controller, model, credentials])
                 code, response = 202, "Model is being deployed"
             else:
                 code, response = 404, "Credentials {} not found!".format(credentials)
         else:
             code, response = errors.unauthorized()
+        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -200,7 +200,7 @@ def add_bundle(controller, model):
         execute_task(mod.disconnect)
         execute_task(con.disconnect)
         if mod.m_access == 'admin' or mod.m_access == 'write':
-            subprocess.Popen(["python3", "{}/scripts/bundle_deployment.py".format(juju.get_api_dir()), token.username, token.password, juju.get_api_dir(), controller, model, str(data['bundle'])])
+            subprocess.Popen(["python3", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR), token.username, token.password, settings.SOJOBO_API_DIR, controller, model, str(data['bundle'])])
             code, response = 202, "Bundle is being deployed"
         else:
             code, response = errors.unauthorized()
@@ -229,6 +229,7 @@ def delete_model(controller, model):
             code, response = errors.does_not_exist('model')
         elif con.c_access == 'superuser' and state != 'error':
             datastore.delete_model(controller, model)
+            code, response = 200, "Model {} is being deleted".format(model)
         else:
             code, response = errors.unauthorized()
         execute_task(con.disconnect)

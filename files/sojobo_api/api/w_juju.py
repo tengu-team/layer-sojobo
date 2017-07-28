@@ -66,6 +66,7 @@ class Model_Connection(object):
         if self.m_connection is not None:
             await self.m_connection.disconnect()
 
+
 class Controller_Connection(object):
     def __init__(self):
         self.url = None
@@ -168,10 +169,10 @@ async def authenticate(api_key, auth):
             try:
                 cont_name = list(await get_all_controllers())[0]
                 await controller.set_controller(token, cont_name)
-                controller.disconnect()
+                await controller.disconnect()
                 return token
             except JujuAPIError:
-                controller.disconnect()
+                await controller.disconnect()
                 error = errors.unauthorized()
                 abort(error[0], error[1])
     else:
@@ -232,6 +233,7 @@ async def create_controller(c_type, name, region, credentials):
     controller = Controller_Connection()
     return controller
 
+
 async def generate_cred_file(c_type, name, credentials):
     return get_controller_types()[c_type].generate_cred_file(name, credentials)
 
@@ -239,10 +241,11 @@ async def generate_cred_file(c_type, name, credentials):
 async def delete_controller(con):
     #controller = con.c_connection
     #await controller.destroy(True)
-    check_output(['juju', 'login', settings.JUJU_ADMIN_USER, '-c', con.c_name], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
-    check_call(['juju', 'destroy-controller', '-y', con.c_name, '--destroy-all-models'])
-    check_call(['juju', 'remove-credential', con.c_type, con.c_name])
+    check_output(['/snap/bin/juju', 'login', con.c_name, '-u', settings.JUJU_ADMIN_USER], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
+    check_call(['/snap/bin/juju', 'destroy-controller', '-y', con.c_name, '--destroy-all-models'])
+    check_call(['/snap/bin/juju', 'remove-credential', con.c_type, con.c_name])
     datastore.destroy_controller(con.c_name)
+
 
 async def get_all_controllers():
     return datastore.get_all_controllers()
@@ -338,6 +341,7 @@ async def get_model_creds(model):
     cloud_cred = info.serialize()['cloud-credential-tag']
     cloud_result = tag.untag('cloudcred-', cloud_cred)
     return get_cloud_response(cloud_result)
+
 
 def get_cloud_response(data):
     values = data.split('_')

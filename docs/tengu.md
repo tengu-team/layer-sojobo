@@ -158,6 +158,7 @@ excluding calls handling users.
   - Content-Type:application/json
 * **Required body**:
   - model
+  - credentials
 * **Optional body**:
   - ssh-key
 * **Successful response**:
@@ -197,7 +198,7 @@ excluding calls handling users.
         }
     ],
     "credentials":[<credential JSON>]
-}          
+  }          
   ```
 #### **Request type**: POST
 * **Description**:
