@@ -9,17 +9,17 @@
         <collectionProp name="Arguments.arguments">
           <elementProp name="api-key" elementType="Argument">
             <stringProp name="Argument.name">api-key</stringProp>
-            <stringProp name="Argument.value">1004a062d8acd9fad21cec2f41bdedab77b1f0db9b88b20b6259306c1525de17</stringProp>
+            <stringProp name="Argument.value">ac234f437dd3d7a5eefb79ea3ee7e01ba260ac409b72e732b38b6b4338135ab6</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="password" elementType="Argument">
             <stringProp name="Argument.name">password</stringProp>
-            <stringProp name="Argument.value">sPu/kHL9EAHYa+4hvH5JoV4z</stringProp>
+            <stringProp name="Argument.value">miZBa6CySw7Ab6/ASOiA6Q8b</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="basic-auth" elementType="Argument">
             <stringProp name="Argument.name">basic-auth</stringProp>
-            <stringProp name="Argument.value">Basic YWRtaW46dk1Qd28xWlNhUTJ4UFB4MW92VjJvLytX</stringProp>
+            <stringProp name="Argument.value">Basic YWRtaW46bWlaQmE2Q3lTdzdBYjYvQVNPaUE2UThi</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
           <elementProp name="ip" elementType="Argument">
@@ -76,7 +76,7 @@
             <collectionProp name="Arguments.arguments">
               <elementProp name="" elementType="HTTPArgument">
                 <boolProp name="HTTPArgument.always_encode">false</boolProp>
-                <stringProp name="Argument.value">{&quot;controller&quot; : &quot;stresstesting&quot;,&#xd;
+                <stringProp name="Argument.value">{&quot;controller&quot; : &quot;hacontroller&quot;,&#xd;
  &quot;type&quot; : &quot;google&quot;,&#xd;
  &quot;region&quot; : &quot;asia-east1&quot;,&#xd;
  &quot;credentials&quot;: &#xd;
@@ -120,7 +120,7 @@
           <boolProp name="LoopController.continue_forever">false</boolProp>
           <stringProp name="LoopController.loops">1</stringProp>
         </elementProp>
-        <stringProp name="ThreadGroup.num_threads">5</stringProp>
+        <stringProp name="ThreadGroup.num_threads">25</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1</stringProp>
         <longProp name="ThreadGroup.start_time">1500555065000</longProp>
         <longProp name="ThreadGroup.end_time">1500555065000</longProp>
@@ -163,7 +163,7 @@
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/tengu/controllers/stresstesting/models</stringProp>
+          <stringProp name="HTTPSampler.path">/tengu/controllers/hacontroller/models</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -222,7 +222,7 @@
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/tengu/controllers/stresstesting/models/mod${__threadNum}</stringProp>
+          <stringProp name="HTTPSampler.path">/tengu/controllers/hacontroller/models/mod${__threadNum}</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -250,7 +250,7 @@
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/tengu/controllers/stresstesting/models/mod${__threadNum}/applications</stringProp>
+          <stringProp name="HTTPSampler.path">/tengu/controllers/hacontroller/models/mod${__threadNum}/applications</stringProp>
           <stringProp name="HTTPSampler.method">POST</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -274,7 +274,7 @@
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/tengu/controllers/stresstesting/models/mod${__threadNum}</stringProp>
+          <stringProp name="HTTPSampler.path">/tengu/controllers/hacontroller/models/mod${__threadNum}</stringProp>
           <stringProp name="HTTPSampler.method">GET</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -294,7 +294,7 @@
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/tengu/controllers/stresstesting/models/mod${__threadNum}</stringProp>
+          <stringProp name="HTTPSampler.path">/tengu/controllers/hacontroller/models/mod${__threadNum}</stringProp>
           <stringProp name="HTTPSampler.method">DELETE</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
@@ -347,7 +347,7 @@
           <stringProp name="HTTPSampler.response_timeout"></stringProp>
           <stringProp name="HTTPSampler.protocol"></stringProp>
           <stringProp name="HTTPSampler.contentEncoding"></stringProp>
-          <stringProp name="HTTPSampler.path">/tengu/controllers/stresstesting</stringProp>
+          <stringProp name="HTTPSampler.path">/tengu/controllers/hacontroller</stringProp>
           <stringProp name="HTTPSampler.method">DELETE</stringProp>
           <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
           <boolProp name="HTTPSampler.auto_redirects">false</boolProp>

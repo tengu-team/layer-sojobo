@@ -19,17 +19,20 @@ from hashlib import sha256
 import os
 import shutil
 import subprocess
+from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
-from charmhelpers.core.hookenv import status_set, log, config, open_port, unit_private_ip, application_version_set
+from charmhelpers.core.hookenv import status_set, log, config, open_port, unit_private_ip, application_version_set, leader_get, leader_set
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charmhelpers.contrib.python.packages import pip_install
 from charms.reactive import hook, when, when_not, set_state, remove_state
+import charms.leadership
 
 
 API_DIR = '/opt/sojobo_api'
 USER = 'sojobo'
 GROUP = 'www-data'
 HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_private_ip()
+db = unitdata.kv()
 ###############################################################################
 # INSTALLATION AND UPGRADES
 ###############################################################################
@@ -37,7 +40,8 @@ HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_private_ip(
 @when_not('api.installed')
 def install():
     log('Installing Sojobo API')
-    os.mkdir(API_DIR)
+    if not os.path.isdir(API_DIR):
+        os.mkdir(API_DIR)
     install_api()
     set_state('api.installed')
 
@@ -55,7 +59,7 @@ def configure_webapp():
     context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
     render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
     open_port(80)
-    restart_api()
+    service_restart('nginx')
     set_state('api.configured')
     status_set('blocked', 'Waiting for a connection with Redis')
 
@@ -64,15 +68,36 @@ def configure_webapp():
 def config_changed():
     context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
     render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
-    restart_api()
+    service_restart('nginx')
+
+
+@when('leadership.is_leader')
+@when_not('secrets.configured')
+def set_secrets():
+    api_key = sha256(os.urandom(256)).hexdigest()
+    password = b64encode(os.urandom(18)).decode('utf-8')
+    leader_set({
+        'api-key': api_key,
+        'password': password
+    })
+    db.set('api-key', api_key)
+    db.set('password', password)
+    set_state('secrets.configured')
+
+
+@when('api.configured')
+@when_not('leadership.is_leader')
+def set_secrets_local():
+    db.set('api-key',leader_get()['api-key'])
+    db.set('password', leader_get()['password'])
 
 
 @when('api.configured', 'redis.available')
 @when_not('api.running')
 def connect_to_redis(redis):
     redis_db = redis.redis_data()
-    api_key = sha256(os.urandom(256)).hexdigest()
-    password = b64encode(os.urandom(18)).decode('utf-8')
+    api_key = db.get('api-key')
+    password = db.get('password')
     render('settings.py', '{}/settings.py'.format(API_DIR), {
         'API_KEY': api_key,
         'JUJU_ADMIN_USER': 'admin',
@@ -97,15 +122,14 @@ def redis_db_removed():
 
 @when('sojobo.available', 'api.running')
 def configure(sojobo):
-    with open("{}/settings.py".format(API_DIR), "r") as settings:
-        api_key = settings.readline().split(' = ')[1][1:-1]
+    api_key = db.get('api-key')
     sojobo.configure('https://{}'.format(HOST), API_DIR, api_key, USER)
 
 
-@when('reverseproxy.available', 'api.running')
-def configure_proxy(reverseproxy):
-    reverseproxy.configure(80)
-    set_state('api.reverseproxy-configured')
+@when('proxy.available', 'api.running')
+def configure_proxy(proxy):
+    proxy.configure(80)
+    set_state('api.proxy-configured')
 ###############################################################################
 # UTILS
 ###############################################################################
@@ -137,19 +161,19 @@ def install_api():
         pip_install(pkg)
     subprocess.check_call(['pip3', 'install', 'juju==0.6.0'])
     mergecopytree('files/sojobo_api', API_DIR)
-    os.mkdir('{}/files'.format(API_DIR))
-    os.mkdir('{}/bundle'.format(API_DIR))
-    os.mkdir('{}/log'.format(API_DIR))
-    os.mkdir('{}/backup'.format(API_DIR))
+    if not os.path.isdir('{}/files'.format(API_DIR)):
+        os.mkdir('{}/files'.format(API_DIR))
+    if not os.path.isdir('{}/bundle'.format(API_DIR)):
+        os.mkdir('{}/bundle'.format(API_DIR))
+    if not os.path.isdir('{}/log'.format(API_DIR)):
+        os.mkdir('{}/log'.format(API_DIR))
+    if not os.path.isdir('{}/backup'.format(API_DIR)):
+        os.mkdir('{}/backup'.format(API_DIR))
     adduser(USER)
-    os.mkdir('/home/{}'.format(USER))
+    if not os.path.isdir('/home/{}'.format(USER)):
+        os.mkdir('/home/{}'.format(USER))
     chownr('/home/{}'.format(USER), USER, USER, chowntopdir=True)
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
-
-
-def restart_api():
-    service_restart('nginx')
-    subprocess.check_call(['service', 'nginx', 'status'])
