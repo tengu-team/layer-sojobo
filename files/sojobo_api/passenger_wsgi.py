@@ -16,7 +16,7 @@
 import sys
 import os
 
-INTERP = os.path.expanduser("/usr/bin/python3")
+INTERP = os.path.expanduser("/usr/bin/python3.6")
 if sys.executable != INTERP:
     os.execl(INTERP, INTERP, *sys.argv)
 

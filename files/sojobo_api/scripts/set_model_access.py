@@ -19,94 +19,47 @@ import sys
 import traceback
 import logging
 import json
-
 import redis
-from juju.client.connection import JujuData
 from juju.model import Model
 from juju.controller import Controller
 
-################################################################################
-# Asyncio Wrapper
-################################################################################
-def execute_task(command, *args):
-    loop = asyncio.get_event_loop()
-    loop.set_debug(False)
-    result = loop.run_until_complete(command(*args))
-    loop.close()
-    return result
 
-################################################################################
-# Redis Functions
-################################################################################
-def set_db_access(url, port, c_name, m_name, user, acl):
-    try:
-        logger.info('Setting up Redis connection ')
-        db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
-        result_json = db.get(user)
-        result = json.loads(result_json)
-        new_access = []
-        for acc in result['access']:
-            if list(acc.keys())[0] == c_name:
-                models = acc[c_name]['models']
-                for modelname in models:
-                    if list(modelname.keys())[0] == m_name:
-                        models.remove(modelname)
-                new_model = {m_name: access}
-                models.append(new_model)
-                acc[c_name]['models'] = models
-            new_access.append(acc)
-        result['access'] = new_access
-        json_result = json.dumps(result)
-        db.set(user, json_result)
-    except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            logger.error(l)
-
-
-def get_ssh_keys(usr, url, port):
-    db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
-    data = db.get(user)
-    return json.loads(data)['ssh_keys']
-################################################################################
-# Async Functions
-################################################################################
 async def set_model_acc(c_name, m_name, access, user, username, password, url, port):
     try:
-        logger.info('Setting up Controllerconnection for model: %s', c_name)
-        controller = Controller()
-        jujudata = JujuData()
-        controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
-        model_list = []
-        ssh_keys = get_ssh_keys(user, url, port)
-        await controller.connect(controller_endpoint, username, password)
-        logger.info('Connected to controller %s ', c_name)
-        models = await controller.get_models()
-        model_list = [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
-        for mod in model_list:
-            if m_name == mod['name']:
-                logger.info('Setting up Modelconnection for model: %s', model_name)
-                model_uuid = mod['uuid']
+        controllers = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
+        users = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
+        controller = json.loads(controllers.get(c_name))
+        usr = json.loads(users.get(user))
+        for mod in controller['models']:
+            if mod['name'] == m_name:
                 model = Model()
-                if not model_uuid is None:
-                    await model.connect(controller_endpoint, model_uuid, username, password)
-                    try:
-                        await model.revoke(user)
-                    except Exception:
-                        pass
-                    await model.grant(user, acl=access)
-                    logger.info('Admin Access granted for for %s:%s for user %s', controller_name, model_name, user)
-                    if access in ['admin','write'] and ssh_keys:
-                        for key in ssh_keys:
-                            if key:
-                                await model.add_ssh_key(user, key)
-                    await model.disconnect()
-                    logger.info('Successfully disconnected %s', model_name)
-                else:
-                    logger.error('Model_Uuid could not be found. Can not connect to Model : %s', model_name)
-        set_db_access(url, port, c_name, m_name, user, access)
-        await controller.disconnect()
+                await model.connect(controller['endpoints'][0], mod['uuid'], username, password, controller['ca-cert'])
+                await model.grant(user, acl=access)
+                exists_con = False
+                for con in usr['controllers']:
+                    if con['name'] == c_name:
+                        exists_mod = False
+                        exists_con = True
+                        for mod in con['models']:
+                            if mod['name'] == m_name:
+                                mod['access'] = access
+                                exists_mod = True
+                                break
+                        if not exists_mod:
+                            con['models'].append({'name': m_name, 'access': access})
+                if not exists_con:
+                    usr['controllers'].append({'name': c_name, 'access': 'login', 'models': [{'name': m_name, 'access': access}]})
+                    contro = Controller()
+                    await contro.connect(controller['endpoints'][0], username, password, controller['ca-cert'])
+                    await contro.grant(user)
+                    await contro.disconnect()
+                logger.info('%s access granted on %s:%s for  %s', access, c_name, m_name, user)
+                if access == 'admin' or access == 'write':
+                    for key in usr['ssh-keys']:
+                        await model.add_ssh_key(user, key)
+                model.disconnect()
+        controllers.set(c_name, json.dumps(controller))
+        users.set(user, json.dumps(usr))
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -115,11 +68,15 @@ async def set_model_acc(c_name, m_name, access, user, username, password, url, p
 
 
 if __name__ == '__main__':
-    username, password, api_dir, url, port, user, access, controller_name, model_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8], sys.argv[9]
     logger = logging.getLogger('set_model_access')
-    hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(api_dir))
+    hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
-    execute_task(set_model_acc, controller_name, model_name, access, user, username, password, url, port)
+    loop = asyncio.get_event_loop()
+    loop.set_debug(False)
+    result = loop.run_until_complete(set_model_acc(sys.argv[8], sys.argv[9], sys.argv[7],
+                                                   sys.argv[6], sys.argv[1], sys.argv[2],
+                                                   sys.argv[4], sys.argv[5]))
+    loop.close()

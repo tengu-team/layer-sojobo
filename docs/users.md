@@ -191,7 +191,7 @@ The User-API provides user management over all controllers.
   - code: 202
   - message:
   ```json
-"Process being handeled"
+  "Process being handeled"
   ```
 
 #### **Request type**: DELETE
@@ -206,7 +206,7 @@ The User-API provides user management over all controllers.
   - code: 202
   - message:
   ```json
-"Process being handeled"
+  "Process being handeled"
   ```
 
 ## **/users/[user]/credentials** <a name="credentials"></a>
@@ -257,14 +257,14 @@ The User-API provides user management over all controllers.
 "Process being handeled"
   ```
 
-  #### **Request type**: DELETE
+#### **Request type**: DELETE
   * **Description**:
-    Removes the users given SSH.
+    Removes the users credential.
   * **Required headers**:
     - api-key
     - Content-Type:application/json
   * **Required body**:
-    - ssh-key
+    - name
   * **Successful response**:
     - code: 202
     - message:

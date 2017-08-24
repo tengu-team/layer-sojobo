@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 # Copyright (C) 2017  Qrama
 #
 # This program is free software: you can redistribute it and/or modify
@@ -39,6 +39,7 @@ db = unitdata.kv()
 @when('juju.installed')
 @when_not('api.installed')
 def install():
+    subprocess.call(['python3.6', '-m', 'pip', 'install', '--upgrade', 'pip', 'setuptools', 'wheel'])
     log('Installing Sojobo API')
     if not os.path.isdir(API_DIR):
         os.mkdir(API_DIR)
@@ -88,7 +89,7 @@ def set_secrets():
 @when('api.configured')
 @when_not('leadership.is_leader')
 def set_secrets_local():
-    db.set('api-key',leader_get()['api-key'])
+    db.set('api-key', leader_get()['api-key'])
     db.set('password', leader_get()['password'])
 
 
@@ -157,8 +158,8 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 
 
 def install_api():
-    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'redis']:
-        pip_install(pkg)
+    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler', 'gitpython', 'redis', 'asyncio_extras']:
+        subprocess.check_call(['pip3', 'install', 'pkg'])
     subprocess.check_call(['pip3', 'install', 'juju==0.6.0'])
     mergecopytree('files/sojobo_api', API_DIR)
     if not os.path.isdir('{}/files'.format(API_DIR)):

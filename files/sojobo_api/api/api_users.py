@@ -1,4 +1,3 @@
-# !/usr/bin/env python3
 # Copyright (C) 2017  Qrama
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,12 +16,10 @@
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
-import subprocess
 from flask import request, Blueprint
 
-from sojobo_api import settings
-from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
-from sojobo_api.api.w_juju import execute_task, Controller_Connection
+from sojobo_api.api import w_errors as errors, w_juju as juju
+from sojobo_api.api.w_juju import execute_task
 
 
 USERS = Blueprint('users', __name__)
@@ -34,31 +31,11 @@ def get():
 
 @USERS.route('/', methods=['GET'])
 def get_users_info():
-    #try:
-    token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-    u_info = datastore.get_user(token.username)
-    access_list = []
-    if token.is_admin:
-        code, response = 200, execute_task(juju.get_users_info)
-    else:
-        for controller in u_info['access']:
-            c_name = list(controller.keys())[0]
-            if controller[c_name]['access'] == 'superuser':
-                c_users = datastore.get_controller_users(c_name)
-                for usr in c_users:
-                    data = execute_task(juju.get_user_info, usr['name'])
-                    access_list.append(data)
-        if access_list:
-            response_list = []
-            for ac in access_list:
-                if ac not in response_list:
-                    response_list.append(ac)
-            code, response = 200, response_list
-        else:
-            access_list.append(execute_task(get_user_info, token.username))
-            code, response = 200, access_list
-    # except KeyError:
-    #     code, response = errors.invalid_data()
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        code, response = 200, execute_task(juju.get_users_info, token)
+    except KeyError:
+        code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
 
@@ -70,19 +47,14 @@ def reactivate_user():
         user = juju.check_input(data['username'])
         if token.is_admin:
             if execute_task(juju.user_exists, user):
-                controllers = execute_task(juju.get_all_controllers)
-                for con in controllers:
-                    controller = Controller_Connection()
-                    execute_task(controller.set_controller, token, con)
-                    execute_task(juju.enable_user, controller, user)
-                    execute_task(controller.disconnect)
-                datastore.enable_user(user)
+                execute_task(juju.enable_user, token, user)
                 code, response = 200, 'User {} succesfully activated'.format(user)
         else:
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
+
 
 @USERS.route('/', methods=['POST'])
 def create_user():
@@ -94,13 +66,7 @@ def create_user():
             if execute_task(juju.user_exists, user):
                 code, response = errors.already_exists('user')
             else:
-                datastore.create_user(user)
-                controllers = execute_task(juju.get_all_controllers)
-                for con in controllers:
-                    controller = Controller_Connection()
-                    execute_task(controller.set_controller, token, con)
-                    execute_task(juju.create_user, controller, user, data['password'])
-                    execute_task(controller.disconnect)
+                execute_task(juju.create_user, token, user, data['password'])
                 code, response = 200, 'User {} succesfully created'.format(user)
         else:
             code, response = errors.unauthorized()
@@ -113,10 +79,10 @@ def create_user():
 def get_user_info(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        usr = juju.check_input(user)
-        if execute_task(juju.user_exists, usr):
-            if usr == token.username or token.is_admin:
-                code, response = 200, execute_task(juju.get_user_info, usr)
+        user = juju.check_input(user)
+        if execute_task(juju.user_exists, user):
+            if user == token.username or token.is_admin:
+                code, response = 200, execute_task(juju.get_user_info, user)
             else:
                 code, response = errors.unauthorized()
         else:
@@ -126,7 +92,6 @@ def get_user_info(user):
     return juju.create_response(code, response)
 
 
-
 @USERS.route('/<user>', methods=['PUT'])
 def change_user_password(user):
     try:
@@ -134,12 +99,7 @@ def change_user_password(user):
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if usr == token.username or token.is_admin:
-                controllers = execute_task(juju.get_all_controllers)
-                for con in controllers:
-                    controller = Controller_Connection()
-                    execute_task(controller.set_controller, token, con)
-                    execute_task(juju.change_user_password, controller, usr, request.json['password'])
-                    execute_task(controller.disconnect)
+                execute_task(juju.change_user_password, token, usr, request.json['password'])
                 code, response = 200, 'succesfully changed password for user {}'.format(usr)
             else:
                 code, response = errors.unauthorized()
@@ -158,14 +118,8 @@ def delete_user(user):
         if token.is_admin:
             if execute_task(juju.user_exists, usr):
                 if usr != 'admin':
-                    controllers = execute_task(juju.get_all_controllers)
-                    for con in controllers:
-                        controller = Controller_Connection()
-                        execute_task(controller.set_controller, token, con)
-                        execute_task(juju.delete_user, controller, usr)
-                        execute_task(controller.disconnect)
+                    execute_task(juju.delete_user, token, usr)
                     code, response = 200, 'User {} succesfully removed'.format(usr)
-                    datastore.disable_user(usr)
                 else:
                     code, response = 403, 'This would remove the admin from the system!'
             else:
@@ -182,7 +136,9 @@ def get_ssh_keys(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         if token.is_admin or token.username == user:
-            code, response = 200, datastore.get_ssh_keys(user)
+            code, response = 200, execute_task(juju.get_ssh_keys_user, user)
+        else:
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -193,13 +149,12 @@ def add_ssh_key(user):
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        cons = datastore.get_all_controllers()
-        usr = juju.check_input(user)
-        for con in cons:
-            if datastore.get_controller_access(con, token.username) == 'superuser':
-                subprocess.Popen(["python3", "{}/scripts/add_ssh_keys.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.REDIS_HOST, settings.REDIS_PORT, usr])
-        code, response = 202, 'Process being handeled'
+        user = juju.check_input(user)
+        if token.is_admin or token.username == user:
+            execute_task(juju.add_ssh_key_user, user, data['ssh-key'])
+            code, response = 202, 'Process being handeled'
+        else:
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -210,13 +165,12 @@ def delete_ssh_key(user):
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        cons = datastore.get_all_controllers()
-        usr = juju.check_input(user)
-        for con in cons:
-            if datastore.get_controller_access(con, token.username) == 'superuser':
-                subprocess.Popen(["python3", "{}/scripts/remove_ssh_keys.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(), con, data['ssh-key'], settings.REDIS_HOST, settings.REDIS_PORT, usr])
-        code, response = 202, 'Process being handeled'
+        user = juju.check_input(user)
+        if token.is_admin or token.username == user:
+            execute_task(juju.remove_ssh_key_user, user, data['ssh-key'])
+            code, response = 202, 'Process being handeled'
+        else:
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -226,44 +180,43 @@ def delete_ssh_key(user):
 def get_credentials(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        if token.is_admin or token.username == user:
-            code, response = 200, datastore.get_credentials(user)
+        usr = juju.check_input(user)
+        if token.is_admin or token.username == usr:
+            code, response = 200, juju.execute_task(juju.get_credentials, token, usr)
+        else:
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials', methods=['POST'])
-def add_credentials(user):
+def add_credential(user):
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        cons = datastore.get_all_controllers()
         usr = juju.check_input(user)
-        for con in cons:
-            if datastore.get_controller_access(con, token.username) == 'superuser' or token.is_admin:
-                result_cred =  execute_task(juju.generate_cred_file, data['c_type'], data['name'], data['credentials'])
-                subprocess.Popen(["python3", "{}/scripts/add_credentials.py".format(juju.get_api_dir()), usr,
-                                  juju.get_api_dir(), str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
-        code, response = 202, 'Process being handeled'
+        if token.is_admin or token.username == usr:
+            execute_task(juju.add_credential, usr, data['c_type'], data['name'], data['credentials'])
+            code, response = 202, 'Process being handeled'
+        else:
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
 
-@USERS.route('/<user>/crecentials', methods=['DELETE'])
-def delete_credentials(user):
+@USERS.route('/<user>/credentials', methods=['DELETE'])
+def remove_credential(user):
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        cons = datastore.get_all_controllers()
         usr = juju.check_input(user)
-        for con in cons:
-            if datastore.get_controller_access(con, token.username) == 'superuser':
-                result_cred =  execute_task(juju.generate_cred_file, data['c_type'], data['name'], data['credentials'])
-                subprocess.Popen(["python3", "{}/scripts/remove_credentials.py".format(juju.get_api_dir()), usr,
-                                  juju.get_api_dir(), str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
-        code, response = 202, 'Process being handeled'
+        if token.is_admin or token.username == usr:
+            execute_task(juju.remove_credential, usr, data['name'])
+            code, response = 202, 'Process being handeled'
+        else:
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -294,12 +247,13 @@ def get_ucontroller_access(user, controller):
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
+                execute_task(con.connect, token)
                 code, response = 200, execute_task(juju.get_ucontroller_access, con, usr)
+                execute_task(con.disconnect)
             else:
                 code, response = errors.unauthorized()
         else:
             code, response = errors.does_not_exist('user')
-        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -310,20 +264,16 @@ def grant_to_controller(user, controller):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
-        access = juju.check_access(request.json['access'])
         usr = juju.check_input(user)
-        u_exists = execute_task(juju.user_exists, usr)
-        if u_exists:
-            if execute_task(juju.check_same_access, usr, access, con):
-                code, response = 409, "Access level already set to {}".format(access)
-                execute_task(con.disconnect)
-            else:
-                execute_task(con.disconnect)
-                subprocess.Popen(["python3", "{}/scripts/set_user_access.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(),settings.REDIS_HOST, settings.REDIS_PORT, usr, access, controller])
+        if (token.is_admin or con.c_access == 'superuser') and usr != 'admin':
+            access = juju.check_access(request.json['access'])
+            if execute_task(juju.user_exists, usr):
+                execute_task(juju.add_user_to_controller, token, con, usr, access)
                 code, response = 202, 'Process being handeled'
+            else:
+                code, response = errors.does_not_exist('user')
         else:
-            code, response = errors.does_not_exist('user')
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -335,17 +285,16 @@ def revoke_from_controller(user, controller):
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
         usr = juju.check_input(user)
-        if execute_task(juju.user_exists, usr):
-            if con.c_access == 'superuser' and user != 'admin':
-                execute_task(juju.controller_revoke, con, usr)
-                datastore.set_controller_access(con.c_name, usr, 'login')
-                datastore.remove_models_access(con.c_name, usr)
-                code, response = 200, execute_task(juju.get_controller_access, con, usr)
+        if (token.is_admin or con.c_access == 'superuser' or token.username == usr) and usr != 'admin':
+            if execute_task(juju.user_exists, usr):
+                execute_task(con.connect, token)
+                execute_task(juju.remove_user_from_controller, token, con, usr)
+                code, response = 200, execute_task(juju.remove_user_from_controller, con, usr)
+                execute_task(con.disconnect)
             else:
-                code, response = errors.unauthorized()
+                code, response = errors.does_not_exist('user')
         else:
-            code, response = errors.does_not_exist('user')
-        execute_task(con.disconnect)
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -359,12 +308,13 @@ def get_models_access(user, controller):
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
+                execute_task(con.connect, token)
                 code, response = 200, execute_task(juju.get_models_access, con, usr)
+                execute_task(con.disconnect)
             else:
                 code, response = errors.unauthorized()
         else:
             code, response = errors.does_not_exist('user')
-        execute_task(con.disconnect)
     except KeyError:
         code, response = errors. invalid_data()
     return juju.create_response(code, response)
@@ -384,8 +334,6 @@ def get_model_access(user, controller, model):
                 code, response = errors.unauthorized()
         else:
             code, response = errors.does_not_exist('user')
-        execute_task(mod.disconnect)
-        execute_task(con.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -395,20 +343,17 @@ def get_model_access(user, controller, model):
 def grant_to_model(user, controller, model):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        access = juju.check_access(request.json['access'])
+        con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
         usr = juju.check_input(user)
-        mod_access = datastore.get_model_access(controller, model, usr)
-        con_access = datastore.get_controller_access(controller, usr)
-        u_exists = execute_task(juju.user_exists, user)
-        if u_exists:
-            if (mod_access == 'admin' or con_access == 'superuser') and user != 'admin':
-                subprocess.Popen(["python3", "{}/scripts/set_model_access.py".format(juju.get_api_dir()), token.username,
-                                  token.password, juju.get_api_dir(),settings.REDIS_HOST, settings.REDIS_PORT, usr, access, controller, model])
+        if (token.is_admin or mod.m_access == 'admin' or con.c_access == 'superuser') and user != 'admin':
+            access = juju.check_access(request.json['access'])
+            if execute_task(juju.user_exists, user):
+                execute_task(juju.add_user_to_model, token, con, mod, usr, access)
                 code, response = 202, 'Process being handeled'
             else:
-                code, response =  errors.unauthorized()
+                code, response = errors.does_not_exist('user')
         else:
-            code, response = errors.does_not_exist('user')
+            code, response =  errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -422,15 +367,16 @@ def revoke_from_model(user, controller, model):
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
-                execute_task(juju.model_revoke, mod, usr)
-                datastore.remove_model(con.c_name, mod.m_name, usr)
+                execute_task(con.connect, token)
+                execute_task(mod.connect, token)
+                execute_task(juju.remove_user_from_model, con, mod, usr)
                 code, response = 200, 'Revoked access for user {} on model {}'.format(usr, model)
+                execute_task(con.disconnect)
+                execute_task(mod.disconnect)
             else:
                 code, response = errors.unauthorized()
         else:
             code, response = errors.does_not_exist('user')
-        execute_task(con.disconnect)
-        execute_task(mod.disconnect)
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)

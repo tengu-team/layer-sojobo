@@ -8,3 +8,29 @@ options:
     type: string
     default: "127.0.0.1"
     description: listen address. When left at the default value, defaults to internal ip address.
+  install_sources:
+    description: |
+      list of extra apt sources, per charm-helpers standard
+      format (a yaml list of strings encoded as a string). each source
+      may be either a line that can be added directly to
+      sources.list(5), or in the form ppa:<user>/<ppa-name> for adding
+      personal package archives, or a distribution component to enable.
+    type: string
+    default: |
+      - "deb https://oss-binaries.phusionpassenger.com/apt/passenger xenial main"
+      - "ppa:jonathonf/python-3.6"
+  install_keys:
+    description: |
+      list of signing keys for install_sources package sources, per
+      charmhelpers standard format (a yaml list of strings encoded as
+      a string). the keys should be the full ascii armoured gpg public
+      keys. while gpg key ids are also supported and looked up on a
+      keyserver, operators should be aware that this mechanism is
+      insecure. null can be used if a standard package signing key is
+      used that will already be installed on the machine, and for ppa
+      sources where the package signing key is securely retrieved from
+      launchpad.
+    type: string
+    default: |
+      - 561F9B9CAC40B2F7
+      - null

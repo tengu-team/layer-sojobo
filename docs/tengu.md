@@ -1,7 +1,9 @@
 # Tengu-API Documentation
 
-The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-API. It contains all the calls to use JuJu,
-excluding calls handling users.
+The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-API. It contains all the calls to use JuJu, excluding calls handling users.
+
+# ToDo
+- implement JSON web tokens
 
 **Currently, all the calls must be made with BasicAuth in the request!**
 
@@ -51,7 +53,7 @@ excluding calls handling users.
   - message:
   ```json
   [
-      "controller1-name"
+      "controller1-name",
       "controller2-name"
   ]
   ```
@@ -151,16 +153,13 @@ excluding calls handling users.
 
 #### **Request type**: POST
 * **Description**:
-  Creates a new model on a controller. It checks if the model already exists and if the user is allowed to create a model on
-  the given controller
+  Creates a new model on a controller. It checks if the model already exists and if the user is allowed to create a model on the given controller
 * **Required headers**:
   - api-key
   - Content-Type:application/json
 * **Required body**:
   - model
   - credentials
-* **Optional body**:
-  - ssh-key
 * **Successful response**:
   - code: 202
   - message:
@@ -210,7 +209,7 @@ excluding calls handling users.
 * **Required body**:
   - bundle
 * **Successful response**:
-  - code: 200
+  - code: 202
   - message:
   ```json
   "Bundle is being deployed"          
@@ -366,6 +365,46 @@ excluding calls handling users.
       "exposed": false
   }
   ```
+#### **Request type**: PUT
+* **Description**:
+  Exposes or unexposes an application.
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+  - expose
+* **Successful response**:
+  - code: 200
+  - message:
+  ```json
+  {
+      "units": [
+          {
+              "ports": [],
+              "series": "xenial",
+              "name": "mysql/0",
+              "machine": "0",
+              "private-ip": "",
+              "public-ip": ""
+          }
+      ],
+      "name": "mysql",
+      "charm": "cs:mysql-57",
+      "status": {
+          "message": "waiting for machine",
+          "since": "2017-06-23T13:23:14.999857294Z",
+          "current": "waiting",
+          "version": ""
+      },
+      "relations": [
+          {
+              "interface": "cluster",
+              "with": "mysql"
+          }
+      ],
+      "exposed": false
+  }
+  ```
 
 #### **Request type**: DELETE
 * **Description**:
@@ -376,38 +415,60 @@ excluding calls handling users.
 * **Required body**:
 
 * **Successful response**:
+  - code: 202
+  - message:
+  ```json
+    "The application is being removed"
+  ```
+
+## **/tengu/controllers/[controller]/models/[model]/applications/[application]/config** <a name="config"></a>
+#### **Request type**: GET
+* **Description**:
+  Return all the config values of the given application.
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+
+* **Successful response**:
   - code: 200
   - message:
   ```json
-  [
-      {
-          "units": [
-              {
-                  "ports": [],
-                  "series": "xenial",
-                  "name": "mysql/0",
-                  "machine": "0",
-                  "private-ip": "",
-                  "public-ip": ""
-              }
-          ],
-          "name": "mysql",
-          "charm": "cs:mysql-57",
-          "status": {
-              "message": "waiting for machine",
-              "since": "2017-06-23T13:23:14.999857294Z",
-              "current": "waiting",
-              "version": ""
-          },
-          "relations": [
-              {
-                  "interface": "cluster",
-                  "with": "mysql"
-              }
-          ],
-          "exposed": false
-      }
-  ]
+  {
+    "backup_dir": {
+        "default": true,
+        "description": "Directory where backups will be stored",
+        "type": "string",
+        "value": "/var/lib/mysql/backups"
+    },
+    "backup_retention_count": {
+        "default": true,
+        "description": "Number of recent backups to retain.",
+        "type": "int",
+        "value": 7
+    },
+    "backup_schedule": {
+        "default": true,
+        "description": "Cron schedule used for backups. If empty backups are disabled\n",
+        "type": "string",
+        "value": ""
+    }
+  }  
+  ```
+
+#### **Request type**: PUT
+* **Description**:
+  Change a specific config value of an application
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+  - config
+* **Successful response**:
+  - code: 202
+  - message:
+  ```json
+    "The config parameter is being changed"
   ```
 
 ## **/tengu/controllers/[controller]/models/[model]/applications/[application]/units** <a name="units"></a>
@@ -449,30 +510,14 @@ excluding calls handling users.
 * **Required headers**:
   - api-key
   - Content-Type:application/json
-* **Required body**:
-
+* **Optional body**:
+  - amount
+  - target
 * **Successful response**:
-  - code: 200
+  - code: 202
   - message:
   ```json
-  [
-      {
-          "ports": [],
-          "series": "trusty",
-          "name": "wordpress/0",
-          "machine": "1",
-          "private-ip": "",
-          "public-ip": ""
-      },
-      {
-          "ports": [],
-          "series": "trusty",
-          "name": "wordpress/1",
-          "machine": "2",
-          "private-ip": "",
-          "public-ip": ""
-      }
-  ]
+    "Units being added"
   ```
 
 ## **/tengu/controllers/[controller]/models/[model]/applications/[application]/units/[unitnumber]** <a name="unit"></a>
@@ -507,19 +552,10 @@ excluding calls handling users.
 * **Required body**:
 
 * **Successful response**:
-  - code: 200
+  - code: 202
   - message:
   ```json
-  [
-      {
-          "ports": [],
-          "series": "trusty",
-          "name": "wordpress/0",
-          "machine": "1",
-          "private-ip": "",
-          "public-ip": ""
-      }
-  ]
+    "Unit is being removed"
   ```
 
 ## **/tengu/controllers/[controller]/models/[model]/machines/** <a name="machines"></a>
@@ -635,47 +671,10 @@ excluding calls handling users.
 * **Required body**:
 
 * **Successful response**:
-  - code: 200
+  - code: 202
   - message:
   ```json
-  [
-      {
-          "instance-id": "juju-b7313c-3",
-          "ip": {
-              "external_ip": "104.199.3.129",
-              "internal_ip": "10.132.0.37"
-          },
-          "containers": [],
-          "series": "xenial",
-          "name": "3",
-          "hardware-characteristics": {
-              "mem": 1700,
-              "availability-zone": "europe-west1-c",
-              "root-disk": 10240,
-              "arch": "amd64",
-              "cpu-power": 138,
-              "cpu-cores": 1
-          }
-      },
-      {
-          "instance-id": "juju-b7313c-0",
-          "ip": {
-              "external_ip": "104.155.26.44",
-              "internal_ip": "10.132.0.35"
-          },
-          "containers": [],
-          "series": "xenial",
-          "name": "0",
-          "hardware-characteristics": {
-              "mem": 1700,
-              "availability-zone": "europe-west1-b",
-              "root-disk": 10240,
-              "arch": "amd64",
-              "cpu-power": 138,
-              "cpu-cores": 1
-          }
-      }
-  ]
+    "machine is being deleted"
   ```
 
 ## **/tengu/controllers/[controller]/models/[model]/relations** <a name="relations"></a>

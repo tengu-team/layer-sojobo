@@ -20,146 +20,82 @@ import traceback
 import logging
 import json
 import redis
-from juju.client.connection import JujuData
 from juju import tag
 from juju.controller import Controller
 from juju.client import client
 ################################################################################
-# Asyncio Wrapper
-################################################################################
-def execute_task(command, *args):
-    loop = asyncio.get_event_loop()
-    loop.set_debug(False)
-    result = loop.run_until_complete(command(*args))
-    loop.close()
-    return result
-################################################################################
 # Datastore Functions
 ################################################################################
-def get_controller(c_name, connection):
-    result = connection.get(c_name)
-    return json.loads(result)
-
-
-def get_controller_users(controller, user_db, cont_db):
-    cont = get_controller(controller, cont_db)
-    result = []
-    for user in cont['users']:
-        user_obj = user_db.get(user)
-        json_user = json.loads(user_obj)
-        result.append(json_user)
-    return result
-
-
-def get_ssh_keys(user, connection):
-    data = connection.get(user)
-    return [k for k in json.loads(data)['ssh_keys'] if k is not None]
-
-
-def get_controller_access(c_name, user, connection):
-    json_data = connection.get(user)
-    data = json.loads(json_data)
-    for acc in data['access']:
-        if list(acc.keys())[0] == c_name:
-            return acc[c_name]['access']
-
-
-def get_superusers(c_name, user_db, cont_db):
-    result = []
-    users = get_controller_users(c_name, user_db, cont_db)
-    for user in users:
-        if get_controller_access(c_name, user['name'], user_db) == 'superuser':
-            result.append(user['name'])
-    return result
-
-
-def get_credentials(user, connection, cred_name):
-    user_data = connection.get(user)
-    data = json.loads(user_data)
-    for creds in data['credentials']:
-        if creds['name'] == cred_name:
-            return creds
-
-
 def set_model_access(c_name, m_name, user, connection, access):
     user_data = connection.get(user)
     result = json.loads(user_data)
-    new_access = []
-    for acc in result['access']:
-        if list(acc.keys())[0] == c_name:
-            models = acc[c_name]['models']
-            for modelname in models:
-                if list(modelname.keys())[0] == m_name:
-                    models.remove(modelname)
-            new_model = {m_name: access}
-            models.append(new_model)
-            acc[c_name]['models'] = models
-        new_access.append(acc)
-    result['access'] = new_access
-    json_result = json.dumps(result)
-    connection.set(user, json_result)
+    for con in result['controllers']:
+        if con['name'] == c_name:
+            for mod in con['models']:
+                if mod['name'] == m_name:
+                    mod['access'] = access
+                    break
+            break
+    connection.set(user, json.dumps(result))
 
 
-def set_model_state(c_name, m_name, state, connection):
-    con = get_controller(c_name, connection)
-    new_models = []
+def set_model_state(c_name, m_name, state, connection, uuid=None):
+    con = json.loads(connection.get(c_name))
     for mod in con['models']:
-        if list(mod.keys())[0] == m_name:
-            new_mod = {}
-            new_mod[m_name] = state
-            mod = new_mod
-        new_models.append(mod)
-    con['models'] = new_models
-    j_con = json.dumps(con)
-    connection.set(c_name, j_con)
+        if mod['name'] == m_name:
+            mod['status'] = state
+            if uuid:
+                mod['uuid'] = uuid
+            break
+    connection.set(c_name, json.dumps(con))
 ################################################################################
 # Async Functions
 ################################################################################
 async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
     try:
         logger.info('Setting up Controllerconnection for %s', c_name)
+        users = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
+        controllers = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
         controller = Controller()
-        jujudata = JujuData()
-        controller_endpoint = jujudata.controllers()[c_name]['api-endpoints'][0]
-        user_db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
-        cont_db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
-        s_users = get_superusers(c_name, user_db, cont_db)
-        userkeys = get_ssh_keys(usr, user_db)
-        adminkeys = get_ssh_keys('admin', user_db)
-        await controller.connect(controller_endpoint, usr, pwd)
-        logger.info('Setting up Modelconnection for model: %s', m_name)
-        c_type = get_controller(c_name, cont_db)['type']
+        await controller.connect(json.loads(controllers.get(c_name))['endpoints'][0], usr, pwd)
+        c_type = json.loads(controllers.get(c_name))['type']
+        logger.info('Adding credentials')
         cloud_facade = client.CloudFacade.from_connection(controller.connection)
-        credentialfile = get_credentials(usr, user_db, cred_name)
-        cred = client.CloudCredential(credentialfile['key'], credentialfile['type'])
-        update_cloudcred = client.UpdateCloudCredential(cred, tag.credential(c_type, usr, credentialfile['name']))
-        await cloud_facade.UpdateCredentials([update_cloudcred])
-        model = await controller.add_model(m_name, cloud_name=c_type, credential_name=credentialfile['name'], owner=tag.user(usr))
-        for key in userkeys:
+        for cred in json.loads(users.get(usr))['credentials']:
+            if cred['name'] == cred_name:
+                credential = cred
+                cloud_cred = client.UpdateCloudCredential(
+                    client.CloudCredential(cred['key'], cred['type']),
+                    tag.credential(c_type, usr, cred['name'])
+                )
+                await cloud_facade.UpdateCredentials([cloud_cred])
+        logger.info('Creating model: %s', m_name)
+        model = await controller.add_model(
+            m_name,
+            cloud_name=c_type,
+            credential_name=credential['name'],
+            owner=tag.user(usr)
+        )
+        logger.info('Adding ssh-keys to model and setting up grants: %s', m_name)
+        set_model_access(c_name, m_name, usr, users, 'admin')
+        for key in json.loads(users.get(usr))['ssh-keys']:
             await model.add_ssh_key(usr, key)
-        for key in adminkeys:
-            await model.add_ssh_key('admin', key)
-        for user in s_users:
-            if user != 'admin':
-                await model.grant(user, acl='admin')
-                sshkey = get_ssh_keys(user, user_db)
-                for key in sshkey:
-                    await model.add_ssh_key(user, key)
-            set_model_access(c_name, m_name, user, user_db, 'admin')
-            logger.info('Admin Access granted for user %s on model %s', user, m_name)
-        set_model_state(c_name, m_name, 'ready', cont_db)
-        set_model_access(c_name, m_name, usr, user_db, 'admin')
+        for u in json.loads(controllers.get(c_name))['users']:
+            if u['access'] == 'superuser':
+                await model.grant(u['name'], acl='admin')
+                set_model_access(c_name, m_name, u['name'], users, 'admin')
+                for key in json.loads(users.get(u['name']))['ssh-keys']:
+                    await model.add_ssh_key(u['name'], key)
+        set_model_state(c_name, m_name, 'ready', controllers, model.info.uuid)
     except Exception as e:
-        models = await controller.get_models()
-        list_models = [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
-        if m_name in list_models:
-            set_model_state(c_name, m_name, 'ready', cont_db)
+        if 'model' in locals():
+            set_model_state(c_name, m_name, 'ready', controllers,model.serialize()['model'].serialize()['uuid'] )
         else:
-            set_model_state(c_name, m_name, 'ERROR: {}'.format(e), cont_db)
+            set_model_state(c_name, m_name, 'ERROR: {}'.format(e), controllers)
     finally:
         if 'model' in locals():
             await model.disconnect()
@@ -167,11 +103,14 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
 
 
 if __name__ == '__main__':
-    username, password, api_dir, url, port, controller_name, model_name, cred_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]
     logger = logging.getLogger('add-model')
-    hdlr = logging.FileHandler('{}/log/add_model.log'.format(api_dir))
+    hdlr = logging.FileHandler('{}/log/add_model.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
-    execute_task(create_model, controller_name, model_name, username, password, url, port, cred_name)
+    loop = asyncio.get_event_loop()
+    loop.set_debug(False)
+    loop.run_until_complete(create_model(sys.argv[6], sys.argv[7], sys.argv[1],
+                                         sys.argv[2], sys.argv[4], sys.argv[5], sys.argv[8]))
+    loop.close()
