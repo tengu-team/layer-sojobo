@@ -8,7 +8,7 @@ Since it is still in beta, any suggestions and bugs are welcome on [Github](http
 The required charms can be found in the qrama-charms repo. In order to install these using the following commands, one must be in the topdir of the cloned qrama-charms repo.
 ```
 juju deploy ./sojobo-api
-juju deploy ./redis --series xenial
+juju deploy ./redis redis-server --series xenial
 juju add-relation sojobo-api redis
 ```
 Each cloud environment has its own subordinate charm, containing some cloud-specific workflows.
