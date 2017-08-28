@@ -153,7 +153,10 @@ def check_input(data):
 
 
 async def authenticate(api_key, auth):
+    error = errors.unauthorized()
     if api_key == settings.API_KEY:
+        if auth is None:
+            abort(error[0], error[1])
         token = JuJu_Token(auth)
         if token.is_admin:
             return token
@@ -165,10 +168,8 @@ async def authenticate(api_key, auth):
                     pass
                 return token
             except JujuAPIError:
-                error = errors.unauthorized()
                 abort(error[0], error[1])
     else:
-        error = errors.unauthorized()
         abort(error[0], error[1])
 
 
