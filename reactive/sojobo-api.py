@@ -17,13 +17,13 @@
 from base64 import b64encode
 from hashlib import sha256
 import os
+import requests
 import shutil
 import subprocess
 from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
 from charmhelpers.core.hookenv import status_set, log, config, open_port, unit_private_ip, application_version_set, leader_get, leader_set
 from charmhelpers.core.host import service_restart, chownr, adduser
-from charmhelpers.contrib.python.packages import pip_install
 from charms.reactive import hook, when, when_not, set_state, remove_state
 import charms.leadership
 
@@ -75,8 +75,8 @@ def config_changed():
 @when('leadership.is_leader')
 @when_not('secrets.configured')
 def set_secrets():
-    api_key = sha256(os.urandom(256)).hexdigest()
-    password = b64encode(os.urandom(18)).decode('utf-8')
+    api_key = leader_get().get('api-key', sha256(os.urandom(256)).hexdigest())
+    password = leader_get().get('password', b64encode(os.urandom(18)).decode('utf-8'))
     leader_set({
         'api-key': api_key,
         'password': password
@@ -110,9 +110,36 @@ def connect_to_redis(redis):
         'REDIS_HOST': redis_db['host'],
         'REDIS_PORT': redis_db['port']
     })
-    set_state('api.running')
     service_restart('nginx')
     status_set('active', 'admin-password: {} api-key: {}'.format(password, api_key))
+    set_state('api.running')
+
+
+@when('leadership.is_leader', 'api.running')
+@when_not('admin.created')
+def create_admin():
+    if leader_get().get('admin') != 'Created':
+        res = requests.post('http://{}/users'.format(unit_private_ip()),
+                            json={'username': 'admin', 'password': db.get('password')},
+                            headers={'api-key': db.get('api-key')},
+                            auth=('admin', db.get('password')))
+        if res.status_code == 200:
+            leader_set({'admin': 'Created'})
+            status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
+            set_state('admin.created')
+        else:
+            status_set('blocked', 'error creating admin user')
+    else:
+        leader_set({'admin': 'Created'})
+
+
+@when('api.running')
+@when_not('leadership.is_leader')
+def status_update_not_leader():
+    if leader_get().get('admin') != 'Created':
+        status_set('blocked', 'error creating admin user')
+    else:
+        status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
 
 
 @when_not('redis.available')

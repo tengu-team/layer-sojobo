@@ -224,7 +224,6 @@ async def create_controller(token, c_type, name, region, credentials):
             con_data['controllers'][name]['uuid'],
             con_data['controllers'][name]['ca-cert'],
             con_data['controllers'][name]['region'])
-    datastore.create_user('admin')
     datastore.add_user_to_controller(name, 'admin', 'superuser')
     controller = Controller_Connection(token, name)
     result_cred = await generate_cred_file(c_type, 'admin', credentials)
@@ -795,7 +794,7 @@ async def remove_user_from_model(token, controller, model, username):
 
 
 async def user_exists(username):
-    return username == settings.JUJU_ADMIN_USER or username in await get_all_users()
+    return username in await get_all_users()
 
 
 #libjuju: geen andere methode om users op te vragen atm
