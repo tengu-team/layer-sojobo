@@ -331,14 +331,10 @@ async def get_model_info(token, controller, model):
         return {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
                 'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
                 'status': datastore.check_model_state(controller.c_name, model.m_name), 'credentials' : credentials}
-    elif state == 'accepted':
-        s_users = await get_controller_superusers(controller)
-        u_list = [{"user" : us, "access" : "admin"} for us in s_users]
-        if not token.username in s_users:
-            u_list.append({"user" : token.username, "access" : "admin"})
-        return {'name': model.m_name, 'status': state, 'users' : u_list}
-    elif state == 'error':
-        return {'name': model.m_name, 'status': state}
+    elif state == 'accepted' or state == 'error':
+        return {'name': model.m_name, 'status': state, 'users' : {"user" : token.username, "access" : "admin"}}
+    else:
+        return {}
 
 
 async def get_model_creds(token, model):
@@ -429,7 +425,8 @@ async def create_model(token, controller, model, credentials):
         code, response = errors.already_exists('model')
     elif credentials in datastore.get_credential_keys(token.username):
         datastore.add_model_to_controller(controller, model)
-        datastore.set_model_access(controller, model, token.username, 'accepted')
+        datastore.set_model_state(controller, model, 'accepted')
+        datastore.set_model_access(controller, model, token.username, 'admin')
         Popen(["python3.6", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), token.username,
                token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT,
                controller, model, credentials])
