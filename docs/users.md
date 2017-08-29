@@ -45,6 +45,7 @@ The User-API provides user management over all controllers.
       "controllers": [
         {
           "name": "gce1",
+          "type": "google",
           "access": "superuser",
           "models": [
             {
@@ -94,6 +95,7 @@ The User-API provides user management over all controllers.
     "credentials": [
       {
         "name": "admin",
+        "type": "google",
         "type": "jsonfile",
         "key": {
           "file": "google_cred_file"
