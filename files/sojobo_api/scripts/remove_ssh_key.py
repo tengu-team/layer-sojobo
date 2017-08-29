@@ -39,7 +39,7 @@ async def remove_ssh_key(usr, pwd, ssh_key, url, port, username):
                         if modl['name'] == mod['name']:
                             model = Model()
                             logger.info('Setting up Modelconnection for model: %s', mod['name'])
-                            await model.connect(controller['endpoints'][0], mod['uuid'],
+                            await model.connect(controller['endpoints'][0], modl['uuid'],
                                                 usr, pwd, controller['ca-cert'])
                             await model.remove_ssh_key(username, ssh_key)
                             await model.disconnect()

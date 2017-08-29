@@ -356,7 +356,11 @@ def get_cloud_response(data):
 async def get_ssh_keys(token, model):
     async with model.connect(token) as juju:
         res = await juju.get_ssh_key(False)
-    return res.serialize()['results'][0].serialize()
+    data = res.serialize()['results'][0].serialize()['result']
+    if data is None:
+        return []
+    else:
+        return data
 
 
 async def get_ssh_keys_user(user):
@@ -416,7 +420,7 @@ async def get_public_ip_controller(token, controller):
 
 #libjuju geen manier om gui te verkrijgen of juju gui methode
 async def get_gui_url(controller, model):
-    return 'https://{}:17070/gui/{}'.format(controller.endpoint, model.m_uuid)
+    return 'https://{}/gui/{}'.format(controller.endpoint, model.m_uuid)
 
 
 async def create_model(token, controller, model, credentials):
