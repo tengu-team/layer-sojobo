@@ -136,7 +136,10 @@ def create_response(http_code, return_object, is_json=False):
 
 
 def check_input(data):
-    if data is not None:
+    if not data:
+        error = errors.empty()
+        abort(error[0], error[1])
+    else:
         items = data.split(':', 1)
         if len(items) > 1 and items[0].lower() not in ['local', 'github', 'lxd', 'kvm']:
             error = errors.invalid_option(items[0])
@@ -146,10 +149,7 @@ def check_input(data):
                 if not all(x.isalpha() or x.isdigit() or x == '-' for x in item):
                     error = errors.invalid_input()
                     abort(error[0], error[1])
-            result = data.lower()
-    else:
-        result = None
-    return result
+            return data.lower()
 
 
 async def authenticate(api_key, auth):

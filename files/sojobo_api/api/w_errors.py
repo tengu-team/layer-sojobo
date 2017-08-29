@@ -24,6 +24,10 @@ def invalid_input():
     return 400, 'Only lowercase letters, digits and hyphens are allowed'
 
 
+def empty():
+    return 400, 'Empty values are not allowed'
+
+
 def invalid_access(access):
     return 400, 'This access level does not exist: {}'.format(access)
 

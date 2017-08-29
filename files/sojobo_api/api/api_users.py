@@ -65,9 +65,11 @@ def create_user():
         if token.is_admin:
             if execute_task(juju.user_exists, user):
                 code, response = errors.already_exists('user')
-            else:
+            elif data['password']:
                 execute_task(juju.create_user, token, user, data['password'])
                 code, response = 200, 'User {} succesfully created'.format(user)
+            else:
+                code, response = errors.empty()
         else:
             code, response = errors.unauthorized()
     except KeyError:
