@@ -159,7 +159,7 @@ The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-A
   - Content-Type:application/json
 * **Required body**:
   - model
-  - credentials
+  - credential
 * **Successful response**:
   - code: 202
   - message:

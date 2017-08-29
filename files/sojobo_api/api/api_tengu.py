@@ -108,7 +108,7 @@ def create_model(controller):
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
         model = juju.check_input(data['model'])
-        credentials = juju.check_input(data['credentials'])
+        credentials = juju.check_input(data['credential'])
         if con.c_access == 'add-model' or con.c_access == 'superuser':
             code, response = execute_task(juju.create_model, token, con.c_name, model, credentials)
         else:
