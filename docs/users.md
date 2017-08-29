@@ -26,39 +26,36 @@ The User-API provides user management over all controllers.
 * **Successful response**:
   - code: 200
   - message:
+  Remark: credentials are cloud-type specific: the actual value of the key-attribute depends on the type.
   ```json
-  {
+  [
+    {
+      "name": "admin",
+      "active": true,
+      "credentials": [
+        {
           "name": "admin",
-          "active": true,
-          "credentials": [
-              {
-                  "name": "admin",
-                  "type": "jsonfile",
-                  "key": {
-                      "file": "{"google_cred_file"}"
-                  }
-              }
-          ],
-          "ssh_keys": [
-              null
-          ],
-          "access": [
-              {
-                  "testcontroller": {
-                      "access": "superuser",
-                      "models": [
-                          {
-                              "controller": "admin"
-                          },
-                          {
-                              "default": "admin"
-                          }
-                      ],
-                      "type": "google"
-                  }
-              }
+          "type": "jsonfile",
+          "key": {
+            "file": "google_cred_file"
+          }
+        }
+      ],
+      "ssh_keys": [],
+      "controllers": [
+        {
+          "name": "gce1",
+          "access": "superuser",
+          "models": [
+            {
+              "name": "default",
+              "access": "admin"
+            }
           ]
-      }
+        }
+      ]
+    }     
+  ]
   ```
 
 #### **Request type**: POST
@@ -89,39 +86,34 @@ The User-API provides user management over all controllers.
 * **Successful response**:
   - code: 200
   - message:
+  Remark: credentials are cloud-type specific: the actual value of the key-attribute depends on the type.
   ```json
   {
-          "name": "admin",
-          "active": true,
-          "credentials": [
-              {
-                  "name": "admin",
-                  "type": "jsonfile",
-                  "key": {
-                      "file": "{"google_cred_file"}"
-                  }
-              }
-          ],
-          "ssh_keys": [
-              null
-          ],
-          "access": [
-              {
-                  "testcontroller": {
-                      "access": "superuser",
-                      "models": [
-                          {
-                              "controller": "admin"
-                          },
-                          {
-                              "default": "admin"
-                          }
-                      ],
-                      "type": "google"
-                  }
-              }
-          ]
+    "name": "admin",
+    "active": true,
+    "credentials": [
+      {
+        "name": "admin",
+        "type": "jsonfile",
+        "key": {
+          "file": "google_cred_file"
+        }
       }
+    ],
+    "ssh_keys": [],
+    "controllers": [
+      {
+        "name": "gce1",
+        "access": "superuser",
+        "models": [
+          {
+            "name": "default",
+            "access": "admin"
+          }
+        ]
+      }
+    ]
+  }    
   ```
 
 #### **Request type**: PUT
