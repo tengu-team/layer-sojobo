@@ -219,14 +219,11 @@ def add_user_to_controller(c_name, user, access):
     con.set(c_name, json.dumps(data))
     con = connect_to_users()
     data = json.loads(con.get(user))
-    exists = False
     for controller in data['controllers']:
         if controller['name'] == c_name:
-            exists = True
-            c_type = controller['type']
+            data['controllers'].append({
+                'access' : access, 'name': c_name, 'models' : [], 'type': controller['type']})
             break
-    if not exists:
-        data['controllers'].append({'access' : access, 'name': c_name, 'models' : [], 'type': c_type})
     con.set(user, json.dumps(data))
 
 

@@ -72,7 +72,7 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-"User <username> succesfully created."
+  "User <username> succesfully created."
   ```
 
 ## **/users/[user]** <a name="user"></a>
@@ -130,7 +130,7 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-"succesfully changed password for user admin"
+  "succesfully changed password for user admin"
   ```
 
 #### **Request type**: DELETE
@@ -144,16 +144,26 @@ The User-API provides user management over all controllers.
 * **Successful response**:
   - code: 200
   - message:
-```json
-  [{"name": "username",
-    "controllers": [{"name": "controller-name",
-                     "type": "controller-type",
-                     "access": "controller access",
-                     "models": [{"name": "model-name",
-                                 "access": "model access"}]
-                   }]
-  }]
-```
+  ```json
+  [
+    {
+      "name": "username",
+      "controllers": [
+        {
+          "name": "controller-name",
+          "type": "controller-type",
+          "access": "controller access",
+          "models": [
+            {
+              "name": "model-name",
+              "access": "model access"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+  ```
 
 ## **/users/[user]/ssh** <a name="ssh"></a>
 #### **Request type**: GET
@@ -248,23 +258,23 @@ The User-API provides user management over all controllers.
   - code: 202
   - message:
   ```json
-"Process being handeled"
+  "Process being handeled"
   ```
 
 #### **Request type**: DELETE
-  * **Description**:
-    Removes the users credential.
-  * **Required headers**:
-    - api-key
-    - Content-Type:application/json
-  * **Required body**:
-    - name
-  * **Successful response**:
-    - code: 202
-    - message:
-    ```json
+* **Description**:
+  Removes the users credential.
+* **Required headers**:
+  - api-key
+  - Content-Type:application/json
+* **Required body**:
+  - name
+* **Successful response**:
+  - code: 202
+  - message:
+  ```json
   "Process being handeled"
-    ```
+  ```
 
 ## **/users/[user]/controllers** <a name="controllers"></a>
 #### **Request type**: GET
@@ -354,9 +364,12 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  [{"name": "model-name",
-    "access": "model access"}]
-  }]
+  [
+    {
+      "name": "model-name",
+      "access": "model access"
+    }
+  ]
   ```
 
 ## **/users/[user]/controllers/[controller]/models/[model]** <a name="model"></a>
@@ -372,8 +385,10 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  {"name": "model-name",
-   "access": "model access"}
+  {
+    "name": "model-name",
+    "access": "model access"
+  }
   ```
 
 #### **Request type**: PUT
@@ -388,8 +403,10 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  {"name": "model-name",
-   "access": "model access"}
+  {
+    "name": "model-name",
+    "access": "model access"
+  }
   ```
 
 #### **Request type**: DELETE
@@ -404,6 +421,10 @@ The User-API provides user management over all controllers.
   - code: 200
   - message:
   ```json
-  [{"name": "model-name",
-    "access": "model access"}]
+  [
+    {
+      "name": "model-name",
+      "access": "model access"
+    }
+  ]
   ```

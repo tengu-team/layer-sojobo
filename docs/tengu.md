@@ -84,7 +84,7 @@ The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-A
     "users": [
         "admin"
     ]
-}
+  }
   ```
 
 ## **/tengu/controllers/[controller]** <a name="controller"></a>
@@ -116,7 +116,7 @@ The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-A
         "access": "superuser"
       }
     ]
-}
+  }
   ```
 
 #### **Request type**: DELETE
@@ -632,7 +632,7 @@ The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-A
     - code: 200
     - message:
     ```json
-"Machine is being deployed"
+    "Machine is being deployed"
     ```
 
 ## **/tengu/controllers/[controller]/models/[model]/machines/[machine]** <a name="machine"></a>
