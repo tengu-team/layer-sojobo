@@ -21,8 +21,6 @@ import os
 # import shutil
 from subprocess import check_output, check_call, Popen
 import json
-from pathlib import Path
-import yaml
 from asyncio_extras import async_contextmanager
 from flask import abort, Response
 from juju import tag
@@ -51,10 +49,13 @@ class Controller_Connection(object):
         self.c_connection = Controller()
         con = datastore.get_controller(c_name)
         self.c_type = con['type']
-        self.endpoint = con['endpoints'][0]
-        self.c_cacert = con['ca-cert']
+        if len(con['endpoints']) > 0:
+            self.endpoint = con['endpoints'][0]
+            self.c_cacert = con['ca-cert']
+        else:
+            self.endpoint = None
+            self.c_cacert = None
         self.c_token = getattr(get_controller_types()[self.c_type], 'Token')(self.endpoint, token.username, token.password)
-
     async def set_controller(self, token, c_name):
         await self.c_connection.disconnect()
         self.c_name = c_name
@@ -210,29 +211,13 @@ async def check_c_type(c_type):
         abort(error[0], error[1])
 
 
-async def create_controller(token, c_type, name, region, credentials):
-    get_controller_types()[c_type].create_controller(name, region, credentials)
-    pswd = settings.JUJU_ADMIN_PASSWORD
-    check_output(['juju', 'change-user-password', 'admin', '-c', name],
-                 input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
-    with open(os.path.join(str(Path.home()), '.local', 'share', 'juju', 'controllers.yaml'), 'r') as data:
-        con_data = yaml.load(data)
-        datastore.create_controller(
-            name,
-            c_type,
-            con_data['controllers'][name]['api-endpoints'],
-            con_data['controllers'][name]['uuid'],
-            con_data['controllers'][name]['ca-cert'],
-            con_data['controllers'][name]['region'])
-    datastore.add_user_to_controller(name, 'admin', 'superuser')
-    controller = Controller_Connection(token, name)
-    result_cred = await generate_cred_file(c_type, 'admin', credentials)
-    datastore.add_credential('admin', result_cred)
-    for model in await get_all_models(token, controller):
-        datastore.add_model_to_controller(name, model['name'])
-        datastore.set_model_state(name, model['name'], 'ready', model['uuid'])
-        datastore.set_model_access(name, model['name'], token.username, 'admin')
-    return await get_controller_info(token, controller)
+async def create_controller(c_type, name, region, credentials):
+    for controller in await get_all_controllers():
+        if datastore.get_controller(controller)['state'] == 'PENDING':
+            return 503, 'An environment is already being created'
+    Popen(["python3.6", "{}/scripts/add_controller.py".format(settings.SOJOBO_API_DIR),
+           c_type, name, region, json.dumps(credentials)])
+    return 202, 'Environment {} is being created in region {}'.format(name, region)
 
 
 async def generate_cred_file(c_type, name, credentials):
@@ -253,7 +238,8 @@ async def get_all_controllers():
 
 
 async def controller_exists(c_name):
-    return c_name in list(await get_all_controllers())
+    controllers = await get_all_controllers()
+    return c_name in controllers
 
 
 async def get_controller_access(con, username):
@@ -266,10 +252,12 @@ async def get_controllers_info():
 
 async def get_controller_info(token, controller):
     if controller.c_access is not None:
-        models = await get_models_info(token, controller)
+        con = datastore.get_controller(controller.c_name)
         users = await get_users_controller(controller.c_name)
-        result = {'name': controller.c_name, 'type': controller.c_token.type, 'models': models,
-                  'users': users}
+        result = {'name': controller.c_name, 'type': controller.c_token.type,
+                  'users': users, 'state': con['state'], 'models': []}
+        if con['state'] == 'ready':
+            result['models'] = await get_models_info(token, controller)
     else:
         result = None
     return result
@@ -291,9 +279,7 @@ async def get_controller_type(c_name):
 # MODEL FUNCTIONS
 ###############################################################################
 async def get_all_models(token, controller):
-    async with controller.connect(token) as juju:
-        models = await juju.get_models()
-    return [model.serialize()['model'].serialize() for model in models.serialize()['user-models']]
+    return datastore.get_all_models(controller.c_name)
 
 
 async def model_exists(token, controller, modelname):

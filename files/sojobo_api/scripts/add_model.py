@@ -23,6 +23,7 @@ import redis
 from juju import tag
 from juju.controller import Controller
 from juju.client import client
+from juju.errors import JujuAPIError, JujuError
 ################################################################################
 # Datastore Functions
 ################################################################################
@@ -76,26 +77,32 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
             credential_name=credential['name'],
             owner=tag.user(usr)
         )
-        logger.info('Adding ssh-keys to model and setting up grants: %s', m_name)
         set_model_access(c_name, m_name, usr, users, 'admin')
+        set_model_state(c_name, m_name, 'ready', controllers, model.info.uuid)
+        logger.info('Adding ssh-keys to model: %s', m_name)
         for key in json.loads(users.get(usr))['ssh-keys']:
-            await model.add_ssh_key(usr, key)
+            try:
+                await model.add_ssh_key(usr, key)
+            except (JujuAPIError, JujuError):
+                pass
         for u in json.loads(controllers.get(c_name))['users']:
             if u['access'] == 'superuser':
                 await model.grant(u['name'], acl='admin')
                 set_model_access(c_name, m_name, u['name'], users, 'admin')
                 for key in json.loads(users.get(u['name']))['ssh-keys']:
-                    await model.add_ssh_key(u['name'], key)
-        set_model_state(c_name, m_name, 'ready', controllers, model.info.uuid)
+                    try:
+                        await model.add_ssh_key(u['name'], key)
+                    except (JujuAPIError, JujuError):
+                        pass
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
         if 'model' in locals():
-            set_model_state(c_name, m_name, 'ready', controllers,model.serialize()['model'].serialize()['uuid'] )
+            set_model_state(c_name, m_name, 'ready', controllers, model.info.uuid)
         else:
-            set_model_state(c_name, m_name, 'ERROR: {}'.format(e), controllers)
+            set_model_state(c_name, m_name, 'error', controllers)
     finally:
         if 'model' in locals():
             await model.disconnect()

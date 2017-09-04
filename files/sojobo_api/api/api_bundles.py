@@ -60,7 +60,7 @@ def get_bundle(bundle):
         }
         return create_response(200, data)
     else:
-        abort(400, 'The bundle {} could not be found'.format(bundle))
+        abort(404, 'The bundle {} could not be found'.format(bundle))
 
 
 def get_json(bundle):

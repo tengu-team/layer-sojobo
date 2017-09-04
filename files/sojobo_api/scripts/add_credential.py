@@ -31,7 +31,7 @@ async def add_credential(username, credential, url, port):
         user = json.loads(users.get(username))
         if creds not in user['credentials']:
             user['credentials'].append(creds)
-            users.set(username, json.dumps(user))
+        users.set(username, json.dumps(user))
         logger.info('Succesfully added credential for %s', username)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

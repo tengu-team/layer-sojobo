@@ -110,23 +110,37 @@ def get_all_users():
 ################################################################################
 # CONTROLLER FUNCTIONS
 ################################################################################
-def create_controller(controller_name, c_type, endpoints, uuid, ca_cert, region):
+def create_controller(controller_name, c_type, region):
     con = connect_to_controllers()
     if controller_name in con.keys():
         return False
     else:
         controller = {
             'name' : controller_name,
+            'state': 'accepted',
             'users': [],
             'type' : c_type,
             'models' : [],
-            'endpoints': endpoints,
-            'uuid': uuid,
-            'ca-cert': ca_cert,
+            'endpoints': [],
+            'uuid': '',
+            'ca-cert': '',
             'region': region
         }
         con.set(controller_name, json.dumps(controller))
         return True
+
+
+def set_controller_state(controller, state, endpoints=None, uuid=None, ca_cert=None):
+    con = connect_to_controllers()
+    data = json.loads(con.get(controller))
+    data['state'] = state
+    if endpoints:
+        data['endpoints'] = endpoints
+    if uuid:
+        data['uuid'] = uuid
+    if ca_cert:
+        data['ca-cert'] = ca_cert
+    con.set(controller, json.dumps(data))
 
 
 def destroy_controller(c_name):
@@ -170,7 +184,8 @@ def set_model_state(c_name, m_name, status, uuid=None):
     for model in data['models']:
         if model['name'] == m_name:
             model['status'] = status
-            model['uuid'] = uuid
+            if uuid:
+                model['uuid'] = uuid
             break
     con.set(c_name, json.dumps(data))
 
@@ -209,10 +224,12 @@ def set_controller_access(c_name, user, access):
 def add_user_to_controller(c_name, user, access):
     con = connect_to_controllers()
     data = json.loads(con.get(c_name))
+    c_type = data['type']
     exists = False
     for usr in data['users']:
         if usr['name'] == user:
             exists = True
+            usr['name']['access'] = access
             break
     if not exists:
         data['users'].append({'name': user, 'access': access})
@@ -221,9 +238,16 @@ def add_user_to_controller(c_name, user, access):
     data = json.loads(con.get(user))
     for controller in data['controllers']:
         if controller['name'] == c_name:
-            data['controllers'].append({
-                'access' : access, 'name': c_name, 'models' : [], 'type': controller['type']})
+            controller['access'] = access
+            exists = True
             break
+    if not exists:
+        data['controllers'].append({
+            'access' : access,
+            'name': c_name,
+            'models' : [],
+            'type': c_type
+        })
     con.set(user, json.dumps(data))
 
 
@@ -251,6 +275,12 @@ def get_controller_users(c_name):
 def get_all_controllers():
     con = connect_to_controllers()
     return con.keys()
+
+
+def get_all_models(controller):
+    con = connect_to_controllers()
+    data = json.loads(con.get(controller))
+    return data['models']
 ################################################################################
 # MODEL FUNCTIONS
 ################################################################################

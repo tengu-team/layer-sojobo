@@ -31,7 +31,7 @@ import charms.leadership
 API_DIR = '/opt/sojobo_api'
 USER = 'sojobo'
 GROUP = 'www-data'
-HOST = config()['host'] if config()['host'] != '127.0.0.1' else unit_private_ip()
+HOST = unit_private_ip()
 db = unitdata.kv()
 ###############################################################################
 # INSTALLATION AND UPGRADES
@@ -39,7 +39,6 @@ db = unitdata.kv()
 @when('juju.installed')
 @when_not('api.installed')
 def install():
-    subprocess.call(['python3.6', '-m', 'pip', 'install', '--upgrade', 'pip', 'setuptools', 'wheel'])
     log('Installing Sojobo API')
     if not os.path.isdir(API_DIR):
         os.mkdir(API_DIR)
@@ -151,7 +150,7 @@ def redis_db_removed():
 @when('sojobo.available', 'api.running')
 def configure(sojobo):
     api_key = db.get('api-key')
-    sojobo.configure('https://{}'.format(HOST), API_DIR, api_key, USER)
+    sojobo.configure('https://{}'.format(config()['host']), API_DIR, api_key, USER)
 
 
 @when('proxy.available', 'api.running')
@@ -187,8 +186,8 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 def install_api():
     for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler',
                 'gitpython', 'redis', 'asyncio_extras', 'requests']:
-        subprocess.check_call(['pip3', 'install', pkg])
-    subprocess.check_call(['pip3', 'install', 'juju==0.6.0'])
+        subprocess.check_call(['python3.6', '-m', 'pip', 'install', pkg])
+    subprocess.check_call(['python3.6', '-m', 'pip', 'install', 'juju==0.6.0'])
     mergecopytree('files/sojobo_api', API_DIR)
     if not os.path.isdir('{}/files'.format(API_DIR)):
         os.mkdir('{}/files'.format(API_DIR))
