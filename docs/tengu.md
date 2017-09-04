@@ -71,20 +71,10 @@ The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-A
   - region
   - credentials
 * **Successful response**:
-  - code: 200
+  - code: 202
   - message:
   ```json
-  {
-    "name": "controller1-name",
-    "models": [
-        "controller",
-        "default"
-    ],
-    "type": "google",
-    "users": [
-        "admin"
-    ]
-  }
+  "Environment [controller] is being created"
   ```
 
 ## **/tengu/controllers/[controller]** <a name="controller"></a>
@@ -102,6 +92,7 @@ The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-A
   ```json
   {
     "name": "controller1-name",
+    "state": "ready",
     "models": [
       {
         "name": "default",
