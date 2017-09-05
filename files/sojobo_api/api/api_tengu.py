@@ -219,10 +219,10 @@ def add_application(controller, model):
             code, response = errors.already_exists('application')
         else:
             if mod.m_access == 'write' or mod.m_access == 'admin':
-                series = juju.check_input(data.get('series', None))
-                config = juju.check_input(data.get('config', None))
-                machine = juju.check_input(data.get('target', None))
-                app_name = juju.check_input(data.get('app_name', None))
+                series = juju.check_input(data.get('series', None), True)
+                config = juju.check_input(data.get('config', None), True)
+                machine = juju.check_input(data.get('target', None), True)
+                app_name = juju.check_input(data.get('app_name', None), True)
                 units = juju.check_input(data.get('units', "1"))
                 app = juju.check_input(data['application'])
                 execute_task(juju.deploy_app, token, mod, app, name=app_name, ser=series, tar=machine, con=config, num_of_units=int(units))
@@ -351,8 +351,8 @@ def add_machine(controller, model):
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
         if mod.m_access == 'write' or mod.m_access == 'admin':
-            series = juju.check_input(data.get('series', None))
-            constraints = juju.check_input(data.get('constraints', None))
+            series = juju.check_input(data.get('series', None), True)
+            constraints = juju.check_input(data.get('constraints', None), True)
             if execute_task(juju.cloud_supports_series, con, series):
                 execute_task(juju.add_machine, token, mod, series, constraints)
                 code, response = 202, 'machine is being deployed'

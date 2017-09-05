@@ -21,6 +21,7 @@ import logging
 import json
 import redis
 from juju.model import Model
+from juju.errors import JujuAPIError, JujuError
 
 
 async def add_ssh_key(usr, pwd, ssh_key, url, port, username):
@@ -41,7 +42,10 @@ async def add_ssh_key(usr, pwd, ssh_key, url, port, username):
                             if modl['name'] == mod['name']:
                                 await model.connect(controller['endpoints'][0], modl['uuid'],
                                                     usr, pwd, controller['ca-cert'])
-                                await model.add_ssh_key(username, ssh_key)
+                                try:
+                                    await model.add_ssh_key(username, ssh_key)
+                                except (JujuAPIError, JujuError):
+                                    pass
                                 await model.disconnect()
                                 break
     except Exception as e:

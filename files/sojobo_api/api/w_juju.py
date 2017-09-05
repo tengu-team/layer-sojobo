@@ -136,10 +136,13 @@ def create_response(http_code, return_object, is_json=False):
     )
 
 
-def check_input(data):
+def check_input(data, optional=False):
     if not data:
-        error = errors.empty()
-        abort(error[0], error[1])
+        if optional:
+            return None
+        else:
+            error = errors.empty()
+            abort(error[0], error[1])
     else:
         items = data.split(':', 1)
         if len(items) > 1 and items[0].lower() not in ['local', 'github', 'lxd', 'kvm']:
