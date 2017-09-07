@@ -287,8 +287,10 @@ def get_all_models(controller):
 def delete_model(controller, model):
     con = connect_to_controllers()
     data = json.loads(con.get(controller))
-    if model in data['models']:
-        data['models'].remove(model)
+    for mod in data['models']:
+        if mod['name'] == model:
+            data['models'].remove(mod)
+            break
     con.set(controller, json.dumps(data))
     for user in get_all_users():
         remove_model(controller, model, user)
@@ -299,8 +301,10 @@ def remove_model(controller, model, user):
     data = json.loads(con.get(user))
     for contr in data['controllers']:
         if contr['name'] == controller:
-            if model in contr['models']:
-                contr['models'].remove(model)
+            for mod in contr['models']:
+                if mod['name'] == model:
+                    contr['models'].remove(mod)
+                    break
             break
     con.set(user, json.dumps(data))
 

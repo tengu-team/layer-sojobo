@@ -814,10 +814,10 @@ async def get_controllers_access(usr):
 
 
 async def get_ucontroller_access(controller, username):
-    access = await get_controllers_access(username)
-    for acc in access:
-        if list(acc.keys())[0] == controller.c_name:
-            return acc
+    controllers = await get_controllers_access(username)
+    for con in controllers:
+        if con['name'] == controller.c_name:
+            return con
 
 
 async def get_models_access(controller, name):

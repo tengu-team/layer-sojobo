@@ -249,9 +249,7 @@ def get_ucontroller_access(user, controller):
         usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
             if token.is_admin or token.username == usr:
-                execute_task(con.connect, token)
                 code, response = 200, execute_task(juju.get_ucontroller_access, con, usr)
-                execute_task(con.disconnect)
             else:
                 code, response = errors.unauthorized()
         else:
