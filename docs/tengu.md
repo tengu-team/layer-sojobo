@@ -8,7 +8,7 @@ The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-A
 **Currently, all the calls must be made with BasicAuth in the request!**
 
 ## API Calls
-- [/login](#login)
+- [/tengu/login](#login)
 - [/tengu/controllers](#controllers)
 - [/tengu/controllers/[controller]](#controller)
 - [/tengu/controllers/[controller]/models](#models)
@@ -24,7 +24,7 @@ The Tengu-API is a blueprint, automaticaly deployed when installing the Sojobo-A
 - [/tengu/controllers/[controller]/models/[model]/relations/[app1]/[app2]](#relation-del)
 - [/tengu/backup](#backup)
 
-## **/login** <a name="login"></a>
+## **/tengu/login** <a name="login"></a>
 #### **Request Type**: POST
 * **Description**:
   Verifies the provided BasicAuth.
