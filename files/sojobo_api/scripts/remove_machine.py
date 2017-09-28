@@ -48,14 +48,18 @@ async def remove_machine(c_name, m_name, usr, pwd, url, port, machine):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('remove-machine')
     hdlr = logging.FileHandler('{}/log/remove_machine.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
+    ws_logger.addHandler(hdlr)
+    ws_logger.setLevel(logging.DEBUG)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
-    loop.set_debug(False)
+    loop.set_debug(True)
     loop.run_until_complete(remove_machine(sys.argv[6], sys.argv[7], sys.argv[1],
                                          sys.argv[2], sys.argv[4], sys.argv[5], sys.argv[8]))
     loop.close()

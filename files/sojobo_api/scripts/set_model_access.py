@@ -68,14 +68,18 @@ async def set_model_acc(c_name, m_name, access, user, username, password, url, p
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('set_model_access')
     hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
+    ws_logger.addHandler(hdlr)
+    ws_logger.setLevel(logging.DEBUG)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
-    loop.set_debug(False)
+    loop.set_debug(True)
     result = loop.run_until_complete(set_model_acc(sys.argv[8], sys.argv[9], sys.argv[7],
                                                    sys.argv[6], sys.argv[1], sys.argv[2],
                                                    sys.argv[4], sys.argv[5]))

@@ -41,13 +41,17 @@ async def add_credential(username, credential, url, port):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('add_credentials')
     hdlr = logging.FileHandler('{}/log/add_credentials.log'.format(sys.argv[2]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
+    ws_logger.addHandler(hdlr)
+    ws_logger.setLevel(logging.DEBUG)
     logger.addHandler(hdlr)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     loop = asyncio.get_event_loop()
-    loop.set_debug(False)
+    loop.set_debug(True)
     loop.run_until_complete(add_credential(sys.argv[1], sys.argv[3], sys.argv[4], sys.argv[5]))
     loop.close()

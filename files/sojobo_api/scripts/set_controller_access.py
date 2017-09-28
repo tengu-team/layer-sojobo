@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401,C0302, R0914
+# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
 import sys
 import traceback
@@ -69,14 +69,18 @@ async def set_controller_acc(c_name, access, user, username, password, url, port
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('set_controller_access')
     hdlr = logging.FileHandler('{}/log/set_controller_access.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
+    ws_logger.addHandler(hdlr)
+    ws_logger.setLevel(logging.DEBUG)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
-    loop.set_debug(False)
+    loop.set_debug(True)
     result = loop.run_until_complete(set_controller_acc(sys.argv[8], sys.argv[7], sys.argv[6],
                                                         sys.argv[1], sys.argv[2], sys.argv[4], sys.argv[5]))
     loop.close()

@@ -1,5 +1,5 @@
 # pylint: disable=c0111,c0301
-#!/usr/bin/env python3
+#!/usr/bin/env python3.6
 from functools import wraps
 import requests
 from flask import request, Blueprint, abort

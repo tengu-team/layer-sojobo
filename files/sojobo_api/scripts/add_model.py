@@ -22,6 +22,7 @@ import json
 import redis
 from juju import tag
 from juju.controller import Controller
+from juju.model import Model
 from juju.client import client
 from juju.errors import JujuAPIError, JujuError
 ################################################################################
@@ -54,13 +55,13 @@ def set_model_state(c_name, m_name, state, connection, uuid=None):
 ################################################################################
 async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
     try:
-        logger.info('Setting up Controllerconnection for %s', c_name)
+        logger.info('%s -> Setting up Controllerconnection for %s', m_name, c_name)
         users = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
         controllers = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
         controller = Controller()
         await controller.connect(json.loads(controllers.get(c_name))['endpoints'][0], usr, pwd)
         c_type = json.loads(controllers.get(c_name))['type']
-        logger.info('Adding credentials')
+        logger.info('%s -> Adding credentials', m_name)
         cloud_facade = client.CloudFacade.from_connection(controller.connection)
         for cred in json.loads(users.get(usr))['credentials']:
             if cred['name'] == cred_name:
@@ -70,16 +71,40 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
                     tag.credential(c_type, usr, cred['name'])
                 )
                 await cloud_facade.UpdateCredentials([cloud_cred])
-        logger.info('Creating model: %s', m_name)
-        model = await controller.add_model(
+        logger.info('%s -> Creating model: %s', m_name, m_name)
+        # Not yet fixed in latest libjuju version
+        # model = await controller.add_model(
+        #     m_name,
+        #     cloud_name=c_type,
+        #     credential_name=credential['name'],
+        #     owner=tag.user(usr)
+        # )
+        model_facade = client.ModelManagerFacade.from_connection(controller.connection)
+
+        owner=tag.user(usr)
+        model_info = await model_facade.CreateModel(
+            tag.cloud(c_type),
+            None,
+            credential,
             m_name,
-            cloud_name=c_type,
-            credential_name=credential['name'],
-            owner=tag.user(usr)
+            owner,
+            None
         )
+
+        model = Model()
+        await model.connect(
+            controller.connection.endpoint,
+            model_info.uuid,
+            controller.connection.username,
+            controller.connection.password,
+            controller.connection.cacert,
+            controller.connection.macaroons,
+            loop=controller.loop,
+        )
+        logger.info('%s -> model deployed on juju', m_name)
         set_model_access(c_name, m_name, usr, users, 'admin')
         set_model_state(c_name, m_name, 'ready', controllers, model.info.uuid)
-        logger.info('Adding ssh-keys to model: %s', m_name)
+        logger.info('%s -> Adding ssh-keys to model: %s', m_name, m_name)
         for key in json.loads(users.get(usr))['ssh-keys']:
             try:
                 await model.add_ssh_key(usr, key)
@@ -94,6 +119,7 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
                         await model.add_ssh_key(u['name'], key)
                     except (JujuAPIError, JujuError):
                         pass
+        logger.info('%s -> succesfully deployed model', m_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -110,14 +136,18 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger('add-model')
+    ws_logger = logging.getLogger('websockets.protocol')
     hdlr = logging.FileHandler('{}/log/add_model.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
-    logger.setLevel(logging.INFO)
+    ws_logger.addHandler(hdlr)
+    ws_logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG)
     loop = asyncio.get_event_loop()
-    loop.set_debug(False)
+    loop.set_debug(True)
     loop.run_until_complete(create_model(sys.argv[6], sys.argv[7], sys.argv[1],
                                          sys.argv[2], sys.argv[4], sys.argv[5], sys.argv[8]))
     loop.close()

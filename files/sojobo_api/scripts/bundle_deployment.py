@@ -69,14 +69,18 @@ async def deploy_bundle(username, password, controller_name, model_name, bundle,
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('bundle_deployment')
     hdlr = logging.FileHandler('{}/log/bundle_deployment.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
+    ws_logger.addHandler(hdlr)
+    ws_logger.setLevel(logging.DEBUG)
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
-    loop.set_debug(False)
+    loop.set_debug(True)
     loop.run_until_complete(deploy_bundle(sys.argv[1], sys.argv[2], sys.argv[4],
                                           sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]))
     loop.close()

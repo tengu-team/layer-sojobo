@@ -1,5 +1,5 @@
 # pylint: disable=c0111,c0301, E0611, E0401
-#!/usr/bin/env python3
+#!/usr/bin/env python3.6
 import json
 import redis
 from sojobo_api import settings
