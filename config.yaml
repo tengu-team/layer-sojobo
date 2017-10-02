@@ -38,3 +38,7 @@ options:
     type: string
     default: "tengu-team"
     description: The github-repo where the bundles can be found.
+  port:
+    type: int
+    default: 80
+    description: listen port.

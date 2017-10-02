@@ -16,7 +16,7 @@
 # pylint: disable=c0111,c0301,c0325,c0103
 import os
 import logging
-
+from sojobo_api import settings
 from sojobo_api.app import APP, create_response, redirect
 ########################################################################################################################
 # HEADERS SETUP
@@ -70,4 +70,4 @@ if __name__ == '__main__':
     hdlr.setFormatter(formatter)
     logger.setLevel(logging.INFO)
     APP.logger.addHandler(hdlr)
-    APP.run(host='0.0.0.0', port=int(os.environ.get('SOJOBO_API_PORT')), threaded=True)
+    APP.run(host='0.0.0.0', port=int(settings.SOJOBO_API_PORT), threaded=True)

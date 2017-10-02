@@ -58,7 +58,7 @@ def upgrade_charm():
 def configure_webapp():
     context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
     render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
-    open_port(80)
+    open_port(config()['port'])
     service_restart('nginx')
     set_state('api.configured')
     status_set('blocked', 'Waiting for a connection with Redis')
@@ -108,7 +108,8 @@ def connect_to_redis(redis):
         'SOJOBO_USER': USER,
         'REDIS_HOST': redis_db['host'],
         'REDIS_PORT': redis_db['port'],
-        'REPO_NAME': config()['github-repo']
+        'REPO_NAME': config()['github-repo'],
+        'SOJOBO_API_PORT' : config()['port']
     })
     service_restart('nginx')
     status_set('active', 'admin-password: {} api-key: {}'.format(password, api_key))
@@ -156,7 +157,7 @@ def configure(sojobo):
 
 @when('proxy.available', 'api.running')
 def configure_proxy(proxy):
-    proxy.configure(80)
+    proxy.configure(config()['port'])
     set_state('api.proxy-configured')
 ###############################################################################
 # UTILS
