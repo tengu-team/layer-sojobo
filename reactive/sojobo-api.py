@@ -107,7 +107,8 @@ def connect_to_redis(redis):
         'SOJOBO_IP': 'http://{}'.format(HOST),
         'SOJOBO_USER': USER,
         'REDIS_HOST': redis_db['host'],
-        'REDIS_PORT': redis_db['port']
+        'REDIS_PORT': redis_db['port'],
+        'REPO_NAME': config()['github-repo']
     })
     service_restart('nginx')
     status_set('active', 'admin-password: {} api-key: {}'.format(password, api_key))

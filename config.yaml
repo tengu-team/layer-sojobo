@@ -34,3 +34,7 @@ options:
     default: |
       - 561F9B9CAC40B2F7
       - null
+  github-repo:
+    type: string
+    default: "tengu-team"
+    description: The github-repo where the bundles can be found.

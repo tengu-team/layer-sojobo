@@ -11,7 +11,7 @@ from sojobo_api import settings
 
 BUNDLES = Blueprint('bundles', __name__)
 
-
+REPO = settings.REPO_NAME
 def get():
     return BUNDLES
 
@@ -33,7 +33,7 @@ def authenticate(func):
 @authenticate
 def get_bundles():
     i = 1
-    res = requests.get('https://api.github.com/orgs/tengu-team/repos')
+    res = requests.get('https://api.github.com/orgs/{}/repos'.format(REPO))
     data = []
     while res.json() != [] and res.status_code == 200:
         for b in res.json():
@@ -45,14 +45,14 @@ def get_bundles():
                     'logo': None
                 })
         i += 1
-        res = requests.get('https://api.github.com/orgs/tengu-team/repos?page={}'.format(i))
+        res = requests.get('https://api.github.com/orgs/{}/repos?page={}'.format(REPO, i))
     return create_response(200, data)
 
 
 @BUNDLES.route('/<bundle>', methods=['GET'])
 @authenticate
 def get_bundle(bundle):
-    res = requests.get('https://api.github.com/repos/tengu-team/{}'.format(bundle))
+    res = requests.get('https://api.github.com/repos/{}/{}'.format(REPO, bundle))
     if res.status_code == 200:
         data = {
             'name': res.json()['name'],
@@ -62,14 +62,14 @@ def get_bundle(bundle):
         }
         return create_response(200, data)
     else:
-        abort(404, 'The bundle {} could not be found'.format(bundle))
+        abort(404, 'The bundle {}:{} could not be found'.format(REPO, bundle))
 
 
 def get_json(bundle):
-    res = requests.get('https://raw.githubusercontent.com/tengu-team/{}/master/bundle.yaml'.format(bundle))
+    res = requests.get('https://raw.githubusercontent.com/{}/{}/master/bundle.yaml'.format(REPO, bundle))
     if res.status_code == 200:
         res_dict = yaml.load(res.text)
         json_file = json.dumps(res_dict)
         return json_file
     else:
-        return None
+        abort(404, 'The bundle {}:{} could not be found'.format(REPO, bundle))
