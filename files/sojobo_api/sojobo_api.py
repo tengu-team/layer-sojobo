@@ -24,7 +24,7 @@ from sojobo_api.app import APP, create_response, redirect
 @APP.after_request
 def apply_caching(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Authorization,Content-Type,Location,id-token,api-key'
+    response.headers['Access-Control-Allow-Headers'] = 'Authorization,Content-Type,Location,api-key'
     response.headers['Access-Control-Expose-Headers'] = 'Content-Type,Location'
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,PUT,DELETE,OPTIONS'
     response.headers['Accept'] = 'application/json'
