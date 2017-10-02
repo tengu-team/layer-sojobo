@@ -144,7 +144,7 @@ def delete_user(user):
     return juju.create_response(code, response)
 
 
-@USERS.route('/<user>/ssh', methods=['GET'])
+@USERS.route('/<user>/ssh-keys', methods=['GET'])
 def get_ssh_keys(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
@@ -157,7 +157,7 @@ def get_ssh_keys(user):
     return juju.create_response(code, response)
 
 
-@USERS.route('/<user>/ssh', methods=['POST'])
+@USERS.route('/<user>/ssh-keys', methods=['POST'])
 def add_ssh_key(user):
     data = request.json
     try:
@@ -173,7 +173,7 @@ def add_ssh_key(user):
     return juju.create_response(code, response)
 
 
-@USERS.route('/<user>/ssh', methods=['DELETE'])
+@USERS.route('/<user>/ssh-keys', methods=['DELETE'])
 def delete_ssh_key(user):
     data = request.json
     try:
