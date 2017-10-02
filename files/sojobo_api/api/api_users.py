@@ -29,6 +29,17 @@ def get():
     return USERS
 
 
+
+@USERS.route('/login', methods=['POST'])
+def login():
+    try:
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        code, response = 200, 'Success'
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
 @USERS.route('/', methods=['GET'])
 def get_users_info():
     try:
