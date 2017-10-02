@@ -72,6 +72,7 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
                 )
                 await cloud_facade.UpdateCredentials([cloud_cred])
         logger.info('%s -> Creating model: %s', m_name, m_name)
+
         # Not yet fixed in latest libjuju version
         # model = await controller.add_model(
         #     m_name,
@@ -79,6 +80,7 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
         #     credential_name=credential['name'],
         #     owner=tag.user(usr)
         # )
+        # Workaround
         model_facade = client.ModelManagerFacade.from_connection(controller.connection)
 
         owner=tag.user(usr)
