@@ -2,6 +2,8 @@
 #!/usr/bin/env python3.6
 from functools import wraps
 import requests
+import json
+import yaml
 from flask import request, Blueprint, abort
 from sojobo_api.api.w_juju import create_response
 from sojobo_api import settings
@@ -64,8 +66,10 @@ def get_bundle(bundle):
 
 
 def get_json(bundle):
-    res = requests.get('https://raw.githubusercontent.com/tengu-team/{}/master/bundle.json'.format(bundle))
+    res = requests.get('https://raw.githubusercontent.com/tengu-team/{}/master/bundle.yaml'.format(bundle))
     if res.status_code == 200:
-        return res.json()
+        res_dict = yaml.load(res.text)
+        json_file = json.dumps(res_dict)
+        return json_file
     else:
         return None
