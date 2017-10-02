@@ -170,34 +170,6 @@ def delete_model(controller, model):
     return juju.create_response(code, response)
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/gui', methods=['GET'])
-def get_gui_url(controller, model):
-    try:
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
-        if mod.m_access == 'admin':
-            code, response = 200, execute_task(juju.get_gui_url, con, mod)
-        else:
-            code, response = errors.no_permission()
-    except KeyError:
-        code, response = errors.invalid_data()
-    return juju.create_response(code, response)
-
-
-@TENGU.route('/controllers/<controller>/models/<model>/sshkey', methods=['GET'])
-def get_ssh_keys(controller, model):
-    try:
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
-        if mod.m_access == 'admin':
-            code, response = 200, execute_task(juju.get_ssh_keys, token, mod)
-        else:
-            code, response = errors.no_permission()
-    except KeyError:
-        code, response = errors.invalid_data()
-    return juju.create_response(code, response)
-
-
 @TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['GET'])
 def get_applications_info(controller, model):
     try:
@@ -522,6 +494,7 @@ def remove_relation(controller, model, app1, app2):
 
 
 # On hold
+# TO DO: Backup and restore calls
 @TENGU.route('/backup', methods=['GET'])
 def backup_controllers():
     try:
