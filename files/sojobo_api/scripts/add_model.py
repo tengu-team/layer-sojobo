@@ -22,7 +22,6 @@ import json
 import redis
 from juju import tag
 from juju.controller import Controller
-from juju.model import Model
 from juju.client import client
 from juju.errors import JujuAPIError, JujuError
 ################################################################################
@@ -73,36 +72,13 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
                 await cloud_facade.UpdateCredentials([cloud_cred])
         logger.info('%s -> Creating model: %s', m_name, m_name)
 
-        # Not yet fixed in latest libjuju version
-        # model = await controller.add_model(
-        #     m_name,
-        #     cloud_name=c_type,
-        #     credential_name=credential['name'],
-        #     owner=tag.user(usr)
-        # )
-        # Workaround
-        model_facade = client.ModelManagerFacade.from_connection(controller.connection)
-
-        owner=tag.user(usr)
-        model_info = await model_facade.CreateModel(
-            tag.cloud(c_type),
-            None,
-            credential,
+        model = await controller.add_model(
             m_name,
-            owner,
-            None
+            cloud_name=c_type,
+            credential_name=credential['name'],
+            owner=tag.user(usr)
         )
 
-        model = Model()
-        await model.connect(
-            controller.connection.endpoint,
-            model_info.uuid,
-            controller.connection.username,
-            controller.connection.password,
-            controller.connection.cacert,
-            controller.connection.macaroons,
-            loop=controller.loop,
-        )
         logger.info('%s -> model deployed on juju', m_name)
         set_model_access(c_name, m_name, usr, users, 'admin')
         set_model_state(c_name, m_name, 'ready', controllers, model.info.uuid)
