@@ -30,24 +30,21 @@ async def remove_ssh_key(usr, pwd, ssh_key, url, port, username):
         controllers = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
         users = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
         user = json.loads(users.get(username))
-        if ssh_key in user['ssh-keys']:
-            key = base64.b64decode(ssh_key.strip().split()[1].encode('ascii'))
-            fp_plain = hashlib.md5(key).hexdigest()
-            fingerprint = ':'.join(a+b for a, b in zip(fp_plain[::2], fp_plain[1::2]))
-            ssh_dict = {'ssh-key': ssh_key, 'Fingerprint': fingerprint}
-            user['ssh-keys'].remove(ssh_dict)
-            users.set(username, json.dumps(user))
-            for con in user['controllers']:
-                for mod in con['models']:
-                    controller = json.loads(controllers.get(con['name']))
-                    for modl in controller['models']:
-                        if modl['name'] == mod['name']:
-                            model = Model()
-                            logger.info('Setting up Modelconnection for model: %s', mod['name'])
-                            await model.connect(controller['endpoints'][0], modl['uuid'],
-                                                usr, pwd, controller['ca-cert'])
-                            await model.remove_ssh_key(username, ssh_key)
-                            await model.disconnect()
+        for key in user['ssh-keys']:
+            if key['ssh-key'] == ssh_key:
+                user['ssh-keys'].remove(ssh_dict)
+                users.set(username, json.dumps(user))
+                for con in user['controllers']:
+                    for mod in con['models']:
+                        controller = json.loads(controllers.get(con['name']))
+                        for modl in controller['models']:
+                            if modl['name'] == mod['name']:
+                                model = Model()
+                                logger.info('Setting up Modelconnection for model: %s', mod['name'])
+                                await model.connect(controller['endpoints'][0], modl['uuid'],
+                                                    usr, pwd, controller['ca-cert'])
+                                await model.remove_ssh_key(username, ssh_key)
+                                await model.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
