@@ -660,13 +660,8 @@ async def get_application_config(token, mod, app_name):
 # USER FUNCTIONS
 ###############################################################################
 async def create_user(token, username, password):
-    datastore.create_user(username)
-    for con in await get_all_controllers():
-        controller = Controller_Connection(token, con)
-        async with controller.connect(token) as juju:  #pylint: disable=E1701
-            await juju.add_user(username, password)
-            await juju.grant(username)
-            datastore.add_user_to_controller(con, username, 'login')
+    Popen(["python3.6", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR),
+       username, password])
 
 
 async def delete_user(token, username):
