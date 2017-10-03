@@ -660,8 +660,7 @@ async def get_application_config(token, mod, app_name):
 # USER FUNCTIONS
 ###############################################################################
 async def create_user(token, username, password):
-    Popen(["python3.6", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR),
-       username, password])
+    Popen(["python3.6", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR), username, password])
 
 
 async def delete_user(token, username):

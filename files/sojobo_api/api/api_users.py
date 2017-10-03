@@ -49,24 +49,6 @@ def get_users_info():
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
-#
-# @USERS.route('/', methods=['PUT'])
-# def reactivate_user():
-#     data = request.json
-#     try:
-#         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-#         user = juju.check_input(data['username'])
-#         if token.is_admin:
-#             if execute_task(juju.user_exists, user):
-#                 execute_task(juju.enable_user, token, user)
-#                 code, response = 200, 'User {} succesfully activated'.format(user)
-#         else:
-#             code, response = errors.unauthorized()
-#     except KeyError:
-#         code, response = errors.invalid_data()
-#     return juju.create_response(code, response)
-
-
 @USERS.route('/', methods=['POST'])
 def create_user():
     data = request.json
@@ -78,7 +60,7 @@ def create_user():
                 code, response = errors.already_exists('user')
             elif data['password']:
                 execute_task(juju.create_user, token, user, data['password'])
-                code, response = 200, 'User {} succesfully created'.format(user)
+                code, response = 202, 'User {} is being created'.format(user)
             else:
                 code, response = errors.empty()
         else:
@@ -218,15 +200,29 @@ def add_credential(user):
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
-
-@USERS.route('/<user>/credentials', methods=['DELETE'])
-def remove_credential(user):
+@USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
+def get_credential(user, credential):
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         usr = juju.check_input(user)
         if token.is_admin or token.username == usr:
-            execute_task(juju.remove_credential, usr, data['name'])
+            execute_task(juju.get_credential, usr, data['name'], credential)
+            code, response = 202, 'Process being handeled'
+        else:
+            code, response = errors.unauthorized()
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+@USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
+def remove_credential(user, credential):
+    data = request.json
+    try:
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        usr = juju.check_input(user)
+        if token.is_admin or token.username == usr:
+            execute_task(juju.remove_credential, usr, data['name'], credential)
             code, response = 202, 'Process being handeled'
         else:
             code, response = errors.unauthorized()

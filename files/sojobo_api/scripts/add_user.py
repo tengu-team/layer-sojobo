@@ -17,6 +17,7 @@
 import asyncio
 import logging
 import sys
+sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
