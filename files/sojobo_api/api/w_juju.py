@@ -342,16 +342,6 @@ def get_cloud_response(data):
     return None
 
 
-async def get_ssh_keys(token, model):
-    async with model.connect(token) as juju:
-        res = await juju.get_ssh_key(False)
-    data = res.serialize()['results'][0].serialize()['result']
-    if data is None:
-        return []
-    else:
-        return data
-
-
 async def get_ssh_keys_user(user):
     return datastore.get_ssh_keys(user)
 
