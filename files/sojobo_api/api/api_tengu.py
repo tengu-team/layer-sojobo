@@ -57,7 +57,7 @@ def create_controller():
                 code, response = errors.already_exists('controller')
             else:
                 code, response = execute_task(juju.create_controller, c_type,
-                                              controller, data['region'], data['credentials'])
+                                              controller, data['region'], data['credential'])
         else:
             code, response = errors.no_permission()
     except KeyError:

@@ -49,22 +49,22 @@ def get_users_info():
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
 
-
-@USERS.route('/', methods=['PUT'])
-def reactivate_user():
-    data = request.json
-    try:
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        user = juju.check_input(data['username'])
-        if token.is_admin:
-            if execute_task(juju.user_exists, user):
-                execute_task(juju.enable_user, token, user)
-                code, response = 200, 'User {} succesfully activated'.format(user)
-        else:
-            code, response = errors.unauthorized()
-    except KeyError:
-        code, response = errors.invalid_data()
-    return juju.create_response(code, response)
+#
+# @USERS.route('/', methods=['PUT'])
+# def reactivate_user():
+#     data = request.json
+#     try:
+#         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+#         user = juju.check_input(data['username'])
+#         if token.is_admin:
+#             if execute_task(juju.user_exists, user):
+#                 execute_task(juju.enable_user, token, user)
+#                 code, response = 200, 'User {} succesfully activated'.format(user)
+#         else:
+#             code, response = errors.unauthorized()
+#     except KeyError:
+#         code, response = errors.invalid_data()
+#     return juju.create_response(code, response)
 
 
 @USERS.route('/', methods=['POST'])
@@ -210,7 +210,7 @@ def add_credential(user):
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         usr = juju.check_input(user)
         if token.is_admin or token.username == usr:
-            execute_task(juju.add_credential, usr, data['c_type'], data['name'], data['credentials'])
+            execute_task(juju.add_credential, usr, data['type'], data['name'], data['credential'])
             code, response = 202, 'Process being handeled'
         else:
             code, response = errors.unauthorized()
