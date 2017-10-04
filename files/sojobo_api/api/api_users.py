@@ -66,8 +66,9 @@ def create_user():
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        m = re.match('^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$', data['username'])
-        if not(m) and m.end() != len(data['username']):
+        user = data['username']
+        m = re.match('^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$', user)
+        if not(m) and m.end() != len(user):
             code, response = 400, "username does not have the correct format."
         elif token.is_admin:
             if execute_task(juju.user_exists, user):
@@ -104,15 +105,18 @@ def get_user_info(user):
 def change_user_password(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        usr = juju.check_input(user)
-        if execute_task(juju.user_exists, usr):
-            if usr == token.username or token.is_admin:
-                execute_task(juju.change_user_password, token, usr, request.json['password'])
-                code, response = 200, 'succesfully changed password for user {}'.format(usr)
+        if user == token.username or token.is_admin:
+            if execute_task(juju.user_exists, user):
+                pwd = request.json['password']
+                if pwd:
+                    execute_task(juju.change_user_password, token, user, pwd)
+                    code, response = 200, 'succesfully changed password for user {}'.format(user)
+                else:
+                    code, response = errors.empty()
             else:
-                code, response = errors.unauthorized()
+                code, response = errors.does_not_exist('user')
         else:
-            code, response = errors.does_not_exist('user')
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
@@ -122,12 +126,11 @@ def change_user_password(user):
 def delete_user(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        usr = juju.check_input(user)
         if token.is_admin:
-            if execute_task(juju.user_exists, usr):
-                if usr != 'admin':
-                    execute_task(juju.delete_user, token, usr)
-                    code, response = 200, 'User {} succesfully removed'.format(usr)
+            if execute_task(juju.user_exists, user):
+                if user != 'admin':
+                    execute_task(juju.delete_user, token, user)
+                    code, response = 200, 'User {} succesfully removed'.format(user)
                 else:
                     code, response = 403, 'This would remove the admin from the system!'
             else:
