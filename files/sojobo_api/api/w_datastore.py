@@ -58,19 +58,10 @@ def get_user(user):
     return json.loads(con.get(user))
 
 
-def add_ssh_key(user, ssh_key):
+def update_ssh_keys(user, ssh_keys):
     con = connect_to_users()
     data = json.loads(con.get(user))
-    if ssh_key not in data['ssh-keys']:
-        data['ssh-keys'].append(ssh_key)
-    con.set(user, json.dumps(data))
-
-
-def remove_ssh_key(user, ssh_key):
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    if ssh_key in data['ssh-keys']:
-        data['ssh-keys'].remove(ssh_key)
+    data['ssh-keys'] = ssh_keys
     con.set(user, json.dumps(data))
 
 

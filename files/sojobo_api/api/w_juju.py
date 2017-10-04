@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0204,r0913,r0902,e0401,C0302
+# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302,e0611
 import asyncio
 from importlib import import_module
 import os
@@ -344,7 +344,7 @@ def get_cloud_response(data):
 
 async def get_ssh_keys(token, model):
     async with model.connect(token) as juju:
-        res = await juju.get_ssh_key(False)
+        res = await juju.get_ssh_key(raw_ssh=True)
     data = res.serialize()['results'][0].serialize()['result']
     if data is None:
         return []
@@ -691,11 +691,7 @@ async def change_user_password(token, username, password):
 async def update_ssh_key_user(user, ssh_keys):
     Popen([
         "python3.6",
-        "{}/scripts/add_ssh_key.py".format(settings.SOJOBO_API_DIR),
-        settings.JUJU_ADMIN_USER,
-        settings.JUJU_ADMIN_PASSWORD,
-        settings.SOJOBO_API_DIR,
-        str(ssh_keys), settings.REDIS_HOST, settings.REDIS_PORT, user])
+        "{}/scripts/add_ssh_key.py".format(settings.SOJOBO_API_DIR), str(ssh_keys), user, settings.SOJOBO_API_DIR])
 
 
 async def get_users_controller(controller):

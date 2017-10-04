@@ -14,6 +14,10 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302,R0914
+
+#
+# OUTDATED, not used in current api version
+#
 import asyncio
 import sys
 import traceback
