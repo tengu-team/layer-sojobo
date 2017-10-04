@@ -1,4 +1,4 @@
-# Copyright (C) 2017  Qrama
+# Copyright (C) 2017 Qrama
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -66,8 +66,10 @@ def create_user():
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        user = juju.check_input(data['username'])
-        if token.is_admin:
+        m = re.match('^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$', data['username'])
+        if not(m) and m.end() != len(data['username']):
+            code, response = 400, "username does not have the correct format."
+        elif token.is_admin:
             if execute_task(juju.user_exists, user):
                 code, response = errors.already_exists('user')
             elif data['password']:
@@ -86,14 +88,13 @@ def create_user():
 def get_user_info(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        user = juju.check_input(user)
-        if execute_task(juju.user_exists, user):
-            if user == token.username or token.is_admin:
+        if user == token.username or token.is_admin:
+            if execute_task(juju.user_exists, user):
                 code, response = 200, execute_task(juju.get_user_info, user)
             else:
-                code, response = errors.unauthorized()
+                code, response = errors.does_not_exist('user')
         else:
-            code, response = errors.does_not_exist('user')
+            code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)
