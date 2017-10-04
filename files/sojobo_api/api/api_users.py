@@ -16,6 +16,7 @@
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
+import logging
 from flask import request, Blueprint
 
 from sojobo_api.api import w_errors as errors, w_juju as juju
@@ -23,11 +24,22 @@ from sojobo_api.api.w_juju import execute_task
 
 
 USERS = Blueprint('users', __name__)
-
+LOGGER = logging.getLogger("api_users")
+LOGGER.setLevel(logging.DEBUG)
+WS_LOGGER = logging.getLogger('websockets.protocol')
+WS_LOGGER.setLevel(logging.DEBUG)
 
 def get():
     return USERS
 
+@USERS.before_app_first_request
+def initialize():
+    hdlr = logging.FileHandler('/opt/sojobo_api/log/api_users.log')
+    hdlr.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    hdlr.setFormatter(formatter)
+    LOGGER.addHandler(hdlr)
+    WS_LOGGER.addHandler(hdlr)
 
 
 @USERS.route('/login', methods=['POST'])
@@ -139,30 +151,14 @@ def get_ssh_keys(user):
     return juju.create_response(code, response)
 
 
-@USERS.route('/<user>/ssh-keys', methods=['POST'])
-def add_ssh_key(user):
+@USERS.route('/<user>/ssh-keys', methods=['PUT'])
+def update_ssh_keys(user):
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         user = juju.check_input(user)
         if token.is_admin or token.username == user:
-            execute_task(juju.add_ssh_key_user, user, data['ssh-key'])
-            code, response = 202, 'Process being handeled'
-        else:
-            code, response = errors.unauthorized()
-    except KeyError:
-        code, response = errors.invalid_data()
-    return juju.create_response(code, response)
-
-
-@USERS.route('/<user>/ssh-keys', methods=['DELETE'])
-def delete_ssh_key(user):
-    data = request.json
-    try:
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        user = juju.check_input(user)
-        if token.is_admin or token.username == user:
-            execute_task(juju.remove_ssh_key_user, user, data['ssh-key'])
+            execute_task(juju.update_ssh_keys_user, user, data)
             code, response = 202, 'Process being handeled'
         else:
             code, response = errors.unauthorized()
@@ -277,27 +273,6 @@ def grant_to_controller(user, controller):
             if execute_task(juju.user_exists, usr):
                 execute_task(juju.add_user_to_controller, token, con, usr, access)
                 code, response = 202, 'Process being handeled'
-            else:
-                code, response = errors.does_not_exist('user')
-        else:
-            code, response = errors.unauthorized()
-    except KeyError:
-        code, response = errors.invalid_data()
-    return juju.create_response(code, response)
-
-
-@USERS.route('/<user>/controllers/<controller>', methods=['DELETE'])
-def revoke_from_controller(user, controller):
-    try:
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        con = execute_task(juju.authorize, token, juju.check_input(controller))
-        usr = juju.check_input(user)
-        if (token.is_admin or con.c_access == 'superuser' or token.username == usr) and usr != 'admin':
-            if execute_task(juju.user_exists, usr):
-                execute_task(con.connect, token)
-                execute_task(juju.remove_user_from_controller, token, con, usr)
-                code, response = 200, execute_task(juju.remove_user_from_controller, con, usr)
-                execute_task(con.disconnect)
             else:
                 code, response = errors.does_not_exist('user')
         else:

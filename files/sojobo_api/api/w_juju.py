@@ -342,6 +342,16 @@ def get_cloud_response(data):
     return None
 
 
+async def get_ssh_keys(token, model):
+    async with model.connect(token) as juju:
+        res = await juju.get_ssh_key(False)
+    data = res.serialize()['results'][0].serialize()['result']
+    if data is None:
+        return []
+    else:
+        return data
+
+
 async def get_ssh_keys_user(user):
     return datastore.get_ssh_keys(user)
 
@@ -678,24 +688,14 @@ async def change_user_password(token, username, password):
             await juju.change_user_password(username, password)
 
 
-async def add_ssh_key_user(user, ssh_key):
+async def update_ssh_key_user(user, ssh_keys):
     Popen([
         "python3.6",
         "{}/scripts/add_ssh_key.py".format(settings.SOJOBO_API_DIR),
         settings.JUJU_ADMIN_USER,
         settings.JUJU_ADMIN_PASSWORD,
         settings.SOJOBO_API_DIR,
-        ssh_key, settings.REDIS_HOST, settings.REDIS_PORT, user])
-
-
-async def remove_ssh_key_user(user, ssh_key):
-    Popen([
-        "python3.6",
-        "{}/scripts/remove_ssh_key.py".format(settings.SOJOBO_API_DIR),
-        settings.JUJU_ADMIN_USER,
-        settings.JUJU_ADMIN_PASSWORD,
-        settings.SOJOBO_API_DIR,
-        ssh_key, settings.REDIS_HOST, settings.REDIS_PORT, user])
+        str(ssh_keys), settings.REDIS_HOST, settings.REDIS_PORT, user])
 
 
 async def get_users_controller(controller):

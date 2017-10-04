@@ -16,6 +16,7 @@
 # pylint: disable=c0111,c0301,c0325,c0103
 import os
 import logging
+import logging.handlers
 from sojobo_api import settings
 from sojobo_api.app import APP, create_response, redirect
 ########################################################################################################################
@@ -64,10 +65,9 @@ def conflict(error):
 # START FLASK SERVER
 ########################################################################################################################
 if __name__ == '__main__':
-    logger = logging.getLogger('sojobo_api')
-    hdlr = logging.FileHandler('/opt/sojobo_api/log/sojobo_api.log')
+    hdlr = logging.FileHandler("/opt/sojobo_api/log/flask-sojobo-api.log")
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
-    logger.setLevel(logging.INFO)
     APP.logger.addHandler(hdlr)
+    APP.logger.setLevel(logging.DEBUG)
     APP.run(host='0.0.0.0', port=int(settings.SOJOBO_API_PORT), threaded=True)

@@ -19,8 +19,6 @@ import sys
 import traceback
 import logging
 import json
-import base64
-import hashlib
 import redis
 from juju.model import Model
 
@@ -32,7 +30,7 @@ async def remove_ssh_key(usr, pwd, ssh_key, url, port, username):
         user = json.loads(users.get(username))
         for key in user['ssh-keys']:
             if key['ssh-key'] == ssh_key:
-                user['ssh-keys'].remove(ssh_dict)
+                user['ssh-keys'].remove(key)
                 users.set(username, json.dumps(user))
                 for con in user['controllers']:
                     for mod in con['models']:
