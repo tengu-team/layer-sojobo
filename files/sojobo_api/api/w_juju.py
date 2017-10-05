@@ -16,6 +16,7 @@
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302,e0611
 import asyncio
 from importlib import import_module
+from random import randint
 import os
 from subprocess import check_output, check_call, Popen
 import json
@@ -160,17 +161,14 @@ async def authenticate(api_key, auth):
         if auth is None:
             abort(error[0], error[1])
         token = JuJu_Token(auth)
-        if token.is_admin:
+        try:
+            controllers = list(await get_all_controllers())
+            controller = Controller_Connection(token, controllers[len(randint(0, controllers.size()))])
+            async with controller.connect(token):  #pylint: disable=E1701
+                pass
             return token
-        else:
-            try:
-                cont_name = list(await get_all_controllers())[0]
-                controller = Controller_Connection(token, cont_name)
-                async with controller.connect(token):  #pylint: disable=E1701
-                    pass
-                return token
-            except JujuAPIError:
-                abort(error[0], error[1])
+        except JujuAPIError:
+            abort(error[0], error[1])
     else:
         abort(error[0], error[1])
 
@@ -765,7 +763,6 @@ async def user_exists(username):
     return username in await get_all_users()
 
 
-#libjuju: geen andere methode om users op te vragen atm
 async def get_all_users():
     return datastore.get_all_users()
 
