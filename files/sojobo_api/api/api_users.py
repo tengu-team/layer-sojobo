@@ -55,6 +55,12 @@ def login():
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -69,6 +75,12 @@ def get_users_info():
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 @USERS.route('/', methods=['POST'])
@@ -96,6 +108,12 @@ def create_user():
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -116,6 +134,12 @@ def get_user_info(user):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -141,6 +165,12 @@ def change_user_password(user):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -165,99 +195,155 @@ def delete_user(user):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/ssh-keys', methods=['GET'])
 def get_ssh_keys(user):
     try:
+        LOGGER.info('/USERS/%s/ssh-keys [GET] => receiving call', user)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/USERS/%s/ssh-keys [GET] => Authenticated!', user)
         if token.is_admin or token.username == user:
             code, response = 200, execute_task(juju.get_ssh_keys_user, user)
+            LOGGER.info('/USERS/%s/ssh-keys [GET] => Succesfully  ssh-keys!', user)
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
+            LOGGER.error('/USERS/%s/ssh-keys [GET] => No permission to perform this action!', user)
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/ssh-keys', methods=['PUT'])
 def update_ssh_keys(user):
-    data = request.json
     try:
+        LOGGER.info('/USERS/%s/ssh-keys [PUT] => receiving call', user)
+        data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         user = juju.check_input(user)
+        LOGGER.info('/USERS/%s/ssh-keys [PUT] => Authenticated!', user)
         if token.is_admin or token.username == user:
             execute_task(juju.update_ssh_keys_user, user, data)
+            LOGGER.info('/USERS/%s/ssh-keys [PUT] => SH-keys are being updated, check update_ssh_keys.log for more information!', user)
             code, response = 202, 'Process being handeled'
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
+            LOGGER.error('/USERS/%s/ssh-keys [PUT] => No permission to perform this action!', user)
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials', methods=['GET'])
 def get_credentials(user):
     try:
+        LOGGER.info('/USERS/%s/credentials [GET] => receiving call', user)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/USERS/%s/credentials [GET] => Authenticated!', user)
         usr = juju.check_input(user)
         if token.is_admin or token.username == usr:
             code, response = 200, juju.execute_task(juju.get_credentials, token, usr)
+            LOGGER.info('/USERS/%s/credentials [GET] => Succesfully retrieved credentials!', user)
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
+            LOGGER.error('/USERS/%s/credentials [GET] => No permission to perform this action!', user)
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials', methods=['POST'])
 def add_credential(user):
-    data = request.json
     try:
+        LOGGER.info('/USERS/%s/credentials [POST] => receiving call', user)
+        data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/USERS/%s/credentials [POST] => Authenticated!', user)
         usr = juju.check_input(user)
         if token.is_admin or token.username == usr:
             execute_task(juju.add_credential, usr, data['type'], data['name'], data['credential'])
+            LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
             code, response = 202, 'Process being handeled'
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
+            LOGGER.error('/USERS/%s/credentials [POST] => No permission to perform this action!', user)
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 @USERS.route('/<user>/credentials/<credential>', methods=['GET'])
 def get_credential(user, credential):
-    data = request.json
     try:
+        LOGGER.info('/USERS/%s/credentials/%s [GET] => receiving call', user, credential)
+        data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/USERS/%s/credentials/%s [GET] => Authenticated!', user, credential)
         usr = juju.check_input(user)
         if token.is_admin or token.username == usr:
             code, response = 200, execute_task(juju.get_credential, usr, data['name'], credential)
+            LOGGER.info('/USERS/%s/credentials/%s [GET] => Succesfully received credential!', user, credential)
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
+            LOGGER.error('/USERS/%s/credentials/%s [GET] => No permission to perform this action!', user, credential)
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 @USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
@@ -277,6 +363,12 @@ def remove_credential(user, credential):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -298,6 +390,12 @@ def get_controllers_access(user):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -320,6 +418,12 @@ def get_ucontroller_access(user, controller):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -344,6 +448,12 @@ def grant_to_controller(user, controller):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -368,6 +478,12 @@ def get_models_access(user, controller):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -398,6 +514,12 @@ def grant_to_model(user, controller):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -421,6 +543,12 @@ def get_model_access(user, controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -448,4 +576,10 @@ def revoke_from_model(user, controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)

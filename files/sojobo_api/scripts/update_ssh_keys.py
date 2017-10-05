@@ -59,7 +59,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('remove_ssh_keys')
-    hdlr = logging.FileHandler('{}/log/remove_ssh_keys.log'.format(sys.argv[3]))
+    hdlr = logging.FileHandler('{}/log/update_ssh_keys.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)

@@ -162,8 +162,8 @@ async def authenticate(api_key, auth):
             abort(error[0], error[1])
         token = JuJu_Token(auth)
         try:
-            controllers = list(await get_all_controllers())
-            controller = Controller_Connection(token, controllers[len(randint(0, controllers.size()))])
+            controllers = await get_all_controllers()
+            controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)])
             async with controller.connect(token):  #pylint: disable=E1701
                 pass
             return token

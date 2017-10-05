@@ -61,6 +61,12 @@ def get_all_controllers():
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -94,6 +100,12 @@ def create_controller():
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -112,6 +124,12 @@ def get_controller_info(controller):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -137,6 +155,12 @@ def delete_controller(controller):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -163,6 +187,12 @@ def create_model(controller):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -182,6 +212,12 @@ def get_models_info(controller):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -201,6 +237,12 @@ def get_model_info(controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -226,6 +268,12 @@ def add_bundle(controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -249,6 +297,12 @@ def delete_model(controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -268,6 +322,12 @@ def get_applications_info(controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -304,6 +364,12 @@ def add_application(controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -324,6 +390,12 @@ def get_application_info(controller, model, application):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -350,6 +422,12 @@ def expose_application(controller, model, application):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -374,6 +452,12 @@ def remove_app(controller, model, application):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -391,6 +475,12 @@ def get_application_config(controller, model, application):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -413,6 +503,12 @@ def set_application_config(controller, model, application):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -425,6 +521,16 @@ def get_machines_info(controller, model):
         code, response = 200, execute_task(juju.get_machines_info, token, mod)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -445,6 +551,12 @@ def get_machine_info(controller, model, machine):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -471,6 +583,12 @@ def add_machine(controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -495,6 +613,12 @@ def remove_machine(controller, model, machine):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -515,6 +639,12 @@ def get_units_info(controller, model, application):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -540,6 +670,12 @@ def add_unit(controller, model, application):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -565,6 +701,12 @@ def remove_unit(controller, model, application, unitnumber):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -587,6 +729,12 @@ def get_unit_info(controller, model, application, unitnumber):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -603,6 +751,12 @@ def get_relations_info(controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -628,6 +782,12 @@ def add_relation(controller, model):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -648,6 +808,12 @@ def get_relations(controller, model, application):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -672,6 +838,12 @@ def remove_relation(controller, model, app1, app2):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -705,6 +877,12 @@ def backup_controllers():
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
 
 
@@ -740,4 +918,10 @@ def restore_controllers():
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             LOGGER.error(l)
+    except Exception:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
+        code, response = errors.cmd_error(lines)
     return juju.create_response(code, response)
