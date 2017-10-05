@@ -21,6 +21,7 @@ import traceback
 import logging
 sys.path.append('/opt')
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
+from juju.errors import JujuAPIError, JujuError
 
 class JuJu_Token(object):  #pylint: disable=R0903
     def __init__(self):
@@ -34,14 +35,22 @@ async def set_model_acc(username, password, user, access, controller):
         token.username = username
         token.password = password
         access_list = ast.literal_eval(access)
+        ssh_keys = datastore.get_ssh_keys(user)
         for mod in access_list:
             logger.info('setting Model Access for %s on %s!', user, mod['name'])
             model = juju.Model_Connection(token, controller, mod['name'])
-            current_access = datastore.get_model_access(controller, model, user)
-            if not current_access:
-                await model.revoke(user)
-            await model.grant(user, acl=mod['access'])
-            datastore.set_model_access(controller, mod['name'], user, mod['access'])
+            async with model.connect(token) as mod_con:
+                current_access = datastore.get_model_access(controller, mod['name'], user)
+                if not current_access:
+                    await mod_con.revoke(user)
+                await mod_con.grant(user, acl=mod['access'])
+                if mod['acces'] in ['admin', 'write']:
+                    for key in ssh_keys:
+                        try:
+                            mod_con.add_ssh_key(user, key['key'])
+                        except (JujuAPIError, JujuError):
+                            pass
+                datastore.set_model_access(controller, mod['name'], user, mod['access'])
             logger.info('Model Access set for %s on %s!', user, mod['name'])
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()

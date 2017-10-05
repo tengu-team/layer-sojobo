@@ -47,8 +47,10 @@ def initialize():
 @USERS.route('/login', methods=['POST'])
 def login():
     try:
+        LOGGER.info('/USERS/login [POST] => receiving call')
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         code, response = 200, 'Success'
+        LOGGER.info('/USERS/login [POST] => Succesfully logged in!')
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -67,8 +69,11 @@ def login():
 @USERS.route('/', methods=['GET'])
 def get_users_info():
     try:
+        LOGGER.info('/USERS [GET] => receiving call')
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/USERS [GET] => Authenticated!')
         code, response = 200, execute_task(juju.get_users_info, token)
+        LOGGER.info('/USERS [GET] => Succesfully retieved all users!')
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -85,23 +90,30 @@ def get_users_info():
 
 @USERS.route('/', methods=['POST'])
 def create_user():
-    data = request.json
     try:
+        LOGGER.info('/USERS [POST] => receiving call')
+        data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/USERS [POST] => Authenticated!')
         user = data['username']
         m = re.match('^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$', user)
         if not(m) and m.end() != len(user):
             code, response = 400, "username does not have the correct format."
+            LOGGER.error('/USERS [POST] => Username does not have the correct format!')
         elif token.is_admin:
             if execute_task(juju.user_exists, user):
                 code, response = errors.already_exists('user')
+                LOGGER.error('/USERS [POST] => Username %s already exists!', user)
             elif data['password']:
                 execute_task(juju.create_user, token, user, data['password'])
+                LOGGER.info('/USERS [POST] => Creating user %s, check add_user.log for more information!', user)
                 code, response = 202, 'User {} is being created'.format(user)
             else:
                 code, response = errors.empty()
+                LOGGER.error('/USERS [POST] => Username can not be empty!')
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
+            LOGGER.error('/USERS [POST] => No Permission to perform this action!')
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -127,7 +139,7 @@ def get_user_info(user):
             else:
                 code, response = errors.does_not_exist('user')
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -158,7 +170,7 @@ def change_user_password(user):
             else:
                 code, response = errors.does_not_exist('user')
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -188,7 +200,7 @@ def delete_user(user):
             else:
                 code, response = errors.does_not_exist('user')
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -356,7 +368,7 @@ def remove_credential(user, credential):
             execute_task(juju.remove_credential, usr, data['name'], credential)
             code, response = 202, 'Process being handeled'
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -381,7 +393,7 @@ def get_controllers_access(user):
             if token.is_admin or token.username == usr:
                 code, response = 200, execute_task(juju.get_controllers_access, usr)
             else:
-                code, response = errors.unauthorized()
+                code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('user')
     except KeyError:
@@ -409,7 +421,7 @@ def get_ucontroller_access(user, controller):
             if token.is_admin or token.username == usr:
                 code, response = 200, execute_task(juju.get_ucontroller_access, con, usr)
             else:
-                code, response = errors.unauthorized()
+                code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('user')
     except KeyError:
@@ -441,7 +453,7 @@ def grant_to_controller(user, controller):
             else:
                 code, response = errors.does_not_exist('user')
         else:
-            code, response = errors.unauthorized()
+            code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -469,7 +481,7 @@ def get_models_access(user, controller):
                 code, response = 200, execute_task(juju.get_models_access, con, usr)
                 execute_task(con.disconnect)
             else:
-                code, response = errors.unauthorized()
+                code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('user')
     except KeyError:
@@ -505,7 +517,7 @@ def grant_to_model(user, controller):
             if execute_task(juju.user_exists, usr):
                 for mod in data:
                     if not mod['name'] in user_access:
-                        return juju.create_response(errors.unauthorized())
+                        return juju.create_response(errors.no_permission())
                 execute_task(juju.set_models_access, token, con, usr, data)
                 code, response = 202, 'Process being handeled'
     except KeyError:
@@ -534,40 +546,7 @@ def get_model_access(user, controller, model):
                 access = execute_task(juju.get_model_access, mod.m_name, con.c_name, usr)
                 code, response = 200, {'access' : access}
             else:
-                code, response = errors.unauthorized()
-        else:
-            code, response = errors.does_not_exist('user')
-    except KeyError:
-        code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-    except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
-    return juju.create_response(code, response)
-
-
-@USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['DELETE'])
-def revoke_from_model(user, controller, model):
-    try:
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
-        usr = juju.check_input(user)
-        if execute_task(juju.user_exists, usr):
-            if (mod.m_access == 'admin' or mod.c_access == 'superuser') and user != 'admin':
-                execute_task(con.connect, token)
-                execute_task(mod.connect, token)
-                execute_task(juju.remove_user_from_model, con, mod, usr)
-                code, response = 200, 'Revoked access for user {} on model {}'.format(usr, model)
-                execute_task(con.disconnect)
-                execute_task(mod.disconnect)
-            else:
-                code, response = errors.unauthorized()
+                code, response = errors.no_permission()
         else:
             code, response = errors.does_not_exist('user')
     except KeyError:

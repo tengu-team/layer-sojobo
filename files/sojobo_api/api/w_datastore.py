@@ -38,21 +38,6 @@ def create_user(user_name):
         con.set(user_name, json.dumps(user))
 
 
-def disable_user(user):
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    data['active'] = False
-    data['controllers'] = []
-    con.set(user, json.dumps(data))
-
-
-def enable_user(user):
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    data['active'] = True
-    con.set(user, json.dumps(data))
-
-
 def get_user(user):
     con = connect_to_users()
     return json.loads(con.get(user))
@@ -212,49 +197,14 @@ def set_controller_access(c_name, user, access):
     con.set(c_name, json.dumps(data))
 
 
-def add_user_to_controller(c_name, user, access):
-    con = connect_to_controllers()
-    data = json.loads(con.get(c_name))
-    c_type = data['type']
-    exists = False
-    for usr in data['users']:
-        if usr['name'] == user:
-            exists = True
-            usr['name']['access'] = access
-            break
-    if not exists:
-        data['users'].append({'name': user, 'access': access})
-    con.set(c_name, json.dumps(data))
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    for controller in data['controllers']:
-        if controller['name'] == c_name:
-            controller['access'] = access
-            exists = True
-            break
-    if not exists:
-        data['controllers'].append({
-            'access' : access,
-            'name': c_name,
-            'models' : [],
-            'type': c_type
-        })
-    con.set(user, json.dumps(data))
-
-
-def remove_user_from_controller(c_name, user):
+def delete_user(c_name, user):
     con = connect_to_controllers()
     data = json.loads(con.get(c_name))
     if user in data['users']:
         data['users'].remove(user)
     con.set(c_name, json.dumps(data))
     con = connect_to_users()
-    data = json.loads(con.get(user))
-    for controller in data['controllers']:
-        if controller['name'] == c_name:
-            data['controllers'].remove(controller)
-            break
-    con.set(user, json.dumps(data))
+    con.delete(user)
 
 
 def get_controller_users(c_name):

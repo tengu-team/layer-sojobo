@@ -1,4 +1,3 @@
-
 # !/usr/bin/env python3
 # Copyright (C) 2017  Qrama
 #
@@ -16,13 +15,15 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
-import ast
+import logging
 import sys
 import traceback
-import logging
 sys.path.append('/opt')
+from juju import tag
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
+from juju.client import client
+
 
 class JuJu_Token(object):  #pylint: disable=R0903
     def __init__(self):
@@ -30,37 +31,36 @@ class JuJu_Token(object):  #pylint: disable=R0903
         self.password = settings.JUJU_ADMIN_PASSWORD
         self.is_admin = True
 
-async def remove_ssh_key(ssh_keys, username):
+################################################################################
+# Async method
+################################################################################
+async def delete_user(username):
     try:
-        current_keys = datastore.get_ssh_keys(username)
-        new_keys = ast.literal_eval(ssh_keys)
-        add_keys = list(set(new_keys) - set(current_keys))
-        remove_keys = list(set(current_keys) - set(new_keys))
-        user = datastore.get_user(username)
-        token = JuJu_Token()
-        for con in user['controllers']:
-            for mod in con['models']:
-                if mod['access'] == 'write' or mod['access'] == 'admin':
-                    logger.info('Setting up Modelconnection for model: %s', mod['name'])
-                    model = juju.Model_Connection(token, con['name'], mod['name'])
-                    async with model.connect(token) as mod_con:
-                        for a_key in add_keys:
-                            await mod_con.add_ssh_key(username, a_key['key'])
-                        for r_key in remove_keys:
-                            await mod_con.remove_ssh_key(username, r_key['key'])
-        datastore.update_ssh_keys(username, new_keys)
+        token = JuJu_Token
+        #TO DO => libjuju implementation
+        controllers = datastore.get_all_controllers()
+        for con in controllers:
+            logger.info('Setting up Controllerconnection for %s', con)
+            controller = juju.Controller_Connection(token, con)
+            async with controller.connect(token) as con_juju:
+                user_facade = client.UserManagerFacade.from_connection(con_juju.connection)
+                entity = client.Entity(tag.user(username))
+                return await user_facade.RemoveUser([entity])
+                # if wrapper ready =>
+                # await con_juju.remove(username)
+            logger.info('Removed user %s from Controller %s', username ,con)
+        datastore.delete_user(username)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
 
-
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger('delete-user')
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('remove_ssh_keys')
-    hdlr = logging.FileHandler('{}/log/update_ssh_keys.log'.format(sys.argv[3]))
+    hdlr = logging.FileHandler('{}/log/delete_user.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -68,6 +68,6 @@ if __name__ == '__main__':
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
-    loop.set_debug(True)
-    result = loop.run_until_complete(remove_ssh_key(sys.argv[1], sys.argv[2]))
+    loop.set_debug(False)
+    loop.run_until_complete(create_user(sys.argv[1]))
     loop.close()

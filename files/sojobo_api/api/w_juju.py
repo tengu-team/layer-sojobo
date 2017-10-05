@@ -660,21 +660,7 @@ async def create_user(token, username, password):
 
 
 async def delete_user(token, username):
-    for con in await get_all_controllers():
-        controller = Controller_Connection(token, con)
-        async with controller.connect(token) as juju:  #pylint: disable=E1701
-            await juju.disable_user(username)
-        datastore.remove_user_from_controller(con, username)
-    datastore.disable_user(username)
-
-
-async def enable_user(token, username):
-    for con in await get_all_controllers():
-        controller = Controller_Connection(token, con)
-        async with controller.connect(token) as juju:  #pylint: disable=E1701
-            await juju.enable_user(username)
-        datastore.add_user_to_controller(controller, username, 'login')
-    datastore.enable_user_con(controller, username)
+    Popen(["python3.6", "{}/scripts/delete_user.py".format(settings.SOJOBO_API_DIR), username])
 
 
 async def change_user_password(token, username, password):
@@ -724,12 +710,6 @@ async def add_user_to_controller(token, controller, user, access):
     Popen(["python3.6", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
            token.username, token.password, settings.SOJOBO_API_DIR,
            settings.REDIS_HOST, settings.REDIS_PORT, user, access, controller.c_name])
-
-
-async def remove_user_from_controller(token, con, user):
-    await controller_revoke(token, con, user)
-    datastore.set_controller_access(con.c_name, user, 'login')
-    datastore.remove_models_access(con.c_name, user)
 
 
 async def controller_grant(token, controller, username, access):

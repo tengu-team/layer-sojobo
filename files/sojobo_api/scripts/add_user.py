@@ -17,6 +17,7 @@
 import asyncio
 import logging
 import sys
+import traceback
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
@@ -32,17 +33,24 @@ class JuJu_Token(object):  #pylint: disable=R0903
 # Async method
 ################################################################################
 async def create_user(username, password):
-    datastore.create_user(username)
-    controllers = datastore.get_all_controllers()
-    token = JuJu_Token()
-    for con in controllers:
-        logger.info('Setting up Controllerconnection for %s', con)
-        controller = juju.Controller_Connection(token, con)
-        async with controller.connect(token) as con_juju:  #pylint: disable=E1701
-            await con_juju.add_user(username, password)
-            await con_juju.grant(username)
-            datastore.add_user_to_controller(con, username, 'login')
-            logger.info('Succesfully added user %s to controller %s', username, con)
+    try:
+        datastore.create_user(username)
+        controllers = datastore.get_all_controllers()
+        token = JuJu_Token()
+        for con in controllers:
+            logger.info('Setting up Controllerconnection for %s', con)
+            controller = juju.Controller_Connection(token, con)
+            async with controller.connect(token) as con_juju:  #pylint: disable=E1701
+                await con_juju.add_user(username, password)
+                await con_juju.grant(username)
+                datastore.add_user_to_controller(con, username, 'login')
+                logger.info('Succesfully added user %s to controller %s', username, con)
+    except Exception as e:
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            logger.error(l)
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
