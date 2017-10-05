@@ -120,16 +120,10 @@ def connect_to_redis(redis):
 @when_not('admin.created')
 def create_admin():
     if leader_get().get('admin') != 'Created':
-        res = requests.post('http://{}/users'.format(unit_private_ip()),
-                            json={'username': 'admin', 'password': db.get('password')},
-                            headers={'api-key': db.get('api-key')},
-                            auth=('admin', db.get('password')))
-        if res.status_code == 200:
-            leader_set({'admin': 'Created'})
-            status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
-            set_state('admin.created')
-        else:
-            status_set('blocked', 'error creating admin user')
+        subprocess.check_call(["python3.6", "{}/scripts/add_user.py".format(API_DIR), 'admin', db.get('password')])
+        leader_set({'admin': 'Created'})
+        status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
+        set_state('admin.created')
     else:
         leader_set({'admin': 'Created'})
 

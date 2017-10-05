@@ -17,8 +17,6 @@
 import asyncio
 from importlib import import_module
 import os
-# import tempfile
-# import shutil
 from subprocess import check_output, check_call, Popen
 import json
 from asyncio_extras import async_contextmanager
@@ -746,10 +744,10 @@ async def controller_revoke(token, controller, username):
         await juju.revoke(username)
 
 
-async def add_user_to_model(token, controller, model, user, access):
+async def set_models_access(token, controller, user, accesslist):
     Popen(["python3.6", "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR), token.username,
-           token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT,
-           user, access, controller.c_name, model.m_name])
+           token.password, settings.SOJOBO_API_DIR,
+           user, str(accesslist), controller.c_name])
 
 
 async def model_grant(token, model, username, access):

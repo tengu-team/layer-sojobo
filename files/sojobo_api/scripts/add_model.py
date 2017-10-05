@@ -85,7 +85,7 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
         logger.info('%s -> Adding ssh-keys to model: %s', m_name, m_name)
         for key in json.loads(users.get(usr))['ssh-keys']:
             try:
-                await model.add_ssh_key(usr, key)
+                await model.add_ssh_key(usr, key['key'])
             except (JujuAPIError, JujuError):
                 pass
         for u in json.loads(controllers.get(c_name))['users']:
@@ -94,7 +94,7 @@ async def create_model(c_name, m_name, usr, pwd, url, port, cred_name):
                 set_model_access(c_name, m_name, u['name'], users, 'admin')
                 for key in json.loads(users.get(u['name']))['ssh-keys']:
                     try:
-                        await model.add_ssh_key(u['name'], key)
+                        await model.add_ssh_key(u['name'], key['key'])
                     except (JujuAPIError, JujuError):
                         pass
         logger.info('%s -> succesfully deployed model', m_name)

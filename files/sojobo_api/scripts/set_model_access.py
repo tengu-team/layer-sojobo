@@ -16,50 +16,33 @@
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
 import sys
+import ast
 import traceback
 import logging
-import json
-import redis
-from juju.model import Model
-from juju.controller import Controller
+sys.path.append('/opt')
+from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
+class JuJu_Token(object):  #pylint: disable=R0903
+    def __init__(self):
+        self.username = None
+        self.password = None
 
-async def set_model_acc(c_name, m_name, access, user, username, password, url, port):
+async def set_model_acc(username, password, user, access, controller):
     try:
-        controllers = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
-        users = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
-        controller = json.loads(controllers.get(c_name))
-        usr = json.loads(users.get(user))
-        for mod in controller['models']:
-            if mod['name'] == m_name:
-                model = Model()
-                await model.connect(controller['endpoints'][0], mod['uuid'], username, password, controller['ca-cert'])
-                await model.grant(user, acl=access)
-                exists_con = False
-                for con in usr['controllers']:
-                    if con['name'] == c_name:
-                        exists_mod = False
-                        exists_con = True
-                        for mod in con['models']:
-                            if mod['name'] == m_name:
-                                mod['access'] = access
-                                exists_mod = True
-                                break
-                        if not exists_mod:
-                            con['models'].append({'name': m_name, 'access': access})
-                if not exists_con:
-                    usr['controllers'].append({'name': c_name, 'access': 'login', 'models': [{'name': m_name, 'access': access}]})
-                    contro = Controller()
-                    await contro.connect(controller['endpoints'][0], username, password, controller['ca-cert'])
-                    await contro.grant(user)
-                    await contro.disconnect()
-                logger.info('%s access granted on %s:%s for  %s', access, c_name, m_name, user)
-                if access == 'admin' or access == 'write':
-                    for key in usr['ssh-keys']:
-                        await model.add_ssh_key(user, key)
-                model.disconnect()
-        controllers.set(c_name, json.dumps(controller))
-        users.set(user, json.dumps(usr))
+        logger.info('Starting process to set model access')
+        token = JuJu_Token
+        token.username = username
+        token.password = password
+        access_list = ast.literal_eval(access)
+        for mod in access_list:
+            logger.info('setting Model Access for %s on %s!', user, mod['name'])
+            model = juju.Model_Connection(token, controller, mod['name'])
+            current_access = datastore.get_model_access(controller, model, user)
+            if not current_access:
+                await model.revoke(user)
+            await model.grant(user, acl=mod['access'])
+            datastore.set_model_access(controller, mod['name'], user, mod['access'])
+            logger.info('Model Access set for %s on %s!', user, mod['name'])
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -80,7 +63,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    result = loop.run_until_complete(set_model_acc(sys.argv[8], sys.argv[9], sys.argv[7],
-                                                   sys.argv[6], sys.argv[1], sys.argv[2],
-                                                   sys.argv[4], sys.argv[5]))
+    result = loop.run_until_complete(set_model_acc(sys.argv[1], sys.argv[2],
+                                                   sys.argv[4], sys.argv[5], sys.argv[6]))
     loop.close()

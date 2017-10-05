@@ -12,7 +12,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0326,w0406,e0401
+# pylint: disable=c0111,c0301,c0325,c0326,w0406,e0401,e0611
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
@@ -302,6 +302,32 @@ def get_models_access(user, controller):
     return juju.create_response(code, response)
 
 
+@USERS.route('/<user>/controllers/<controller>/models', methods=['PUT'])
+def grant_to_model(user, controller):
+    try:
+        data = request.json
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        con = execute_task(juju.authorize, token, juju.check_input(controller))
+        usr = juju.check_input(user)
+        if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
+            if execute_task(juju.user_exists, user):
+                execute_task(juju.set_models_access, token, con, usr, data)
+                code, response = 202, 'Process being handeled'
+            else:
+                code, response = errors.does_not_exist('user')
+        else:
+            user_access = execute_task(juju.get_models_access, con, usr)
+            if execute_task(juju.user_exists, usr):
+                for mod in data:
+                    if not mod['name'] in user_access:
+                        return juju.create_response(errors.unauthorized())
+                execute_task(juju.set_models_access, token, con, usr, data)
+                code, response = 202, 'Process being handeled'
+    except KeyError:
+        code, response = errors.invalid_data()
+    return juju.create_response(code, response)
+
+
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_access(user, controller, model):
     try:
@@ -316,26 +342,6 @@ def get_model_access(user, controller, model):
                 code, response = errors.unauthorized()
         else:
             code, response = errors.does_not_exist('user')
-    except KeyError:
-        code, response = errors.invalid_data()
-    return juju.create_response(code, response)
-
-
-@USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['PUT'])
-def grant_to_model(user, controller, model):
-    try:
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
-        usr = juju.check_input(user)
-        if (token.is_admin or mod.m_access == 'admin' or con.c_access == 'superuser') and user != 'admin':
-            access = juju.check_access(request.json['access'])
-            if execute_task(juju.user_exists, user):
-                execute_task(juju.add_user_to_model, token, con, mod, usr, access)
-                code, response = 202, 'Process being handeled'
-            else:
-                code, response = errors.does_not_exist('user')
-        else:
-            code, response =  errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
     return juju.create_response(code, response)

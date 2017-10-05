@@ -17,6 +17,8 @@ import os
 import shutil
 import tempfile
 import zipfile
+import sys
+import traceback
 import logging
 from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju
@@ -46,36 +48,52 @@ def get_all_controllers():
     try:
         LOGGER.info('/TENGU/controllers [GET] => receiving call')
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
         if token.is_admin:
             code, response = 200, execute_task(juju.get_all_controllers)
+            LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
         else:
             code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers [GET] => No Permission to perform action!')
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
 @TENGU.route('/controllers', methods=['POST'])
 def create_controller():
-    if request.json is None:
-        data = request.form
-    else:
-        data = request.json
     try:
+        if request.json is None:
+            data = request.form
+        else:
+            data = request.json
         LOGGER.info('/TENGU/controllers [POST] => receiving call')
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers [POST] => Authenticated')
         if token.is_admin:
             controller = juju.check_input(data['controller'])
+            LOGGER.info('/TENGU/controllers [POST] => Creating Controller %s', controller)
             c_type = execute_task(juju.check_c_type, data['type'])
             if execute_task(juju.controller_exists, controller):
                 code, response = errors.already_exists('controller')
+                LOGGER.error('/TENGU/controllers [POST] => Controller %s already exists', controller)
             else:
                 code, response = execute_task(juju.create_controller, c_type,
                                               controller, data['region'], data['credential'])
+                LOGGER.info('/TENGU/controllers [POST] => Creating Controller %s, check add_controller.log for more details! ', controller)
         else:
             code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers [POST] => No Permission to perform action!')
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -84,12 +102,16 @@ def get_controller_info(controller):
     try:
         LOGGER.info('/TENGU/controllers/%s [GET] => receiving call', controller)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        LOGGER.info('/TENGU/controllers/%s [GET] => authenticated!', controller)
+        LOGGER.info('/TENGU/controllers/%s [GET] => Authenticated!', controller)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
-        LOGGER.info('/TENGU/controllers/%s [GET] => authorized!', controller)
+        LOGGER.info('/TENGU/controllers/%s [GET] => Authorized!', controller)
         code, response = 200, execute_task(juju.get_controller_info, token, con)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -98,14 +120,23 @@ def delete_controller(controller):
     try:
         LOGGER.info('/TENGU/controllers/%s [DELETE] => receiving call', controller)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s [DELETE] => Authenticated!', controller)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
+        LOGGER.info('/TENGU/controllers/%s [DELETE] => Authorized!', controller)
         if con.c_access == 'superuser':
+            LOGGER.info('/TENGU/controllers/%s [DELETE] => Deleting Controller!', controller)
             execute_task(juju.delete_controller, con)
             code, response = 200, execute_task(juju.get_all_controllers)
+            LOGGER.info('/TENGU/controllers/%s [DELETE] => Succesfully deleted controller!', controller)
         else:
             code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s [DELETE] => No Permission to perform this action!', controller)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -115,15 +146,23 @@ def create_model(controller):
         LOGGER.info('/TENGU/controllers/%s/models [POST] => receiving call', controller)
         data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
+        LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
         model = juju.check_input(data['model'])
         credentials = juju.check_input(data['credential'])
         if con.c_access == 'add-model' or con.c_access == 'superuser':
+            LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
             code, response = execute_task(juju.create_model, token, con.c_name, model, credentials)
         else:
             code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models [POST] => No Permission to perform this action!', controller)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -132,10 +171,17 @@ def get_models_info(controller):
     try:
         LOGGER.info('/TENGU/controllers/%s/models [GET] => receiving call', controller)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models [GET] => Authenticated!', controller)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
+        LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
         code, response = 200, execute_task(juju.get_models_info, token, con)
+        LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -144,10 +190,17 @@ def get_model_info(controller, model):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => receiving call', controller, model)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => Authenticated!', controller, model)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => Authorized!', controller, model)
         code, response = 200, execute_task(juju.get_model_info, token, con, mod)
+        LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => model information retrieved!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -157,14 +210,22 @@ def add_bundle(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => receiving call', controller, model)
         data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authenticated!', controller, model)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authorized!', controller, model)
         if mod.m_access == 'admin' or mod.m_access == 'write':
+            LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Bundle is being deployed, check bundle_deployment.log for more information!', controller, model)
             execute_task(juju.add_bundle, token, con.c_name, mod.m_name, data['bundle'])
             code, response = 202, "Bundle is being deployed"
         else:
             code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s [POST] => No Permission to perform action!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -173,13 +234,21 @@ def delete_model(controller, model):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => receiving call', controller, model)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Authenticated!', controller, model)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Authorized!', controller, model)
         if mod.m_access == 'admin':
             code, response = 200, execute_task(juju.delete_model, token, con, mod)
+            LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Model succesfully deleted!', controller, model)
         else:
             code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s [DELETE] => No permission to perform this action!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -188,10 +257,17 @@ def get_applications_info(controller, model):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [GET] => receiving call', controller, model)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [GET] => Authenticated!', controller, model)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [GET] => Authorized!', controller, model)
         code, response = 200, execute_task(juju.get_applications_info, token, mod)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [GET] => succesfully retieved applications info!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -201,9 +277,12 @@ def add_application(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => receiving call', controller, model)
         data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authenticated!', controller, model)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authorized!', controller, model)
         if execute_task(juju.app_exists, token, con, mod, data['application']):
             code, response = errors.already_exists('application')
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications [POST] => Application already exists!', controller, model)
         else:
             if mod.m_access == 'write' or mod.m_access == 'admin':
                 series = juju.check_input(data.get('series', None), True)
@@ -214,10 +293,17 @@ def add_application(controller, model):
                 app = juju.check_input(data['application'])
                 execute_task(juju.deploy_app, token, mod, app, name=app_name, ser=series, tar=machine, con=config, num_of_units=int(units))
                 code, response = 200, execute_task(juju.get_application_info, token, mod, app)
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller, model)
             else:
                 code, response = errors.no_permission()
+                LOGGER.error('/TENGU/controllers/%s/models/%s [DELETE] => No permission to perform this action!', controller, model)
+
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
