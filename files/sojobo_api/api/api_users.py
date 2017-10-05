@@ -17,8 +17,10 @@
 # USER FUNCTIONS
 ###############################################################################
 import logging
+import re
+import sys
+import traceback
 from flask import request, Blueprint
-
 from sojobo_api.api import w_errors as errors, w_juju as juju
 from sojobo_api.api.w_juju import execute_task
 
@@ -49,6 +51,10 @@ def login():
         code, response = 200, 'Success'
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -59,6 +65,10 @@ def get_users_info():
         code, response = 200, execute_task(juju.get_users_info, token)
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 @USERS.route('/', methods=['POST'])
@@ -82,6 +92,10 @@ def create_user():
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -98,6 +112,10 @@ def get_user_info(user):
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -119,6 +137,10 @@ def change_user_password(user):
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -139,6 +161,10 @@ def delete_user(user):
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -152,6 +178,10 @@ def get_ssh_keys(user):
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -168,6 +198,10 @@ def update_ssh_keys(user):
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -182,6 +216,10 @@ def get_credentials(user):
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -198,21 +236,28 @@ def add_credential(user):
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
-@USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
+@USERS.route('/<user>/credentials/<credential>', methods=['GET'])
 def get_credential(user, credential):
     data = request.json
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         usr = juju.check_input(user)
         if token.is_admin or token.username == usr:
-            execute_task(juju.get_credential, usr, data['name'], credential)
-            code, response = 202, 'Process being handeled'
+            code, response = 200, execute_task(juju.get_credential, usr, data['name'], credential)
         else:
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 @USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
@@ -228,6 +273,10 @@ def remove_credential(user, credential):
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -245,6 +294,10 @@ def get_controllers_access(user):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -263,6 +316,10 @@ def get_ucontroller_access(user, controller):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -283,6 +340,10 @@ def grant_to_controller(user, controller):
             code, response = errors.unauthorized()
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -303,6 +364,10 @@ def get_models_access(user, controller):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors. invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -329,6 +394,10 @@ def grant_to_model(user, controller):
                 code, response = 202, 'Process being handeled'
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -348,6 +417,10 @@ def get_model_access(user, controller, model):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
 
 
@@ -371,4 +444,8 @@ def revoke_from_model(user, controller, model):
             code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        for l in lines:
+            LOGGER.error(l)
     return juju.create_response(code, response)
