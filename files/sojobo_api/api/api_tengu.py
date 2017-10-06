@@ -378,12 +378,16 @@ def get_application_info(controller, model, application):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [GET] => receiving call', controller, model, application)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [GET] => Authenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [GET] => authorized!', controller, model, application)
         app = juju.check_input(application)
         if execute_task(juju.app_exists, token, con, mod, app):
             code, response = 200, execute_task(juju.get_application_info, token, mod, app)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [GET] => Succesfully retrieved application info!', controller, model, application)
         else:
             code, response = errors.does_not_exist('application')
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s [GET] => Application does not exist!', controller, model, application)
     except KeyError:
         code, response = errors.invalid_data()
         exc_type, exc_value, exc_traceback = sys.exc_info()
