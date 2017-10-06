@@ -20,6 +20,7 @@ import zipfile
 import sys
 import traceback
 import logging
+from werkzeug.exceptions import HTTPException
 from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju
 from sojobo_api.api.w_juju import execute_task
@@ -57,16 +58,13 @@ def get_all_controllers():
             LOGGER.error('/TENGU/controllers [GET] => No Permission to perform action!')
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -77,35 +75,33 @@ def create_controller():
             data = request.form
         else:
             data = request.json
-        LOGGER.info('/TENGU/controllers [POST] => receiving call')
+        url = request.url_rule
+        LOGGER.info('%s [POST] => receiving call', url)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        LOGGER.info('/TENGU/controllers [POST] => Authenticated')
+        LOGGER.info('%s [POST] => Authenticated', url)
         if token.is_admin:
             controller = juju.check_input(data['controller'])
-            LOGGER.info('/TENGU/controllers [POST] => Creating Controller %s', controller)
+            LOGGER.info('%s [POST] => Creating Controller %s', url, controller)
             c_type = execute_task(juju.check_c_type, data['type'])
             if execute_task(juju.controller_exists, controller):
                 code, response = errors.already_exists('controller')
-                LOGGER.error('/TENGU/controllers [POST] => Controller %s already exists', controller)
+                LOGGER.error('%s [POST] => Controller %s already exists', url,  controller)
             else:
                 code, response = execute_task(juju.create_controller, c_type,
                                               controller, data['region'], data['credential'])
-                LOGGER.info('/TENGU/controllers [POST] => Creating Controller %s, check add_controller.log for more details! ', controller)
+                LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/TENGU/controllers [POST] => No Permission to perform action!')
+            LOGGER.error('%s [POST] => No Permission to perform action!', url)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -120,16 +116,13 @@ def get_controller_info(controller):
         code, response = 200, execute_task(juju.get_controller_info, token, con)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -151,16 +144,13 @@ def delete_controller(controller):
             LOGGER.error('/TENGU/controllers/%s [DELETE] => No Permission to perform this action!', controller)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -183,16 +173,13 @@ def create_model(controller):
             LOGGER.error('/TENGU/controllers/%s/models [POST] => No Permission to perform this action!', controller)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -208,16 +195,13 @@ def get_models_info(controller):
         LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -233,16 +217,13 @@ def get_model_info(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => model information retrieved!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -264,16 +245,13 @@ def add_bundle(controller, model):
             LOGGER.error('/TENGU/controllers/%s/models/%s [POST] => No Permission to perform action!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -293,16 +271,13 @@ def delete_model(controller, model):
             LOGGER.error('/TENGU/controllers/%s/models/%s [DELETE] => No permission to perform this action!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -318,16 +293,13 @@ def get_applications_info(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [GET] => succesfully retieved applications info!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -357,19 +329,15 @@ def add_application(controller, model):
             else:
                 code, response = errors.no_permission()
                 LOGGER.error('/TENGU/controllers/%s/models/%s [DELETE] => No permission to perform this action!', controller, model)
-
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -390,16 +358,13 @@ def get_application_info(controller, model, application):
             LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s [GET] => Application does not exist!', controller, model, application)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -422,16 +387,13 @@ def expose_application(controller, model, application):
             code, response = 200, execute_task(juju.get_application_info, token, mod, app)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -452,16 +414,13 @@ def remove_app(controller, model, application):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -475,16 +434,13 @@ def get_application_config(controller, model, application):
         code, response = 200, execute_task(juju.get_application_config, token, mod, app)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -503,16 +459,13 @@ def set_application_config(controller, model, application):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -525,16 +478,13 @@ def get_machines_info(controller, model):
         code, response = 200, execute_task(juju.get_machines_info, token, mod)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -551,16 +501,13 @@ def get_machine_info(controller, model, machine):
             code, response = errors.does_not_exist('machine')
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -583,16 +530,13 @@ def add_machine(controller, model):
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -613,16 +557,13 @@ def remove_machine(controller, model, machine):
             code, response = errors.does_not_exist('machine')
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -639,16 +580,13 @@ def get_units_info(controller, model, application):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -670,16 +608,13 @@ def add_unit(controller, model, application):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -701,16 +636,13 @@ def remove_unit(controller, model, application, unitnumber):
             code, response = errors.does_not_exist('unit')
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -729,16 +661,13 @@ def get_unit_info(controller, model, application, unitnumber):
             code, response = errors.does_not_exist('unit')
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -751,16 +680,13 @@ def get_relations_info(controller, model):
         code, response = 200, execute_task(juju.get_relations_info, token, mod)
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -782,16 +708,13 @@ def add_relation(controller, model):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -808,16 +731,13 @@ def get_relations(controller, model, application):
             code, response = errors.does_not_exist('application')
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -838,16 +758,13 @@ def remove_relation(controller, model, app1, app2):
             code, response = errors.no_app()
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -877,16 +794,13 @@ def backup_controllers():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
 
@@ -918,14 +832,18 @@ def restore_controllers():
             code, response = errors.no_permission()
     except KeyError:
         code, response = errors.invalid_data()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
+        error_log()
+    except HTTPException:
+        ers = error_log()
+        raise
     except Exception:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-        for l in lines:
-            LOGGER.error(l)
-        code, response = errors.cmd_error(lines)
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
+
+def error_log():
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    for l in lines:
+        LOGGER.error(l)
+    return lines
