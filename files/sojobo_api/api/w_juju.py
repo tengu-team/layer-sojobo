@@ -163,10 +163,14 @@ async def authenticate(api_key, auth):
         token = JuJu_Token(auth)
         try:
             controllers = await get_all_controllers()
-            controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)])
-            async with controller.connect(token):  #pylint: disable=E1701
-                pass
-            return token
+            if len(controllers) > 0:
+                controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)])
+                async with controller.connect(token):  #pylint: disable=E1701
+                    pass
+                return token
+            else:
+                if token.username == settings.JUJU_ADMIN_USER and token.password == settings.JUJU_ADMIN_PASSWORD:
+                    return token
         except JujuAPIError:
             abort(error[0], error[1])
     else:
