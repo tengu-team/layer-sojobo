@@ -353,10 +353,9 @@ def remove_credential(user, credential):
 def get_controllers_access(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        usr = juju.check_input(user)
         if execute_task(juju.user_exists, usr):
-            if token.is_admin or token.username == usr:
-                code, response = 200, execute_task(juju.get_controllers_access, usr)
+            if token.is_admin or token.username == user:
+                code, response = 200, execute_task(juju.get_controllers_access, user)
             else:
                 code, response = errors.no_permission()
         else:
@@ -377,11 +376,10 @@ def get_controllers_access(user):
 def get_ucontroller_access(user, controller):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        con = execute_task(juju.authorize, token, juju.check_input(controller))
-        usr = juju.check_input(user)
-        if execute_task(juju.user_exists, usr):
-            if token.is_admin or token.username == usr:
-                code, response = 200, execute_task(juju.get_ucontroller_access, con, usr)
+        if execute_task(juju.user_exists, user):
+            if token.is_admin or token.username == user:
+                con = execute_task(juju.authorize, token, controller)
+                code, response = 200, execute_task(juju.get_ucontroller_access, con, user)
             else:
                 code, response = errors.no_permission()
         else:
@@ -402,17 +400,16 @@ def get_ucontroller_access(user, controller):
 def grant_to_controller(user, controller):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        con = execute_task(juju.authorize, token, juju.check_input(controller))
-        usr = juju.check_input(user)
-        if (token.is_admin or con.c_access == 'superuser') and usr != 'admin':
-            access = juju.check_access(request.json['access'])
-            if execute_task(juju.user_exists, usr):
-                execute_task(juju.add_user_to_controller, token, con, usr, access)
-                code, response = 202, 'Process being handeled'
+        if execute_task(juju.user_exists, usr):
+            if (token.is_admin or con.c_access == 'superuser') and usr != 'admin':
+                access = juju.check_access(request.json['access'])
+                    con = execute_task(juju.authorize, token, juju.check_input(controller))
+                    execute_task(juju.add_user_to_controller, token, con, usr, access)
+                    code, response = 202, 'Process being handeled'
             else:
-                code, response = errors.does_not_exist('user')
+                code, response = errors.no_permission()
         else:
-            code, response = errors.no_permission()
+            code, response = errors.does_not_exist('user')
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
