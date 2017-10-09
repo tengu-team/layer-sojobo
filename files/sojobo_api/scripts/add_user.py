@@ -35,6 +35,7 @@ class JuJu_Token(object):  #pylint: disable=R0903
 async def create_user(username, password):
     try:
         datastore.create_user(username)
+        logger.info('Succesfully created user %s', username)
         controllers = datastore.get_all_controllers()
         token = JuJu_Token()
         for con in controllers:
