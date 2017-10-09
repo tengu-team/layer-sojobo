@@ -676,7 +676,7 @@ def get_unit_info(controller, model, application, unitnumber):
         unit = execute_task(juju.get_unit_info, token, mod, app, unum)
         if unit is not {}:
             code, response = 200, unit
-            OGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Succesfully retrieved Unit information!', controller, model, application, unitnumber)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Succesfully retrieved Unit information!', controller, model, application, unitnumber)
         else:
             code, response = errors.does_not_exist('unit')
             LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Unit does not exist!', controller, model, application, unitnumber)
