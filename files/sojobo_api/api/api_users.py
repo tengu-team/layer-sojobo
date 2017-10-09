@@ -353,7 +353,7 @@ def remove_credential(user, credential):
 def get_controllers_access(user):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        if execute_task(juju.user_exists, usr):
+        if execute_task(juju.user_exists, user):
             if token.is_admin or token.username == user:
                 code, response = 200, execute_task(juju.get_controllers_access, user)
             else:
@@ -400,12 +400,12 @@ def get_ucontroller_access(user, controller):
 def grant_to_controller(user, controller):
     try:
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        if execute_task(juju.user_exists, usr):
-            if (token.is_admin or con.c_access == 'superuser') and usr != 'admin':
+        con = execute_task(juju.authorize, token, juju.check_input(controller))
+        if execute_task(juju.user_exists, user):
+            if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
                 access = juju.check_access(request.json['access'])
-                    con = execute_task(juju.authorize, token, juju.check_input(controller))
-                    execute_task(juju.add_user_to_controller, token, con, usr, access)
-                    code, response = 202, 'Process being handeled'
+                execute_task(juju.add_user_to_controller, token, con, user, access)
+                code, response = 202, 'Process being handeled'
             else:
                 code, response = errors.no_permission()
         else:
