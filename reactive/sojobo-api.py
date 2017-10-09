@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0103,c0301
+# pylint: disable=c0111,c0103,c0301,e0401
 from base64 import b64encode
 from hashlib import sha256
 import os

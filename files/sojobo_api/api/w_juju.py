@@ -710,7 +710,7 @@ async def remove_credential(user, cred_name):
            settings.SOJOBO_API_DIR, cred_name, settings.REDIS_HOST, settings.REDIS_PORT])
 
 
-async def add_user_to_controller(token, controller, user, access):
+async def grant_user_to_controller(token, controller, user, access):
     Popen(["python3.6", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
            token.username, token.password, settings.SOJOBO_API_DIR,
            settings.REDIS_HOST, settings.REDIS_PORT, user, access, controller.c_name])

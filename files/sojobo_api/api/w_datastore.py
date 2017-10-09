@@ -105,6 +105,35 @@ def create_controller(controller_name, c_type, region):
         con.set(controller_name, json.dumps(controller))
         return True
 
+def add_user_to_controller(c_name, user, access):
+    con = connect_to_controllers()
+    data = json.loads(con.get(c_name))
+    c_type = data['type']
+    exists = False
+    for usr in data['users']:
+        if usr['name'] == user:
+            exists = True
+            usr['name']['access'] = access
+            break
+    if not exists:
+        data['users'].append({'name': user, 'access': access})
+    con.set(c_name, json.dumps(data))
+    con = connect_to_users()
+    data = json.loads(con.get(user))
+    for controller in data['controllers']:
+        if controller['name'] == c_name:
+            controller['access'] = access
+            exists = True
+            break
+    if not exists:
+        data['controllers'].append({
+            'access' : access,
+            'name': c_name,
+            'models' : [],
+            'type': c_type
+        })
+    con.set(user, json.dumps(data))
+
 
 def set_controller_state(controller, state, endpoints=None, uuid=None, ca_cert=None):
     con = connect_to_controllers()
