@@ -268,7 +268,7 @@ def delete_model(controller, model):
             LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Model succesfully deleted!', controller, model)
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/TENGU/controllers/%s/models/%s [DELETE] => No permission to perform this action!', controller, model)
+            LOGGER.error('/TENGU/controllers/%s/models/%s [DELETE] => No Permission to perform this action!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -328,7 +328,7 @@ def add_application(controller, model):
                 LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller, model)
             else:
                 code, response = errors.no_permission()
-                LOGGER.error('/TENGU/controllers/%s/models/%s [DELETE] => No permission to perform this action!', controller, model)
+                LOGGER.error('/TENGU/controllers/%s/models/%s [DELETE] => No Permission to perform this action!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -374,16 +374,21 @@ def expose_application(controller, model, application):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [PUT] => receiving call', controller, model, application)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [PUT] => Authenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [PUT] => Authorized!', controller, model, application)
         app = juju.check_input(application)
         exposed = True if data['expose'] == "True" else False
         if execute_task(juju.check_if_exposed, token, mod, app) == exposed:
             code, response = 200, execute_task(juju.get_application_info, token, mod, app)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [PUT] => Application already exposed!', controller, model, application)
         else:
             if exposed:
                 execute_task(juju.expose_app, token, mod, app)
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [PUT] => Application exposed!', controller, model, application)
             else:
                 execute_task(juju.unexpose_app, token, mod, app)
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [PUT] => Application unexposed!', controller, model, application)
             code, response = 200, execute_task(juju.get_application_info, token, mod, app)
     except KeyError:
         code, response = errors.invalid_data()
@@ -402,16 +407,21 @@ def remove_app(controller, model, application):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => receiving call', controller, model, application)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Authenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Authorized!', controller, model, application)
         app = juju.check_input(application)
         if mod.m_access == 'write' or mod.m_access == 'admin':
             if execute_task(juju.app_exists, token, con, mod, app):
                 execute_task(juju.remove_app, token, mod, app)
                 code, response = 202, "The application is being removed"
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Removing application!', controller, model, application)
             else:
                 code, response = errors.does_not_exist('application')
+                LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Application does not exist!', controller, model, application)
         else:
             code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => No Permission to perform this action!', controller, model, application)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -429,9 +439,12 @@ def get_application_config(controller, model, application):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [GET] => receiving call', controller, model, application)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [GET] => Authenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [GET] => Authorized!', controller, model, application)
         app = juju.check_input(application)
         code, response = 200, execute_task(juju.get_application_config, token, mod, app)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [GET] => Succesfully retrieved application config!', controller, model, application)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -450,13 +463,17 @@ def set_application_config(controller, model, application):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => receiving call', controller, model, application)
         data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => Authenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => Authorized!', controller, model, application)
         if mod.m_access == 'write' or mod.m_access == 'admin':
             app = juju.check_input(application)
             execute_task(juju.set_application_config, token, mod, app, data.get('config', None))
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => Config parameter is being changed!', controller, model, application)
             code, response = 202, "The config parameter is being changed"
         else:
             code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => No Permission to perform this action!', controller, model, application)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
