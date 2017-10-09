@@ -162,7 +162,7 @@ async def authenticate(api_key, auth):
             abort(error[0], error[1])
         token = JuJu_Token(auth)
         try:
-            controllers = await get_all_controllers()
+            controllers = get_all_controllers()
             if len(controllers) > 0:
                 controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)])
                 async with controller.connect(token):  #pylint: disable=E1701
@@ -178,7 +178,7 @@ async def authenticate(api_key, auth):
 
 
 async def authorize(token, controller, model=None):
-    if not await controller_exists(controller):
+    if not controller_exists(controller):
         error = errors.does_not_exist('controller')
         abort(error[0], error[1])
     else:
@@ -186,7 +186,7 @@ async def authorize(token, controller, model=None):
         if con.c_access not in ['login', 'add-model', 'superuser']:
             error = errors.does_not_exist('controller')
             abort(error[0], error[1])
-    if model and not await model_exists(token, con, model):
+    if model and not model_exists(con, model):
         error = errors.does_not_exist('model')
         abort(error[0], error[1])
     elif model:
@@ -199,14 +199,14 @@ async def authorize(token, controller, model=None):
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
-async def cloud_supports_series(controller_connection, series):
+def cloud_supports_series(controller_connection, series):
     if series is None:
         return True
     else:
         return series in get_controller_types()[controller_connection.c_token.type].get_supported_series()
 
 
-async def check_c_type(c_type):
+def check_c_type(c_type):
     if check_input(c_type) in get_controller_types().keys():
         return c_type.lower()
     else:
@@ -214,8 +214,8 @@ async def check_c_type(c_type):
         abort(error[0], error[1])
 
 
-async def create_controller(c_type, name, region, credentials):
-    for controller in await get_all_controllers():
+def create_controller(c_type, name, region, credentials):
+    for controller in get_all_controllers():
         if datastore.get_controller(controller)['state'] == 'PENDING':
             return 503, 'An environment is already being created'
     Popen(["python3.6", "{}/scripts/add_controller.py".format(settings.SOJOBO_API_DIR),
@@ -223,7 +223,7 @@ async def create_controller(c_type, name, region, credentials):
     return 202, 'Environment {} is being created in region {}'.format(name, region)
 
 
-async def generate_cred_file(c_type, name, credentials):
+def generate_cred_file(c_type, name, credentials):
     return get_controller_types()[c_type].generate_cred_file(name, credentials)
 
 
@@ -236,37 +236,37 @@ async def delete_controller(con):
     datastore.destroy_controller(con.c_name)
 
 
-async def get_all_controllers():
+def get_all_controllers():
     return datastore.get_all_controllers()
 
 
-async def controller_exists(c_name):
-    controllers = await get_all_controllers()
+def controller_exists(c_name):
+    controllers = get_all_controllers()
     return c_name in controllers
 
 
-async def get_controller_access(con, username):
+def get_controller_access(con, username):
     return datastore.get_controller_access(con.c_name, username)
 
 
-async def get_controllers_info():
+def get_controllers_info():
     return [datastore.get_controller(c) for c in datastore.get_all_controllers()]
 
 
-async def get_controller_info(token, controller):
+def get_controller_info(controller):
     if controller.c_access is not None:
         con = datastore.get_controller(controller.c_name)
-        users = await get_users_controller(controller.c_name)
+        users = get_users_controller(controller.c_name)
         result = {'name': controller.c_name, 'type': controller.c_token.type,
                   'users': users, 'state': con['state'], 'models': []}
         if con['state'] == 'ready':
-            result['models'] = await get_models_info(token, controller)
+            result['models'] = get_models_info(controller)
     else:
         result = None
     return result
 
 
-async def get_controller_superusers(controller):
+def get_controller_superusers(controller):
     users = datastore.get_controller_users(controller)
     result = []
     for user in users:
@@ -275,43 +275,43 @@ async def get_controller_superusers(controller):
     return result
 
 
-async def get_controller_type(c_name):
-    controllers = await get_controllers_info()
+def get_controller_type(c_name):
+    controllers = get_controllers_info()
     return controllers[c_name]['cloud']
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
-async def get_all_models(token, controller):
+def get_all_models(controller):
     return datastore.get_all_models(controller.c_name)
 
 
-async def model_exists(token, controller, modelname):
-    all_models = await get_all_models(token, controller)
+def model_exists(controller, modelname):
+    all_models = get_all_models(controller)
     for model in all_models:
         if model['name'] == modelname:
             return True
     return False
 
 
-async def get_model_uuid(token, controller, model):
-    for mod in await get_all_models(token, controller):
+def get_model_uuid(controller, model):
+    for mod in get_all_models(controller):
         if mod['name'] == model.m_name:
             return mod['uuid']
 
 
-async def get_model_access(model, controller, username):
+def get_model_access(model, controller, username):
     return datastore.get_model_access(controller, model, username)
 
 
-async def get_models_info(token, controller):
-    return await get_all_models(token, controller)
+def get_models_info(controller):
+    return get_all_models(controller)
 
 
 async def get_model_info(token, controller, model):
     state = datastore.check_model_state(controller.c_name, model.m_name)
     if state == 'ready':
         async with model.connect(token):
-            users = await get_users_model(token, controller, model)
+            users = get_users_model(token, controller, model)
             ssh = await get_ssh_keys(token, model)
             applications = await get_applications_info(token, model)
             machines = await get_machines_info(token, model)
@@ -352,7 +352,7 @@ async def get_ssh_keys(token, model):
         return data
 
 
-async def get_ssh_keys_user(user):
+def get_ssh_keys_user(user):
     return datastore.get_ssh_keys(user)
 
 
@@ -385,7 +385,7 @@ async def get_units_info(token, model, application):
             if unit.startswith(application):
                 units.append(data[unit][0])
         for u in units:
-            ports = await get_unit_ports(u)
+            ports = get_unit_ports(u)
             result.append({'name': u['name'],
                            'machine': u['machine-id'],
                            'public-ip': u['public-address'],
@@ -412,7 +412,7 @@ async def get_gui_url(controller, model):
     return 'https://{}/gui/{}'.format(controller.endpoint, model.m_uuid)
 
 
-async def create_model(token, controller, model, credentials):
+def create_model(token, controller, model, credentials):
     state = datastore.check_model_state(controller, model)
     if state != "error":
         code, response = errors.already_exists('model')
@@ -454,13 +454,13 @@ async def get_machines_info(token, model):
                 if 'lxd' in machine:
                     result[machine.split('/')[0]].get('containers', []).append({
                         'name': machine, 'instance-id': data[0]['instance-id'],
-                        'ip': await get_machine_ip(data[0]), 'series': data[0]['series']
+                        'ip': get_machine_ip(data[0]), 'series': data[0]['series']
                     })
                 else:
                     result[machine] = {
                         'name': machine,
                         'instance-id': data[0]['instance-id'],
-                        'ip': await get_machine_ip(data[0]),
+                        'ip': get_machine_ip(data[0]),
                         'series': data[0]['series'],
                         'hardware-characteristics': data[0]['hardware-characteristics']
                     }
@@ -490,19 +490,19 @@ async def get_machine_info(token, model, machine):
             if lxd != []:
                 for cont in lxd:
                     cont_data = data[cont][0]
-                    ip = await get_machine_ip(cont_data)
+                    ip = get_machine_ip(cont_data)
                     containers.append({'name': cont, 'instance-id': cont_data['instance-id'], 'ip': ip, 'series': cont_data['series']})
-            mach_ip = await get_machine_ip(machine_data)
+            mach_ip = get_machine_ip(machine_data)
             result = {'name': machine, 'instance-id': machine_data['instance-id'], 'ip': mach_ip, 'series': machine_data['series'], 'hardware-characteristics' : machine_data['hardware-characteristics'], 'containers': containers}
         else:
-            mach_ip = await get_machine_ip(machine_data)
+            mach_ip = get_machine_ip(machine_data)
             result = {'name': machine, 'instance-id': machine_data['instance-id'], 'ip': mach_ip, 'series': machine_data['series'], 'hardware-characteristics' : machine_data['hardware-characteristics']}
     except KeyError:
         result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown', 'hardware-characteristics' : 'unknown'}
     return result
 
 
-async def get_machine_ip(machine_data):
+def get_machine_ip(machine_data):
     mach_ips = {'internal_ip' : 'unknown', 'external_ip' : 'unknown'}
     if machine_data['addresses'] is None:
         return mach_ips
@@ -524,7 +524,7 @@ async def machine_exists(token, model, machine):
         return machine in juju.state.state.get('machine', {}).keys()
 
 
-async def remove_machine(token, controller, model, machine):
+def remove_machine(token, controller, model, machine):
     Popen(["python3.6", "{}/scripts/remove_machine.py".format(settings.SOJOBO_API_DIR), token.username,
            token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT,
            controller.c_name, model.m_name, machine])
@@ -539,7 +539,7 @@ async def app_exists(token, controller, model, app_name):
     return False
 
 
-async def add_bundle(token, controller, model, bundle):
+def add_bundle(token, controller, model, bundle):
     Popen(["python3.6", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR),
            token.username, token.password, settings.SOJOBO_API_DIR, controller, model,
            str(bundle), settings.REDIS_HOST, settings.REDIS_PORT])
@@ -598,7 +598,7 @@ async def get_unit_info(token, model, application, unitnumber):
     return {}
 
 
-async def add_unit(token, controller, model, app_name, amount, target):
+def add_unit(token, controller, model, app_name, amount, target):
     Popen(["python3.6", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), token.username,
            token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT,
            controller.c_name, model.m_name, app_name, str(amount), target])
@@ -611,7 +611,7 @@ async def remove_unit(token, model, application, unit_number):
         await app.destroy_unit(unit)
 
 
-async def get_unit_ports(unit):
+def get_unit_ports(unit):
     ports = []
     for port in unit['ports']:
         ports.append(port)
@@ -646,46 +646,47 @@ async def remove_relation(token, model, app1, app2):
                         await application.destroy_relation(keys[1].split(':')[1], keys[0])
 
 
-async def set_application_config(token, mod, app_name, config):
-    async with mod.connect(token):
-        app = await get_application_entity(token, mod, app_name)
+async def set_application_config(token, model, app_name, config):
+    async with model.connect(token):
+        app = await get_application_entity(token, model, app_name)
         await app.set_config(config)
 
 
-async def get_application_config(token, mod, app_name):
-    async with mod.connect(token):
-        app = await get_application_entity(token, mod, app_name)
+async def get_application_config(token, model, app_name):
+    async with model.connect(token):
+        app = await get_application_entity(token, model, app_name)
         return await app.get_config()
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
-async def create_user(token, username, password):
+def create_user(token, username, password):
     Popen(["python3.6", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR), username, password])
 
 
-async def delete_user(token, username):
+def delete_user(token, username):
     Popen(["python3.6", "{}/scripts/delete_user.py".format(settings.SOJOBO_API_DIR), username])
 
 
 async def change_user_password(token, username, password):
-    for con in await get_all_controllers():
+    for con in get_all_controllers():
         controller = Controller_Connection(token, con)
         async with controller.connect(token) as juju:  #pylint: disable=E1701
             await juju.change_user_password(username, password)
 
 
-async def update_ssh_key_user(user, ssh_keys):
+def update_ssh_key_user(user, ssh_keys):
     Popen([
         "python3.6",
-        "{}/scripts/add_ssh_key.py".format(settings.SOJOBO_API_DIR), str(ssh_keys), user, settings.SOJOBO_API_DIR])
+        "{}/scripts/add_ssh_key.py".format(settings.SOJOBO_API_DIR),
+        str(ssh_keys), user, settings.SOJOBO_API_DIR])
 
 
-async def get_users_controller(controller):
+def get_users_controller(controller):
     cont_info = datastore.get_controller(controller)
     return cont_info['users']
 
 
-async def get_users_model(token, controller, model):
+def get_users_model(token, controller, model):
     if model.m_access == 'admin' or model.m_access == 'write':
         users = datastore.get_users_model(controller.c_name, model.m_name)
     elif model.m_access == 'read':
@@ -695,22 +696,22 @@ async def get_users_model(token, controller, model):
     return users
 
 
-async def get_credentials(user):
+def get_credentials(user):
     return datastore.get_credentials(user)
 
 
-async def add_credential(user, c_type, cred_name, credential):
-    result_cred = await generate_cred_file(c_type, cred_name, credential)
+def add_credential(user, c_type, cred_name, credential):
+    result_cred = generate_cred_file(c_type, cred_name, credential)
     Popen(["python3.6", "{}/scripts/add_credential.py".format(settings.SOJOBO_API_DIR), user,
            settings.SOJOBO_API_DIR, str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
 
 
-async def remove_credential(user, cred_name):
+def remove_credential(user, cred_name):
     Popen(["python3.6", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR), user,
            settings.SOJOBO_API_DIR, cred_name, settings.REDIS_HOST, settings.REDIS_PORT])
 
 
-async def grant_user_to_controller(token, controller, user, access):
+def grant_user_to_controller(token, controller, user, access):
     Popen(["python3.6", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
            token.username, token.password, settings.SOJOBO_API_DIR,
            settings.REDIS_HOST, settings.REDIS_PORT, user, access, controller.c_name])
@@ -726,7 +727,7 @@ async def controller_revoke(token, controller, username):
         await juju.revoke(username)
 
 
-async def set_models_access(token, controller, user, accesslist):
+def set_models_access(token, controller, user, accesslist):
     Popen(["python3.6", "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR), token.username,
            token.password, settings.SOJOBO_API_DIR,
            user, str(accesslist), controller.c_name])
@@ -743,19 +744,19 @@ async def remove_user_from_model(token, controller, model, username):
     datastore.remove_model(controller.c_name, model.m_name, username)
 
 
-async def user_exists(username):
-    return username in await get_all_users()
+def user_exists(username):
+    return username in get_all_users()
 
 
-async def get_all_users():
+def get_all_users():
     return datastore.get_all_users()
 
 
-async def get_users_info(token):
+def get_users_info(token):
     if token.is_admin:
         result = []
-        for user in await get_all_users():
-            u_info = await get_user_info(user)
+        for user in get_all_users():
+            u_info = get_user_info(user)
             if u_info['active']:
                 result.append(u_info)
         return result
@@ -763,23 +764,23 @@ async def get_users_info(token):
         return datastore.get_user(token.username)
 
 
-async def get_user_info(username):
+def get_user_info(username):
     return datastore.get_user(username)
 
 
-async def get_controllers_access(usr):
-    user = await get_user_info(usr)
+def get_controllers_access(usr):
+    user = get_user_info(usr)
     return user['controllers']
 
 
-async def get_ucontroller_access(controller, username):
-    controllers = await get_controllers_access(username)
+def get_ucontroller_access(controller, username):
+    controllers = get_controllers_access(username)
     for con in controllers:
         if con['name'] == controller.c_name:
             return con
 
 
-async def get_models_access(controller, name):
+def get_models_access(controller, name):
     return datastore.get_models_access(controller.c_name, name)
 #########################
 # extra Acces checks
@@ -801,10 +802,10 @@ def check_access(access):
         abort(error[0], error[1])
 
 
-async def check_same_access(user, new_access, controller, model=None):
+def check_same_access(user, new_access, controller, model=None):
     if model is None:
-        old_acc = await get_ucontroller_access(controller, user)
+        old_acc = get_ucontroller_access(controller, user)
         return old_acc == new_access
     else:
-        old_acc = await get_model_access(model, controller, user)
+        old_acc = get_model_access(model, controller, user)
         return old_acc == new_access
