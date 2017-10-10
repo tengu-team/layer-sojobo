@@ -183,7 +183,7 @@ async def authorize(token, controller, model=None):
         abort(error[0], error[1])
     else:
         con = Controller_Connection(token, controller)
-        if con.c_access not in ['login', 'add-model', 'superuser']:
+        if not c_access_exists(con.c_access):
             error = errors.does_not_exist('controller')
             abort(error[0], error[1])
     if model and not model_exists(con, model):
@@ -191,7 +191,7 @@ async def authorize(token, controller, model=None):
         abort(error[0], error[1])
     elif model:
         mod = Model_Connection(token, controller, model)
-        if mod.m_access not in ['read', 'write', 'admin']:
+        if not m_access_exists(mod.m_access):
             error = errors.does_not_exist('model')
             abort(error[0], error[1])
         return con, mod
@@ -659,11 +659,11 @@ async def get_application_config(token, model, app_name):
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
-def create_user(token, username, password):
+def create_user(username, password):
     Popen(["python3.6", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR), username, password])
 
 
-def delete_user(token, username):
+def delete_user(username):
     Popen(["python3.6", "{}/scripts/delete_user.py".format(settings.SOJOBO_API_DIR), username])
 
 
@@ -674,7 +674,7 @@ async def change_user_password(token, username, password):
             await juju.change_user_password(username, password)
 
 
-def update_ssh_key_user(user, ssh_keys):
+def update_ssh_keys_user(user, ssh_keys):
     Popen([
         "python3.6",
         "{}/scripts/add_ssh_key.py".format(settings.SOJOBO_API_DIR),
@@ -699,6 +699,11 @@ def get_users_model(token, controller, model):
 def get_credentials(user):
     return datastore.get_credentials(user)
 
+def get_credential(user, credential):
+    for cred in get_credentials(user):
+        if cred['name'] == credential:
+            return cred
+    return None
 
 def add_credential(user, c_type, cred_name, credential):
     result_cred = generate_cred_file(c_type, cred_name, credential)
