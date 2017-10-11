@@ -412,7 +412,7 @@ async def get_gui_url(controller, model):
     return 'https://{}/gui/{}'.format(controller.endpoint, model.m_uuid)
 
 
-def (token, controller, model, credentials):
+def create_model(token, controller, model, credentials):
     state = datastore.check_model_state(controller, model)
     if state != "error":
         code, response = errors.already_exists('model')

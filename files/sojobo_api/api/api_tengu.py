@@ -113,7 +113,7 @@ def get_controller_info(controller):
         LOGGER.info('/TENGU/controllers/%s [GET] => Authenticated!', controller)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
         LOGGER.info('/TENGU/controllers/%s [GET] => Authorized!', controller)
-        code, response = 200, juju.get_controller_info(token, con)
+        code, response = 200, juju.get_controller_info(con)
         LOGGER.info('/TENGU/controllers/%s [GET] => Succesfully retrieved controller information!', controller)
     except KeyError:
         code, response = errors.invalid_data()
