@@ -93,7 +93,7 @@ def create_controller():
                                                             controller, data['region'], data['credential'])
                     LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
                 else:
-                    code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: \n {}'.format(c_type, sup_clouds)
+                    code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(c_type, sup_clouds)
                     LOGGER.error('%s [POST] => %s', url, response)
         else:
             code, response = errors.no_permission()

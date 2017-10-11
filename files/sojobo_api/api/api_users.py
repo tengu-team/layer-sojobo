@@ -441,7 +441,7 @@ def grant_to_controller(user, controller):
                     LOGGER.info('/USERS/%s/controllers/%s [PUT] => Changing user access, check set_controller_access.log for more information!', user, controller)
                     code, response = 202, 'Process being handeled'
                 else:
-                    LOGGER.error('/USERS/%s/controllers/%s [PUT] => Invalid access data provided', user, controller, request.json['access'])
+                    LOGGER.error('/USERS/%s/controllers/%s [PUT] => Invalid access data provided : %s', user, controller, request.json['access'])
                     code, response = errors.invalid_access('access')
             else:
                 LOGGER.error('/USERS/%s/controllers/%s [PUT] => User %s does not exist', user, controller, user)

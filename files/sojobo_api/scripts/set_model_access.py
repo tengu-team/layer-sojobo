@@ -41,7 +41,8 @@ async def set_model_acc(username, password, user, access, controller):
             model = juju.Model_Connection(token, controller, mod['name'])
             async with model.connect(token) as mod_con:
                 current_access = datastore.get_model_access(controller, mod['name'], user)
-                if not current_access:
+                logger.info('Current Access level: %s', current_access)
+                if current_access:
                     await mod_con.revoke(user)
                 await mod_con.grant(user, acl=mod['access'])
                 if mod['acces'] in ['admin', 'write']:

@@ -69,7 +69,6 @@ def get_json(bundle):
     res = requests.get('https://raw.githubusercontent.com/{}/{}/master/bundle.yaml'.format(REPO, bundle))
     if res.status_code == 200:
         res_dict = yaml.load(res.text)
-        json_file = json.dumps(res_dict)
-        return json_file
+        return res_dict
     else:
         abort(404, 'The bundle {}:{} could not be found'.format(REPO, bundle))
