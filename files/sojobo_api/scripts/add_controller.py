@@ -38,10 +38,11 @@ class JuJu_Token(object):  #pylint: disable=R0903
 async def create_controller(c_type, name, region, credentials):
     try:
         logger.info('Adding controller to database')
+        cred_name = 'default-{}'.format(name)
         datastore.create_controller(name, c_type, region)
         datastore.add_user_to_controller(name, 'admin', 'superuser')
         logger.info('Bootstrapping controller')
-        juju.get_controller_types()[c_type].create_controller(name, region, credentials)
+        juju.get_controller_types()[c_type].create_controller(name, region, credentials, cred_name)
         pswd = settings.JUJU_ADMIN_PASSWORD
         logger.info('Setting admin password')
         check_output(['juju', 'change-user-password', 'admin', '-c', name],
@@ -59,7 +60,7 @@ async def create_controller(c_type, name, region, credentials):
         logger.info('Connecting to controller')
         controller = juju.Controller_Connection(token, name)
         logger.info('Adding credentials to database')
-        result_cred = juju.generate_cred_file(c_type, 'admin', credentials)
+        result_cred = juju.generate_cred_file(c_type, cred_name, credentials)
         datastore.add_credential('admin', result_cred)
         logger.info('Adding existing models to database')
         async with controller.connect(token) as juju_con:
@@ -69,8 +70,9 @@ async def create_controller(c_type, name, region, credentials):
                 datastore.add_model_to_controller(name, model['name'])
                 datastore.set_model_state(name, model['name'], 'ready', model['uuid'])
                 datastore.set_model_access(name, model['name'], token.username, 'admin')
+        logger.info('Controller succesfully created!')
     except Exception:  #pylint: disable=W0703
-        # datastore.destroy_controller(name)
+        datastore.destroy_controller(name)
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:

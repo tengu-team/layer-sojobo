@@ -85,11 +85,16 @@ def create_controller():
             c_type = juju.check_c_type(data['type'])
             if juju.controller_exists(controller):
                 code, response = errors.already_exists('controller')
-                LOGGER.error('%s [POST] => Controller %s already exists', url,  controller)
+                LOGGER.error('%s [POST] => Controller %s already exists', url, controller)
             else:
-                code, response = juju.create_controller(c_type,
-                                              controller, data['region'], data['credential'])
-                LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
+                sup_clouds = juju.get_supported_regions(c_type)
+                if data['region'] in sup_clouds:
+                    code, response = juju.create_controller(c_type,
+                                                            controller, data['region'], data['credential'])
+                    LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
+                else:
+                    code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: \n {}'.format(c_type, sup_clouds)
+                    LOGGER.error('%s [POST] => %s', url, response)
         else:
             code, response = errors.no_permission()
             LOGGER.error('%s [POST] => No Permission to perform action!', url)
@@ -138,7 +143,7 @@ def delete_controller(controller):
         if con.c_access == 'superuser':
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Deleting Controller!', controller)
             juju.delete_controller(con)
-            code, response = 200, juju.get_all_controllers()
+            code, response = 202, 'Controller {} is being deleted'.format(controller)
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Succesfully deleted controller!', controller)
         else:
             code, response = errors.no_permission()
@@ -162,7 +167,7 @@ def create_model(controller):
         data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
-        con = execute_task(juju.authorize, token, juju.check_input(controller))
+        con = execute_task(juju.authorize, token,  juju.check_input(controller))
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
         model = juju.check_input(data['model'])
         credentials = juju.check_input(data['credential'])
@@ -642,9 +647,7 @@ def add_unit(controller, model, application):
         app = juju.check_input(application)
         if execute_task(juju.app_exists, token, con, mod, app):
             if mod.m_access == 'write' or mod.m_access == 'admin':
-                juju.add_unit(
-
-                token, con, mod, application, data.get('amount', 1), data.get('target', 'None'))
+                juju.add_unit(token, con, mod, application, data.get('amount', 1), data.get('target', 'None'))
                 code, response = 202, "Unit is being created"
                 LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Unit is being created, check add_unit.log for more information!', controller, model, application)
             else:

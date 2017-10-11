@@ -227,14 +227,12 @@ def generate_cred_file(c_type, name, credentials):
     return get_controller_types()[c_type].generate_cred_file(name, credentials)
 
 
-async def delete_controller(con):
-    #controller = con.c_connection
-    #await controller.destroy(True)
-    check_output(['juju', 'login', con.c_name, '-u', settings.JUJU_ADMIN_USER], input=bytes('{}\n'.format(settings.JUJU_ADMIN_PASSWORD), 'utf-8'))
-    check_call(['juju', 'destroy-controller', '-y', con.c_name, '--destroy-all-models'])
-    check_call(['juju', 'remove-credential', con.c_type, con.c_name])
-    datastore.destroy_controller(con.c_name)
+def delete_controller(con):
+    Popen(["python3.6", "{}/scripts/remove_controller.py".format(settings.SOJOBO_API_DIR),
+           con.c_name, con.c_type])
 
+def get_supported_regions(c_type):
+    return get_controller_types()[c_type].get_supported_regions()
 
 def get_all_controllers():
     return datastore.get_all_controllers()
