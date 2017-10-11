@@ -59,7 +59,7 @@ async def create_controller(c_type, name, region, credentials):
         logger.info('Connecting to controller')
         controller = juju.Controller_Connection(token, name)
         logger.info('Adding credentials to database')
-        result_cred = await juju.generate_cred_file(c_type, 'admin', credentials)
+        result_cred = juju.generate_cred_file(c_type, 'admin', credentials)
         datastore.add_credential('admin', result_cred)
         logger.info('Adding existing models to database')
         async with controller.connect(token) as juju_con:
@@ -70,6 +70,7 @@ async def create_controller(c_type, name, region, credentials):
                 datastore.set_model_state(name, model['name'], 'ready', model['uuid'])
                 datastore.set_model_access(name, model['name'], token.username, 'admin')
     except Exception:  #pylint: disable=W0703
+        # datastore.destroy_controller(name)
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:

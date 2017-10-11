@@ -51,7 +51,7 @@ def get_all_controllers():
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
         if token.is_admin:
-            code, response = 200, execute_task(juju.get_all_controllers)
+            code, response = 200, juju.get_all_controllers()
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
         else:
             code, response = errors.no_permission()
@@ -82,12 +82,12 @@ def create_controller():
         if token.is_admin:
             controller = juju.check_input(data['controller'])
             LOGGER.info('%s [POST] => Creating Controller %s', url, controller)
-            c_type = execute_task(juju.check_c_type, data['type'])
-            if execute_task(juju.controller_exists, controller):
+            c_type = juju.check_c_type(data['type'])
+            if juju.controller_exists(controller):
                 code, response = errors.already_exists('controller')
                 LOGGER.error('%s [POST] => Controller %s already exists', url,  controller)
             else:
-                code, response = execute_task(juju.create_controller, c_type,
+                code, response = juju.create_controller(c_type,
                                               controller, data['region'], data['credential'])
                 LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
         else:
@@ -113,7 +113,7 @@ def get_controller_info(controller):
         LOGGER.info('/TENGU/controllers/%s [GET] => Authenticated!', controller)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
         LOGGER.info('/TENGU/controllers/%s [GET] => Authorized!', controller)
-        code, response = 200, execute_task(juju.get_controller_info, token, con)
+        code, response = 200, juju.get_controller_info(token, con)
         LOGGER.info('/TENGU/controllers/%s [GET] => Succesfully retrieved controller information!', controller)
     except KeyError:
         code, response = errors.invalid_data()
@@ -137,8 +137,8 @@ def delete_controller(controller):
         LOGGER.info('/TENGU/controllers/%s [DELETE] => Authorized!', controller)
         if con.c_access == 'superuser':
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Deleting Controller!', controller)
-            execute_task(juju.delete_controller, con)
-            code, response = 200, execute_task(juju.get_all_controllers)
+            juju.delete_controller(con)
+            code, response = 200, juju.get_all_controllers()
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Succesfully deleted controller!', controller)
         else:
             code, response = errors.no_permission()
@@ -168,7 +168,7 @@ def create_model(controller):
         credentials = juju.check_input(data['credential'])
         if con.c_access == 'add-model' or con.c_access == 'superuser':
             LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
-            code, response = execute_task(juju.create_model, token, con.c_name, model, credentials)
+            code, response = juju.create_model(token, con.c_name, model, credentials)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/TENGU/controllers/%s/models [POST] => No Permission to perform this action!', controller)
@@ -192,7 +192,7 @@ def get_models_info(controller):
         LOGGER.info('/TENGU/controllers/%s/models [GET] => Authenticated!', controller)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
         LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
-        code, response = 200, execute_task(juju.get_models_info, token, con)
+        code, response = 200, juju.get_models_info(token, con)
         LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
     except KeyError:
         code, response = errors.invalid_data()
@@ -239,7 +239,7 @@ def add_bundle(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authorized!', controller, model)
         if mod.m_access == 'admin' or mod.m_access == 'write':
             LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Bundle is being deployed, check bundle_deployment.log for more information!', controller, model)
-            execute_task(juju.add_bundle, token, con.c_name, mod.m_name, data['bundle'])
+            juju.add_bundle(token, con.c_name, mod.m_name, data['bundle'])
             code, response = 202, "Bundle is being deployed"
         else:
             code, response = errors.no_permission()
@@ -521,7 +521,7 @@ def add_machine(controller, model):
         if mod.m_access == 'write' or mod.m_access == 'admin':
             series = juju.check_input(data.get('series', None), True)
             constraints = juju.check_input(data.get('constraints', None), True)
-            if execute_task(juju.cloud_supports_series, con, series):
+            if juju.cloud_supports_series(con, series):
                 execute_task(juju.add_machine, token, mod, series, constraints)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller, model)
                 code, response = 202, 'machine is being deployed'
@@ -582,7 +582,7 @@ def remove_machine(controller, model, machine):
         mach = juju.check_input(machine)
         if execute_task(juju.machine_exists, token, mod, mach):
             if mod.m_access == 'write' or mod.m_access == 'admin':
-                execute_task(juju.remove_machine, token, con, mod, mach)
+                juju.remove_machine(token, con, mod, mach)
                 code, response = 202, 'Machine being removed'
                 LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Destroying machine, check remove_machine.log for more information!', controller, model, machine)
             else:
@@ -642,7 +642,9 @@ def add_unit(controller, model, application):
         app = juju.check_input(application)
         if execute_task(juju.app_exists, token, con, mod, app):
             if mod.m_access == 'write' or mod.m_access == 'admin':
-                execute_task(juju.add_unit, token, con, mod, application, data.get('amount', 1), data.get('target', 'None'))
+                juju.add_unit(
+
+                token, con, mod, application, data.get('amount', 1), data.get('target', 'None'))
                 code, response = 202, "Unit is being created"
                 LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Unit is being created, check add_unit.log for more information!', controller, model, application)
             else:
