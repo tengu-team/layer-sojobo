@@ -192,7 +192,7 @@ def get_models_info(controller):
         LOGGER.info('/TENGU/controllers/%s/models [GET] => Authenticated!', controller)
         con = execute_task(juju.authorize, token, juju.check_input(controller))
         LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
-        code, response = 200, juju.get_models_info(token, con)
+        code, response = 200, juju.get_models_info(con)
         LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
     except KeyError:
         code, response = errors.invalid_data()
