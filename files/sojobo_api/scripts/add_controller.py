@@ -39,7 +39,7 @@ async def create_controller(c_type, name, region, credentials):
     try:
         logger.info('Adding controller to database')
         cred_name = 'default-{}'.format(name)
-        datastore.create_controller(name, c_type, region)
+        datastore.create_controller(name, c_type, region, cred_name)
         datastore.add_user_to_controller(name, 'admin', 'superuser')
         logger.info('Bootstrapping controller')
         juju.get_controller_types()[c_type].create_controller(name, region, credentials, cred_name)

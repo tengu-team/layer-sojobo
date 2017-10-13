@@ -31,6 +31,7 @@ def remove_controller(name, c_type):
         logger.info('Removing controller %s from Datastore', name)
         sp.check_call(['juju', 'remove-credential', c_type, name])
         datastore.destroy_controller(name)
+        logger.info('Succesfully removed controller %s!', name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

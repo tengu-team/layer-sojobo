@@ -22,7 +22,7 @@ import traceback
 import logging
 from werkzeug.exceptions import HTTPException
 from flask import send_file, request, Blueprint
-from sojobo_api.api import w_errors as errors, w_juju as juju
+from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task
 
 
@@ -80,21 +80,24 @@ def create_controller():
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('%s [POST] => Authenticated', url)
         if token.is_admin:
-            controller = juju.check_input(data['controller'])
+            valid, controller = juju.check_input(data['controller'], 'controller')
             LOGGER.info('%s [POST] => Creating Controller %s', url, controller)
-            c_type = juju.check_c_type(data['type'])
-            if juju.controller_exists(controller):
-                code, response = errors.already_exists('controller')
-                LOGGER.error('%s [POST] => Controller %s already exists', url, controller)
-            else:
-                sup_clouds = juju.get_supported_regions(c_type)
-                if data['region'] in sup_clouds:
-                    code, response = juju.create_controller(c_type,
-                                                            controller, data['region'], data['credential'])
-                    LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
+            if valid:
+                c_type = juju.check_c_type(data['type'])
+                if juju.controller_exists(controller):
+                    code, response = errors.already_exists('controller')
+                    LOGGER.error('%s [POST] => Controller %s already exists', url, controller)
                 else:
-                    code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(c_type, sup_clouds)
-                    LOGGER.error('%s [POST] => %s', url, response)
+                    sup_clouds = juju.get_supported_regions(c_type)
+                    if data['region'] in sup_clouds:
+                        code, response = juju.create_controller(c_type,
+                                                                controller, data['region'], data['credential'])
+                        LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
+                    else:
+                        code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(c_type, sup_clouds)
+                        LOGGER.error('%s [POST] => %s', url, response)
+            else:
+                code, response = 400, controller
         else:
             code, response = errors.no_permission()
             LOGGER.error('%s [POST] => No Permission to perform action!', url)
@@ -167,10 +170,13 @@ def create_model(controller):
         data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
-        con = execute_task(juju.authorize, token,  juju.check_input(controller))
+        con = execute_task(juju.authorize, token, juju.check_input(controller))
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
         model = juju.check_input(data['model'])
-        credentials = juju.check_input(data['credential'])
+        if not 'credential' in data:
+            credentials = datastore.get_default_credential(controller)
+        else:
+            crecredentials = data['credential']
         if con.c_access == 'add-model' or con.c_access == 'superuser':
             LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
             code, response = juju.create_model(token, con.c_name, model, credentials)
@@ -243,8 +249,12 @@ def add_bundle(controller, model):
         con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authorized!', controller, model)
         if mod.m_access == 'admin' or mod.m_access == 'write':
+            bundle = data['bundle']
+            if 'applications' in bundle:
+                bundle['services'] = bundle['applications']
+                bundle.pop('applications')
             LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Bundle is being deployed, check bundle_deployment.log for more information!', controller, model)
-            juju.add_bundle(token, con.c_name, mod.m_name, data['bundle'])
+            juju.add_bundle(token, con.c_name, mod.m_name, bundle)
             code, response = 202, "Bundle is being deployed"
         else:
             code, response = errors.no_permission()

@@ -45,13 +45,13 @@ async def set_model_acc(username, password, user, access, controller):
                 if current_access:
                     await mod_con.revoke(user)
                 await mod_con.grant(user, acl=mod['access'])
-                if mod['acces'] in ['admin', 'write']:
+                if mod['access'] in ['admin', 'write']:
                     for key in ssh_keys:
                         try:
                             mod_con.add_ssh_key(user, key['key'])
                         except (JujuAPIError, JujuError):
                             pass
-                datastore.set_model_access(controller, mod['name'], user, mod['access'])
+            datastore.set_model_access(controller, mod['name'], user, mod['access'])
             logger.info('Model Access set for %s on %s!', user, mod['name'])
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()

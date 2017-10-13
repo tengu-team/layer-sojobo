@@ -86,7 +86,7 @@ def get_all_users():
 ################################################################################
 # CONTROLLER FUNCTIONS
 ################################################################################
-def create_controller(controller_name, c_type, region):
+def create_controller(controller_name, c_type, region, cred_name):
     con = connect_to_controllers()
     if controller_name in con.keys():
         return False
@@ -100,7 +100,8 @@ def create_controller(controller_name, c_type, region):
             'endpoints': [],
             'uuid': '',
             'ca-cert': '',
-            'region': region
+            'region': region,
+            'default-credential' : cred_name
         }
         con.set(controller_name, json.dumps(controller))
         return True
@@ -241,6 +242,10 @@ def get_controller_users(c_name):
     data = json.loads(con.get(c_name))
     return [get_user(u) for u in data['users']]
 
+def get_default_credential(c_name):
+    con = connect_to_controllers()
+    data = json.loads(con.get(c_name))
+    return data['default-credential']
 
 def get_all_controllers():
     con = connect_to_controllers()
@@ -291,16 +296,17 @@ def get_model_access(controller, model, user):
 def set_model_access(controller, model, user, access):
     con = connect_to_users()
     data = json.loads(con.get(user))
+    acces_set = False
     for contr in data['controllers']:
         if contr['name'] == controller:
-            if model not in contr['models']:
+            for mod in contr['models']:
+                if model == mod['name']:
+                    mod['access'] = access
+                    acces_set = True
+    if not acces_set:
+        for contr in data['controllers']:
+            if contr['name'] == controller:
                 contr['models'].append({'name': model, 'access': access})
-            else:
-                for mod in contr['models']:
-                    if mod['name'] == model:
-                        mod['access'] = access
-                    break
-            break
     con.set(user, json.dumps(data))
 
 

@@ -18,6 +18,7 @@ import asyncio
 from importlib import import_module
 from random import randint
 import os
+import re
 from subprocess import check_output, check_call, Popen
 import json
 from asyncio_extras import async_contextmanager
@@ -135,24 +136,16 @@ def create_response(http_code, return_object, is_json=False):
     )
 
 
-def check_input(data, optional=False):
-    if not data:
-        if optional:
-            return None
+def check_input(data, input_type):
+    regex_dict = {"controller":{"regex":"^(?!-).*^\S+$", "e_message": "Controller name can not start with one ore more \"-\" character and can not contain spaces!"},
+                  "username":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Username had to start with a number or a letter and can only contain numbers, letters or \"-\" "},
+                  "model":"someregex"}
+    if input_type in regex_dict:
+        pattern = re.compile(regex_dict[input_type]['regex'])
+        if pattern.match(data):
+            return True, data
         else:
-            error = errors.empty()
-            abort(error[0], error[1])
-    else:
-        items = data.split(':', 1)
-        if len(items) > 1 and items[0].lower() not in ['local', 'github', 'lxd', 'kvm']:
-            error = errors.invalid_option(items[0])
-            abort(error[0], error[1])
-        else:
-            for item in items:
-                if not all(x.isalpha() or x.isdigit() or x == '-' for x in item):
-                    error = errors.invalid_input()
-                    abort(error[0], error[1])
-            return data.lower()
+            return False, regex_dict[input_type]['e_message']
 
 
 async def authenticate(api_key, auth):
@@ -207,7 +200,7 @@ def cloud_supports_series(controller_connection, series):
 
 
 def check_c_type(c_type):
-    if check_input(c_type) in get_controller_types().keys():
+    if c_type.lower() in get_controller_types().keys():
         return c_type.lower()
     else:
         error = errors.invalid_controller(c_type)

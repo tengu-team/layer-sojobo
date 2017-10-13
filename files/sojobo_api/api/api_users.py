@@ -90,22 +90,22 @@ def create_user():
         data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS [POST] => Authenticated!')
-        user = data['username']
+        valid, user = juju.check_input(data['username'], "username")
         if token.is_admin:
-            m = re.match('^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$', user)
-            if not(m) and m.end() != len(user):
+            if valid:
+                if juju.user_exists(user):
+                    code, response = errors.already_exists('user')
+                    LOGGER.error('/USERS [POST] => Username %s already exists!', user)
+                elif data['password']:
+                    LOGGER.info('/USERS [POST] => Creating user %s, check add_user.log for more information!', user)
+                    juju.create_user(user, data['password'])
+                    code, response = 202, 'User {} is being created'.format(user)
+                else:
+                    code, response = errors.empty()
+                    LOGGER.error('/USERS [POST] => Password cannot be empty!')
+            else:
                 code, response = 400, "username does not have the correct format."
                 LOGGER.error('/USERS [POST] => Username does not have the correct format!')
-            elif juju.user_exists(user):
-                code, response = errors.already_exists('user')
-                LOGGER.error('/USERS [POST] => Username %s already exists!', user)
-            elif data['password']:
-                LOGGER.info('/USERS [POST] => Creating user %s, check add_user.log for more information!', user)
-                juju.create_user(user, data['password'])
-                code, response = 202, 'User {} is being created'.format(user)
-            else:
-                code, response = errors.empty()
-                LOGGER.error('/USERS [POST] => Password cannot be empty!')
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS [POST] => No Permission to perform this action!')
@@ -223,8 +223,12 @@ def get_ssh_keys(user):
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS/%s/ssh-keys [GET] => Authenticated!', user)
         if token.is_admin or token.username == user:
-            code, response = 200, juju.get_ssh_keys_user(user)
-            LOGGER.info('/USERS/%s/ssh-keys [GET] => Succesfully  ssh-keys!', user)
+            if juju.user_exists(user):
+                code, response = 200, juju.get_ssh_keys_user(user)
+                LOGGER.info('/USERS/%s/ssh-keys [GET] => Succesfully  ssh-keys!', user)
+            else:
+                code, response = errors.does_not_exist('user')
+                LOGGER.error('/USERS/%s/ssh-keys [GET] => User %s does not exist!', user, user)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/ssh-keys [GET] => No Permission to perform this action!', user)
@@ -246,12 +250,15 @@ def update_ssh_keys(user):
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => receiving call', user)
         data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        user = juju.check_input(user)
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => Authenticated!', user)
         if token.is_admin or token.username == user:
-            juju.update_ssh_keys_user(user, data)
-            LOGGER.info('/USERS/%s/ssh-keys [PUT] => SH-keys are being updated, check update_ssh_keys.log for more information!', user)
-            code, response = 202, 'Process being handled'
+            if juju.user_exists(user):
+                juju.update_ssh_keys_user(user, data)
+                LOGGER.info('/USERS/%s/ssh-keys [PUT] => SH-keys are being updated, check update_ssh_keys.log for more information!', user)
+                code, response = 202, 'Process being handled'
+            else:
+                code, response = errors.does_not_exist('user')
+                LOGGER.error('/USERS/%s/ssh-keys [PUT] => User %s does not exist!', user, user)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/ssh-keys [PUT] => No Permission to perform this action!', user)
@@ -273,10 +280,13 @@ def get_credentials(user):
         LOGGER.info('/USERS/%s/credentials [GET] => receiving call', user)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS/%s/credentials [GET] => Authenticated!', user)
-        usr = juju.check_input(user)
-        if token.is_admin or token.username == usr:
-            code, response = 200, juju.get_credentials(usr)
-            LOGGER.info('/USERS/%s/credentials [GET] => Succesfully retrieved credentials!', user)
+        if token.is_admin or token.username == user:
+            if juju.user_exists(user):
+                code, response = 200, juju.get_credentials(user)
+                LOGGER.info('/USERS/%s/credentials [GET] => Succesfully retrieved credentials!', user)
+            else:
+                code, response = errors.does_not_exist('user')
+                LOGGER.error('/USERS/%s/credentials [GET] => User %s does not exist!', user, user)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials [GET] => No Permission to perform this action!', user)
@@ -299,11 +309,14 @@ def add_credential(user):
         data = request.json
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS/%s/credentials [POST] => Authenticated!', user)
-        usr = juju.check_input(user)
-        if token.is_admin or token.username == usr:
-            juju.add_credential(usr, data['type'], data['name'], data['credential'])
-            LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
-            code, response = 202, 'Process being handled'
+        if token.is_admin or token.username == user:
+            if juju.user_exists(user):
+                juju.add_credential(user, data['type'], data['name'], data['credential'])
+                LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
+                code, response = 202, 'Process being handled'
+            else:
+                code, response = errors.does_not_exist('user')
+                LOGGER.error('/USERS/%s/credentials [POST] => User %s does not exist!', user, user)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials [POST] => No Permission to perform this action!', user)
@@ -324,10 +337,13 @@ def get_credential(user, credential):
         LOGGER.info('/USERS/%s/credentials/%s [GET] => receiving call', user, credential)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS/%s/credentials/%s [GET] => Authenticated!', user, credential)
-        usr = juju.check_input(user)
-        if token.is_admin or token.username == usr:
-            code, response = 200, juju.get_credential(usr, credential)
-            LOGGER.info('/USERS/%s/credentials/%s [GET] => Succesfully retrieved credential!', user, credential)
+        if token.is_admin or token.username == user:
+            if juju.user_exists(user):
+                code, response = 200, juju.get_credential(user, credential)
+                LOGGER.info('/USERS/%s/credentials/%s [GET] => Succesfully retrieved credential!', user, credential)
+            else:
+                code, response = errors.does_not_exist('user')
+                LOGGER.error('/USERS/%s/credentials/%s [GET] => User %s does not exist!', user, credential, user)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials/%s [GET] => No Permission to perform this action!', user, credential)
@@ -348,11 +364,14 @@ def remove_credential(user, credential):
         LOGGER.info('/USERS/%s/credentials/%s [DELETE] => receiving call', user, credential)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Authenticated!', user, credential)
-        usr = juju.check_input(user)
-        if token.is_admin or token.username == usr:
-            juju.remove_credential(usr, credential)
-            LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Removing credential, check remove_credential.log for more information!', user, credential)
-            code, response = 202, 'Process being handled'
+        if token.is_admin or token.username == user:
+            if juju.user_exists(user):
+                juju.remove_credential(user, credential)
+                LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Removing credential, check remove_credential.log for more information!', user, credential)
+                code, response = 202, 'Process being handled'
+            else:
+                code, response = errors.does_not_exist('user')
+                LOGGER.error('/USERS/%s/credentials/%s [DELETE] => User %s does not exist!', user, credential, user)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials/%s [DELETE] => No Permission to perform this action!', user, credential)
@@ -439,7 +458,7 @@ def grant_to_controller(user, controller):
                 if request.json['access'] and juju.c_access_exists(request.json['access'].lower()):
                     execute_task(juju.add_user_to_controller, token, con, user, request.json['access'].lower())
                     LOGGER.info('/USERS/%s/controllers/%s [PUT] => Changing user access, check set_controller_access.log for more information!', user, controller)
-                    code, response = 202, 'Process being handeled'
+                    code, response = 202, 'Process being handled'
                 else:
                     LOGGER.error('/USERS/%s/controllers/%s [PUT] => Invalid access data provided : %s', user, controller, request.json['access'])
                     code, response = errors.invalid_access('access')
@@ -504,7 +523,7 @@ def grant_to_model(user, controller):
             if juju.user_exists(user):
                 juju.set_models_access(token, con, user, data)
                 LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Setting model access, check set_model_access.log for more information!', user, controller)
-                code, response = 202, 'Process being handeled'
+                code, response = 202, 'Process being handled'
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => User %s does not exist!', user, controller, user)
@@ -539,7 +558,7 @@ def get_model_access(user, controller, model):
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => receiving call!', user, controller, model)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authenticated!', user, controller, model)
-        con, mod = execute_task(juju.authorize, token, juju.check_input(controller), juju.check_input(model))
+        con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authorized!', user, controller, model)
         if juju.user_exists(user):
             if token.is_admin or token.username == user:
