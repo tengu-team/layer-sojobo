@@ -193,8 +193,8 @@ def delete_user(user):
             if juju.user_exists(user):
                 if user != 'admin':
                     juju.delete_user(user)
-                    code, response = 200, 'User {} succesfully removed'.format(user)
-                    LOGGER.info('/USERS/%s [DELETE] => User %s succesfully removed!', user, user)
+                    code, response = 202, 'User {} is being removed'.format(user)
+                    LOGGER.info('/USERS/%s [DELETE] => User %s is being removed!', user, user)
                 else:
                     code, response = 403, 'This would remove the admin from the system!'
                     LOGGER.error('/USERS/%s [DELETE] => This would remove the admin from the system!', user)
@@ -225,7 +225,7 @@ def get_ssh_keys(user):
         if token.is_admin or token.username == user:
             if juju.user_exists(user):
                 code, response = 200, juju.get_ssh_keys_user(user)
-                LOGGER.info('/USERS/%s/ssh-keys [GET] => Succesfully  ssh-keys!', user)
+                LOGGER.info('/USERS/%s/ssh-keys [GET] => Succesfully returned ssh-keys!', user)
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/ssh-keys [GET] => User %s does not exist!', user, user)
@@ -254,8 +254,8 @@ def update_ssh_keys(user):
         if token.is_admin or token.username == user:
             if juju.user_exists(user):
                 juju.update_ssh_keys_user(user, data)
-                LOGGER.info('/USERS/%s/ssh-keys [PUT] => SH-keys are being updated, check update_ssh_keys.log for more information!', user)
-                code, response = 202, 'Process being handled'
+                LOGGER.info('/USERS/%s/ssh-keys [PUT] => SSH-keys are being updated, check update_ssh_keys.log for more information!', user)
+                code, response = 202, 'SSH-keys are being updated'
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/ssh-keys [PUT] => User %s does not exist!', user, user)
@@ -313,7 +313,7 @@ def add_credential(user):
             if juju.user_exists(user):
                 juju.add_credential(user, data['type'], data['name'], data['credential'])
                 LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
-                code, response = 202, 'Process being handled'
+                code, response = 202, 'The credential is being added'
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/credentials [POST] => User %s does not exist!', user, user)
@@ -368,7 +368,7 @@ def remove_credential(user, credential):
             if juju.user_exists(user):
                 juju.remove_credential(user, credential)
                 LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Removing credential, check remove_credential.log for more information!', user, credential)
-                code, response = 202, 'Process being handled'
+                code, response = 202, 'Credential is being removed'
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/credentials/%s [DELETE] => User %s does not exist!', user, credential, user)
@@ -458,7 +458,7 @@ def grant_to_controller(user, controller):
                 if request.json['access'] and juju.c_access_exists(request.json['access'].lower()):
                     execute_task(juju.add_user_to_controller, token, con, user, request.json['access'].lower())
                     LOGGER.info('/USERS/%s/controllers/%s [PUT] => Changing user access, check set_controller_access.log for more information!', user, controller)
-                    code, response = 202, 'Process being handled'
+                    code, response = 202, 'The user\'s access is being changed'
                 else:
                     LOGGER.error('/USERS/%s/controllers/%s [PUT] => Invalid access data provided : %s', user, controller, request.json['access'])
                     code, response = errors.invalid_access('access')
@@ -523,7 +523,7 @@ def grant_to_model(user, controller):
             if juju.user_exists(user):
                 juju.set_models_access(token, con, user, data)
                 LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Setting model access, check set_model_access.log for more information!', user, controller)
-                code, response = 202, 'Process being handled'
+                code, response = 202, 'The model access is being changed'
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => User %s does not exist!', user, controller, user)

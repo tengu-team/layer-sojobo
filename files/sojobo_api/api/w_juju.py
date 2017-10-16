@@ -698,7 +698,7 @@ async def change_user_password(token, username, password):
 def update_ssh_keys_user(user, ssh_keys):
     Popen([
         "python3.6",
-        "{}/scripts/add_ssh_key.py".format(settings.SOJOBO_API_DIR),
+        "{}/scripts/update_ssh_keys.py".format(settings.SOJOBO_API_DIR),
         str(ssh_keys), user, settings.SOJOBO_API_DIR])
 
 
