@@ -331,19 +331,13 @@ def add_application(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authenticated!', controller, model)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authorized!', controller, model)
-        if execute_task(juju.app_exists, token, con, mod, data['application']):
+        app = data['application']
+        if execute_task(juju.app_exists, token, con, mod, app):
             code, response = errors.already_exists('application')
             LOGGER.error('/TENGU/controllers/%s/models/%s/applications [POST] => Application already exists!', controller, model)
         else:
             if mod.m_access == 'write' or mod.m_access == 'admin':
-                # this needs to be fixed properly
-                series = juju.check_input(data.get('series', None), True)
-                config = juju.check_input(data.get('config', None), True)
-                machine = juju.check_input(data.get('target', None), True)
-                app_name = juju.check_input(data.get('app_name', None), True)
-                units = juju.check_input(data.get('units', "1"))
-                app = juju.check_input(data['application'])
-                execute_task(juju.deploy_app, token, mod, app, name=app_name, ser=series, tar=machine, con=config, num_of_units=int(units))
+                execute_task(juju.deploy_app, token, con, mod, app, data)
                 code, response = 200, execute_task(juju.get_application_info, token, mod, app)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller, model)
             else:
@@ -428,10 +422,9 @@ def remove_app(controller, model, application):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Authenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Authorized!', controller, model, application)
-        app = juju.check_input(application)
         if mod.m_access == 'write' or mod.m_access == 'admin':
-            if execute_task(juju.app_exists, token, con, mod, app):
-                execute_task(juju.remove_app, token, mod, app)
+            if execute_task(juju.app_exists, token, con, mod, application):
+                execute_task(juju.remove_app, token, mod, application)
                 code, response = 202, "The application is being removed"
                 LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Removing application!', controller, model, application)
             else:
@@ -460,8 +453,7 @@ def get_application_config(controller, model, application):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [GET] => Authenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [GET] => Authorized!', controller, model, application)
-        app = juju.check_input(application)
-        code, response = 200, execute_task(juju.get_application_config, token, mod, app)
+        code, response = 200, execute_task(juju.get_application_config, token, mod, application)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [GET] => Succesfully retrieved application config!', controller, model, application)
     except KeyError:
         code, response = errors.invalid_data()
@@ -485,8 +477,7 @@ def set_application_config(controller, model, application):
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => Authorized!', controller, model, application)
         if mod.m_access == 'write' or mod.m_access == 'admin':
-            app = juju.check_input(application)
-            execute_task(juju.set_application_config, token, mod, app, data.get('config', None))
+            execute_task(juju.set_application_config, token, mod, application, data.get('config', None))
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => Config parameter is being changed!', controller, model, application)
             code, response = 202, "The config parameter is being changed"
         else:
@@ -536,8 +527,10 @@ def add_machine(controller, model):
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Authorized!', controller, model)
         if mod.m_access == 'write' or mod.m_access == 'admin':
-            series = juju.check_input(data.get('series', None), True)
-            constraints = juju.check_input(data.get('constraints', None), True)
+            constraints = data.get('constraints', None)
+            if constraints:
+                juju.check_constraints(data.get(constraints, True))
+            series = data.get('series', None)
             if juju.cloud_supports_series(con, series):
                 execute_task(juju.add_machine, token, mod, series, constraints)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller, model)
@@ -568,9 +561,8 @@ def get_machine_info(controller, model, machine):
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Authenticated!', controller, model, machine)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Authorized!', controller, model, machine)
-        mach = juju.check_input(machine)
-        if execute_task(juju.machine_exists, token, mod, mach):
-            code, response = 200, execute_task(juju.get_machine_info, token, mod, mach)
+        if execute_task(juju.machine_exists, token, mod, machine):
+            code, response = 200, execute_task(juju.get_machine_info, token, mod, machine)
             LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Succesfully retrieved machine information!', controller, model, machine)
         else:
             code, response = errors.does_not_exist('machine')
@@ -596,10 +588,9 @@ def remove_machine(controller, model, machine):
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => Authenticated!', controller, model, machine)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => Authorized!', controller, model, machine)
-        mach = juju.check_input(machine)
-        if execute_task(juju.machine_exists, token, mod, mach):
+        if execute_task(juju.machine_exists, token, mod, machine):
             if mod.m_access == 'write' or mod.m_access == 'admin':
-                juju.remove_machine(token, con, mod, mach)
+                juju.remove_machine(token, con, mod, machine)
                 code, response = 202, 'Machine being removed'
                 LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Destroying machine, check remove_machine.log for more information!', controller, model, machine)
             else:
@@ -628,9 +619,8 @@ def get_units_info(controller, model, application):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Auhtenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Authorized!', controller, model, application)
-        app = juju.check_input(application)
-        if execute_task(juju.app_exists, token, con, mod, app):
-            code, response = 200, execute_task(juju.get_units_info, token, mod, app)
+        if execute_task(juju.app_exists, token, con, mod, application):
+            code, response = 200, execute_task(juju.get_units_info, token, mod, application)
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Succesfully retrieved units info!', controller, model, application)
         else:
             code, response = errors.does_not_exist('application')
@@ -656,8 +646,7 @@ def add_unit(controller, model, application):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Authenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Authorized!', controller, model, application)
-        app = juju.check_input(application)
-        if execute_task(juju.app_exists, token, con, mod, app):
+        if execute_task(juju.app_exists, token, con, mod, application):
             if mod.m_access == 'write' or mod.m_access == 'admin':
                 juju.add_unit(token, con, mod, application, data.get('amount', 1), data.get('target', 'None'))
                 code, response = 202, "Unit is being created"
@@ -688,9 +677,7 @@ def get_unit_info(controller, model, application, unitnumber):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Authenticated!', controller, model, application, unitnumber)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Authorized!', controller, model, application, unitnumber)
-        app = juju.check_input(application)
-        unum = juju.check_input(unitnumber)
-        unit = execute_task(juju.get_unit_info, token, mod, app, unum)
+        unit = execute_task(juju.get_unit_info, token, mod, application, unitnumber)
         if unit is not {}:
             code, response = 200, unit
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Succesfully retrieved Unit information!', controller, model, application, unitnumber)
@@ -717,11 +704,9 @@ def remove_unit(controller, model, application, unitnumber):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Authenticated!', controller, model, application, unitnumber)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Authorized!', controller, model, application, unitnumber)
-        app = juju.check_input(application)
-        unum = juju.check_input(unitnumber)
-        if execute_task(juju.get_unit_info, token, mod, app, unum) is not {}:
+        if execute_task(juju.get_unit_info, token, mod, application, unitnumber) is not {}:
             if mod.m_access == 'write' or mod.m_access == 'admin':
-                execute_task(juju.remove_unit, token, mod, app, unum)
+                execute_task(juju.remove_unit, token, mod, application, unitnumber)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Unit is being removed!', controller, model, application, unitnumber)
                 code, response = 202, "Unit is being removed"
             else:
@@ -773,6 +758,7 @@ def add_relation(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authenticated!', controller, model)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authorized!', controller, model)
+        #proper check will have to be implemented
         app1, app2 = juju.check_input(data['app1']), juju.check_input(data['app2'])
         if execute_task(juju.app_exists, token, con, mod, app1) and execute_task(juju.app_exists, token, con, mod, app2):
             if mod.m_access == 'write' or mod.m_access == 'admin':
@@ -805,9 +791,8 @@ def get_relations(controller, model, application):
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Authenticated!', controller, model, application)
         con, mod = execute_task(juju.authorize, token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Authorized!', controller, model, application)
-        app = juju.check_input(application)
-        if execute_task(juju.app_exists, token, con, mod, app):
-            code, response = 200, execute_task(juju.get_application_info, token, mod, app)['relations']
+        if execute_task(juju.app_exists, token, con, mod, application):
+            code, response = 200, execute_task(juju.get_application_info, token, mod, application)['relations']
             LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Succesfully retrieved application info!', controller, model, application)
         else:
             code, response = errors.does_not_exist('application')
@@ -834,7 +819,7 @@ def remove_relation(controller, model, app1, app2):
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Authorized!', controller, model, app1, app2)
         if execute_task(juju.app_exists, token, con, mod, app1) and execute_task(juju.app_exists, token, con, mod, app2):
             if mod.m_access == 'write' or mod.m_access == 'admin':
-                execute_task(juju.remove_relation, token, mod, appl1, appl2)
+                execute_task(juju.remove_relation, token, mod, app1, app2)
                 code, response = 202, 'The relation is being removed'
                 LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Relation is being removed!', controller, model, app1, app2)
             else:

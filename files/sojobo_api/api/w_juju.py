@@ -139,13 +139,31 @@ def create_response(http_code, return_object, is_json=False):
 def check_input(data, input_type):
     regex_dict = {"controller":{"regex":"^(?!-).*^\S+$", "e_message": "Controller name can not start with a hyphen and can not contain spaces!"},
                   "username":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Username may only contain lowercase letters, digits and hyphens but can not start with a hyphen"},
-                  "model":{"someregex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Model names may only contain lowercase letters, digits and hyphens but can not start with a hyphen"}}
+                  "model":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Model names may only contain lowercase letters, digits and hyphens but can not start with a hyphen"}}
     if input_type in regex_dict:
         pattern = re.compile(regex_dict[input_type]['regex'])
         if pattern.match(data):
             return True, data
         else:
             return False, regex_dict[input_type]['e_message']
+
+
+def check_constraints(data):
+    cons = ['mem', 'arch', 'cores', 'spaces', 'container', 'root-disk', 'tags', 'cpu-power', 'virt-type']
+    for item in data:
+        if item in cons:
+            if item == 'arch':
+                if data[item] in ['amd64', 'arm', 'i386', 'arm64', 'ppc64el']:
+                    pass
+                else:
+                    error = errors.invalid_option(data[item])
+                    abort(error[0], error[1])
+            else:
+                pass
+        else:
+            error = errors.invalid_option(item)
+            abort(error[0], error[1])
+
 
 
 async def authenticate(api_key, auth):
@@ -536,13 +554,25 @@ def add_bundle(token, controller, model, bundle):
            str(bundle), settings.REDIS_HOST, settings.REDIS_PORT])
 
 
-async def deploy_app(token, model, app_name, name=None, ser=None, tar=None, con=None, num_of_units=1):
-    async with model.connect(token) as juju:
-        try:
-            await juju.deploy(app_name, application_name=name, series=ser, to=tar, config=con, num_units=num_of_units)
-        except JujuError as e:
-            if e == 'subordinate application must be deployed without units':
-                await juju.deploy(app_name, application_name=name, series=ser, to=tar, config=con, num_units=0)
+async def deploy_app(token, con, model, app_name, data):
+    ser = data.get('series', None)
+    if(cloud_supports_series(con, ser)):
+        conf = data.get('config', None)
+        machine = data.get('target', None)
+        if machine and not machine_exists(token, model, machine):
+            error = errors.does_not_exist(machine)
+            abort(error[0], error[1])
+        units = data.get('units', "1")
+        async with model.connect(token) as juju:
+            try:
+                await juju.deploy(app_name, application_name=app_name, series=ser, to=machine, config=conf, num_units=int(units))
+            except JujuError as e:
+                if e == 'subordinate application must be deployed without units':
+                    await juju.deploy(app_name, application_name=app_name, series=ser, config=conf, num_units=0)
+    else:
+        error = errors.invalid_option(data)
+        abort(error[0], error[1])
+
 
 
 async def check_if_exposed(token, model, app_name):
