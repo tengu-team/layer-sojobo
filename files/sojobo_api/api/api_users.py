@@ -104,7 +104,7 @@ def create_user():
                     code, response = errors.empty()
                     LOGGER.error('/USERS [POST] => Password cannot be empty!')
             else:
-                code, response = 400, "username does not have the correct format."
+                code, response = 400, user
                 LOGGER.error('/USERS [POST] => Username does not have the correct format!')
         else:
             code, response = errors.no_permission()

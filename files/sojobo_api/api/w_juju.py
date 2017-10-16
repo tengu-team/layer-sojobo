@@ -137,9 +137,9 @@ def create_response(http_code, return_object, is_json=False):
 
 
 def check_input(data, input_type):
-    regex_dict = {"controller":{"regex":"^(?!-).*^\S+$", "e_message": "Controller name can not start with one ore more \"-\" character and can not contain spaces!"},
-                  "username":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Username had to start with a number or a letter and can only contain numbers, letters or \"-\" "},
-                  "model":"someregex"}
+    regex_dict = {"controller":{"regex":"^(?!-).*^\S+$", "e_message": "Controller name can not start with a hyphen and can not contain spaces!"},
+                  "username":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Username may only contain lowercase letters, digits and hyphens but can not start with a hyphen"},
+                  "model":{"someregex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Model names may only contain lowercase letters, digits and hyphens but can not start with a hyphen"}}
     if input_type in regex_dict:
         pattern = re.compile(regex_dict[input_type]['regex'])
         if pattern.match(data):
