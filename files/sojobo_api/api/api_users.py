@@ -313,7 +313,7 @@ def add_credential(user):
             if juju.user_exists(user):
                 juju.add_credential(user, data['type'], data['name'], data['credential'])
                 LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
-                code, response = 202, 'Process being handled'
+                code, response = 200, juju.get_credentials(user)
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/credentials [POST] => User %s does not exist!', user, user)
@@ -366,9 +366,13 @@ def remove_credential(user, credential):
         LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Authenticated!', user, credential)
         if token.is_admin or token.username == user:
             if juju.user_exists(user):
-                juju.remove_credential(user, credential)
-                LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Removing credential, check remove_credential.log for more information!', user, credential)
-                code, response = 202, 'Process being handled'
+                if juju.credential_exists(user, credential):
+                    juju.remove_credential(user, credential)
+                    LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Removing credential, check remove_credential.log for more information!', user, credential)
+                    code, response = 200, juju.get_credentials(user)
+                else:
+                    code, response = errors.does_not_exist('credential')
+                    LOGGER.error('/USERS/%s/credentials/%s [DELETE] => credential %s does not exist!', user, credential, credential)
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/credentials/%s [DELETE] => User %s does not exist!', user, credential, user)

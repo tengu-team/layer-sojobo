@@ -237,6 +237,8 @@ def create_controller(c_type, name, region, credentials):
 def generate_cred_file(c_type, name, credentials):
     return get_controller_types()[c_type].generate_cred_file(name, credentials)
 
+def remove_cred_file(c_type, name):
+    return get_controller_types()[c_type].remove_cred_file(name)
 
 def delete_controller(con):
     Popen(["python3.6", "{}/scripts/remove_controller.py".format(settings.SOJOBO_API_DIR),
@@ -728,14 +730,22 @@ def get_credential(user, credential):
 
 def add_credential(user, c_type, cred_name, credential):
     result_cred = generate_cred_file(c_type, cred_name, credential)
-    Popen(["python3.6", "{}/scripts/add_credential.py".format(settings.SOJOBO_API_DIR), user,
-           settings.SOJOBO_API_DIR, str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
+    datastore.add_credential(user, result_cred)
+    # Popen(["python3.6", "{}/scripts/add_credential.py".format(settings.SOJOBO_API_DIR), user,
+    #        settings.SOJOBO_API_DIR, str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
 
 
-def remove_credential(user, cred_name):
-    Popen(["python3.6", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR), user,
-           settings.SOJOBO_API_DIR, cred_name, settings.REDIS_HOST, settings.REDIS_PORT])
+def remove_credential(user, cred_name, c_type):
+    # remove_cred_file(c_type, cred_name)
+    datastore.remove_credential(user, cred_name)
+    # Popen(["python3.6", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR), user,
+    #        settings.SOJOBO_API_DIR, cred_name, settings.REDIS_HOST, settings.REDIS_PORT])
 
+def credential_exists(user, credential):
+    for cred in get_credentials(user):
+        if cred['name'] == credential:
+            return True
+    return False
 
 def grant_user_to_controller(token, controller, user, access):
     Popen(["python3.6", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
