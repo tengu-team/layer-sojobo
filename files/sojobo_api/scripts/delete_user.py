@@ -36,16 +36,18 @@ class JuJu_Token(object):  #pylint: disable=R0903
 ################################################################################
 async def delete_user(username):
     try:
-        token = JuJu_Token
+        token = JuJu_Token()
         #TO DO => libjuju implementation
         controllers = datastore.get_all_controllers()
         for con in controllers:
+            datastore.delete_user(username)
             logger.info('Setting up Controllerconnection for %s', con)
             controller = juju.Controller_Connection(token, con)
             async with controller.connect(token) as con_juju:
                 user_facade = client.UserManagerFacade.from_connection(con_juju.connection)
                 entity = client.Entity(tag.user(username))
-                return await user_facade.RemoveUser([entity])
+                logger.info('Removing user from %s', con)
+                await user_facade.RemoveUser([entity])
                 # if wrapper ready =>
                 # await con_juju.remove(username)
             logger.info('Removed user %s from Controller %s', username ,con)
@@ -69,5 +71,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
-    loop.run_until_complete(create_user(sys.argv[1]))
+    loop.run_until_complete(delete_user(sys.argv[1]))
     loop.close()

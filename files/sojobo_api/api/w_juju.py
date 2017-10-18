@@ -188,7 +188,7 @@ async def authenticate(api_key, auth):
         abort(error[0], error[1])
 
 
-async def authorize(token, controller, model=None):
+def authorize(token, controller, model=None):
     if not controller_exists(controller):
         error = errors.does_not_exist('controller')
         abort(error[0], error[1])
@@ -431,9 +431,8 @@ def create_model(token, controller, model, credentials):
         datastore.add_model_to_controller(controller, model)
         datastore.set_model_state(controller, model, 'accepted')
         datastore.set_model_access(controller, model, token.username, 'admin')
-        Popen(["python3.6", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), token.username,
-               token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT,
-               controller, model, credentials])
+        Popen(["python3.6", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), controller,
+               model, settings.SOJOBO_API_DIR, token.username, token.password, credentials])
         code, response = 202, "Model is being deployed"
     else:
         code, response = 404, "Credentials {} not found!".format(credentials)
@@ -672,6 +671,8 @@ async def remove_relation(token, model, app1, app2):
 async def set_application_config(token, model, app_name, config):
     async with model.connect(token):
         app = await get_application_entity(token, model, app_name)
+        for con in config:
+            config['con'] = str(config['con'])
         await app.set_config(config)
 
 
@@ -726,26 +727,23 @@ def get_credential(user, credential):
     for cred in get_credentials(user):
         if cred['name'] == credential:
             return cred
-    return None
-
-def add_credential(user, c_type, cred_name, credential):
-    result_cred = generate_cred_file(c_type, cred_name, credential)
-    datastore.add_credential(user, result_cred)
-    # Popen(["python3.6", "{}/scripts/add_credential.py".format(settings.SOJOBO_API_DIR), user,
-    #        settings.SOJOBO_API_DIR, str(result_cred), settings.REDIS_HOST, settings.REDIS_PORT])
 
 
-def remove_credential(user, cred_name, c_type):
-    # remove_cred_file(c_type, cred_name)
+def add_credential(user, c_type, credential):
+
+    datastore.add_credential(user, credential)
+
+
+def remove_credential(user, cred_name):
     datastore.remove_credential(user, cred_name)
-    # Popen(["python3.6", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR), user,
-    #        settings.SOJOBO_API_DIR, cred_name, settings.REDIS_HOST, settings.REDIS_PORT])
+
 
 def credential_exists(user, credential):
     for cred in get_credentials(user):
         if cred['name'] == credential:
-            return True
-    return False
+            pass
+    error = errors.does_not_exist('credential')
+    abort(error[0], error[1])
 
 def grant_user_to_controller(token, controller, user, access):
     Popen(["python3.6", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),

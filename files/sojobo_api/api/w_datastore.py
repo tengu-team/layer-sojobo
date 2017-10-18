@@ -63,11 +63,12 @@ def add_credential(user, cred):
     con.set(user, json.dumps(data))
 
 
-def remove_credential(user, cred):
+def remove_credential(user, cred_name):
     con = connect_to_users()
     data = json.loads(con.get(user))
-    if cred in data['credentials']:
-        data['credentials'].remove(cred)
+    for cred in data['credentials']:
+        if cred_name == cred['name']:
+            data['credentials'].remove(cred)
     con.set(user, json.dumps(data))
 
 
@@ -227,12 +228,13 @@ def set_controller_access(c_name, user, access):
     con.set(c_name, json.dumps(data))
 
 
-def delete_user(c_name, user):
+def delete_user(user):
     con = connect_to_controllers()
-    data = json.loads(con.get(c_name))
-    if user in data['users']:
-        data['users'].remove(user)
-    con.set(c_name, json.dumps(data))
+    for c_name in con.keys():
+        data = json.loads(con.get(c_name))
+        if user in data['users']:
+            data['users'].remove(user)
+            con.set(c_name, json.dumps(data))
     con = connect_to_users()
     con.delete(user)
 
