@@ -90,9 +90,12 @@ def create_controller():
                 else:
                     sup_clouds = juju.get_supported_regions(c_type)
                     if data['region'] in sup_clouds:
-                        code, response = juju.create_controller(c_type,
-                                                                controller, data['region'], data['credential'])
-                        LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
+                        if juju.credential_exists(token.username, data['credential']):
+                            code, response = juju.create_controller(c_type,
+                                                                    controller, data['region'], data['credential'])
+                            LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
+                        else:
+                            code, response = 400, 'Credential {} not found for user {}'.format(data['credential'], token.username)
                     else:
                         code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(c_type, sup_clouds)
                         LOGGER.error('%s [POST] => %s', url, response)

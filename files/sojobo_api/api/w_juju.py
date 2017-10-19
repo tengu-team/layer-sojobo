@@ -175,14 +175,22 @@ async def authenticate(api_key, auth):
         token = JuJu_Token(auth)
         try:
             controllers = get_all_controllers()
-            if len(controllers) > 0:
-                controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)])
-                async with controller.connect(token):  #pylint: disable=E1701
-                    pass
-                return token
-            else:
-                if token.username == settings.JUJU_ADMIN_USER and token.password == settings.JUJU_ADMIN_PASSWORD:
+            user_state = datastore.check_if_user_ready(token.username)
+            if user_state == 'ready':
+                if len(controllers) > 0:
+                    controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)])
+                    async with controller.connect(token):  #pylint: disable=E1701
+                        pass
                     return token
+                else:
+                    if token.username == settings.JUJU_ADMIN_USER and token.password == settings.JUJU_ADMIN_PASSWORD:
+                        return token
+                    else:
+                        abort(error[0], error[1])
+            elif user_state == 'pending':
+                abort(403, "The user is not ready yet to perform this action. Please wait untill the user is created!")
+            else:
+                abort(403, "The user is being removed and not able to perform this action anymore!")
         except JujuAPIError:
             abort(error[0], error[1])
     else:

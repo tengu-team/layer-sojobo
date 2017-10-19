@@ -46,6 +46,7 @@ async def create_user(username, password):
                 await con_juju.grant(username)
                 datastore.add_user_to_controller(con, username, 'login')
                 logger.info('Succesfully added user %s to controller %s', username, con)
+        datastore.set_user_state(username, 'ready')
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

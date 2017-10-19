@@ -33,7 +33,7 @@ def create_user(user_name):
                 'controllers': [],
                 'ssh-keys': [],
                 'credentials': [],
-                'active': True}
+                'state': 'pending'}
         con = connect_to_users()
         con.set(user_name, json.dumps(user))
 
@@ -41,6 +41,18 @@ def create_user(user_name):
 def get_user(user):
     con = connect_to_users()
     return json.loads(con.get(user))
+
+
+def set_user_state(user_name, state):
+    con = connect_to_users()
+    data = json.loads(con.get(user_name))
+    data['state'] = state
+    con.set(user_name, json.dumps(data))
+
+
+def get_user_state(username):
+    data = get_user(username)
+    return data['state']
 
 
 def update_ssh_keys(user, ssh_keys):
