@@ -723,19 +723,19 @@ def get_users_model(token, controller, model):
 def get_credentials(user):
     return datastore.get_credentials(user)
 
+
 def get_credential(user, credential):
     for cred in get_credentials(user):
         if cred['name'] == credential:
             return cred
 
 
-def add_credential(user, c_type, credential):
-
-    datastore.add_credential(user, credential)
+def add_credential(user, credential):
+    Popen(["python3.6", "{}/scripts/add_credential.py".format(settings.SOJOBO_API_DIR), user, str(credential), settings.SOJOBO_API_DIR])
 
 
 def remove_credential(user, cred_name):
-    datastore.remove_credential(user, cred_name)
+    Popen(["python3.6", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR), user, cred_name, settings.SOJOBO_API_DIR])
 
 
 def credential_exists(user, credential):

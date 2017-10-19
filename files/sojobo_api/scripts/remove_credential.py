@@ -18,21 +18,33 @@ import asyncio
 import sys
 import traceback
 import logging
-import json
-import redis
+sys.path.append('/opt')
+from juju import tag
+from juju.client import client
+from sojobo_api import settings  #pylint: disable=C0413
+from sojobo_api.api import w_datastore as ds, w_juju as juju  #pylint: disable=C0413
 
+class JuJu_Token(object):  #pylint: disable=R0903
+    def __init__(self):
+        self.username = settings.JUJU_ADMIN_USER
+        self.password = settings.JUJU_ADMIN_PASSWORD
+        self.is_admin = False
 
-async def remove_credential(username, cred_name, url, port):
+async def remove_credential(username, cred_name):
     try:
-        logger.info('Setting up connection with Redis')
-        db = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
-        usr = json.loads(db.get(username))
-        for cred in usr['credentials']:
-            if cred['name'] == cred_name:
-                usr['credentials'].remove(cred)
-                db.set(username, json.dumps(usr))
-                break
-        logger.info('Succesfully removed credential for %s', username)
+        token = JuJu_Token()
+        cred = juju.get_credential(username, cred_name)
+        c_type = cred['type']
+        controllers = ds.get_cloud_controllers(c_type)
+        for con in controllers:
+            controller = juju.Controller_Connection(token, con)
+            if controller.c_type == c_type:
+                async with controller.connect(token) as con_juju:
+                    cloud_facade = client.CloudFacade.from_connection(con_juju.connection)
+                    cloud_cred = client.Entity(tag.credential(c_type, username, cred_name))
+                    await cloud_facade.RevokeCredentials(cloud_cred)
+        ds.remove_credential(username, cred_name)
+        logger.info('Succesfully removed credential')
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -44,7 +56,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('add_credentials')
-    hdlr = logging.FileHandler('{}/log/add_credentials.log'.format(sys.argv[2]))
+    hdlr = logging.FileHandler('{}/log/add_credentials.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -53,5 +65,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(remove_credential(sys.argv[1], sys.argv[3], sys.argv[4], sys.argv[5]))
+    loop.run_until_complete(remove_credential(sys.argv[1], sys.argv[2]))
     loop.close()

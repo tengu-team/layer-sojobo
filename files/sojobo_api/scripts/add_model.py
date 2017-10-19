@@ -18,13 +18,10 @@ import asyncio
 import sys
 import traceback
 import logging
-import json
-import redis
 sys.path.append('/opt')
 from juju import tag
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as ds, w_juju as juju  #pylint: disable=C0413
-from juju.controller import Controller
 from juju.client import client
 from juju.errors import JujuAPIError, JujuError
 
@@ -43,23 +40,11 @@ async def create_model(c_name, m_name, usr, pwd, cred_name):
         c_type = juju.get_controller_type(c_name)
         controller = juju.Controller_Connection(token, c_name)
         async with controller.connect(token) as con_juju:
-            logger.info('%s -> Adding credentials', m_name)
-            cloud_facade = client.CloudFacade.from_connection(con_juju.connection)
-            credentials = ds.get_credentials(usr)
-            for cred in credentials:
-                if cred['name'] == cred_name and c_type == cred['type']:
-                    logger.info('%s -> Credential found %s', m_name, cred)
-                    credential = juju.generate_cred_file(c_type, cred['name'], cred['credential'])
-                    cloud_cred = client.UpdateCloudCredential(
-                        client.CloudCredential(credential['key'], credential['type']),
-                        tag.credential(c_type, usr, cred['name'])
-                    )
-                    await cloud_facade.UpdateCredentials([cloud_cred])
             logger.info('%s -> Creating model: %s', m_name, m_name)
             model = await con_juju.add_model(
                 m_name,
                 cloud_name=c_type,
-                credential_name=credential['name'],
+                credential_name=cred_name,
                 owner=tag.user(usr)
             )
             logger.info('%s -> model deployed on juju', m_name)

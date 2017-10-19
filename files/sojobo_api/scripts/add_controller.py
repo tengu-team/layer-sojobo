@@ -35,15 +35,18 @@ class JuJu_Token(object):  #pylint: disable=R0903
         self.is_admin = True
 
 
-async def create_controller(c_type, name, region, credentials):
+async def create_controller(c_type, name, region, cred_name):
     try:
         logger.info('Adding controller to database')
-        cred_name = 'default-{}'.format(name)
+        token = JuJu_Token()
         datastore.create_controller(name, c_type, region, cred_name)
         datastore.add_user_to_controller(name, 'admin', 'superuser')
+
         logger.info('Bootstrapping controller')
-        juju.get_controller_types()[c_type].create_controller(name, region, credentials, cred_name)
-        pswd = settings.JUJU_ADMIN_PASSWORD
+        juju.get_credential(token.username, cred_name)
+        juju.get_controller_types()[c_type].create_controller(name, region, cred_name)
+        pswd = token.password
+
         logger.info('Setting admin password')
         check_output(['juju', 'change-user-password', 'admin', '-c', name],
                      input=bytes('{}\n{}\n'.format(pswd, pswd), 'utf-8'))
@@ -56,14 +59,14 @@ async def create_controller(c_type, name, region, credentials):
             con_data['controllers'][name]['api-endpoints'],
             con_data['controllers'][name]['uuid'],
             con_data['controllers'][name]['ca-cert'])
-        token = JuJu_Token()
         logger.info('Connecting to controller')
         controller = juju.Controller_Connection(token, name)
-        logger.info('Adding credentials to database')
-        result_cred = juju.generate_cred_file(c_type, cred_name, credentials)
-        datastore.add_credential('admin', result_cred)
-        logger.info('Adding existing models to database')
+        logger.info('Adding existing credentials and models to database')
+        credentials = datastore.get_all_credentials(token.username)
         async with controller.connect(token) as juju_con:
+            for cred in credentials:
+                juju_con.add_credential(name=cred['name'], credential=cred['credential'],
+                                        cloud=c_type, owner=token.username)
             models = await juju_con.get_models()
             for model in models.serialize()['user-models']:
                 model = model.serialize()['model'].serialize()

@@ -19,20 +19,41 @@ import sys
 import traceback
 import logging
 import ast
-import json
-import redis
+sys.path.append('/opt')
+from juju import tag
+from juju.client import client
+from sojobo_api import settings  #pylint: disable=C0413
+from sojobo_api.api import w_datastore as ds, w_juju as juju  #pylint: disable=C0413
 
+class JuJu_Token(object):  #pylint: disable=R0903
+    def __init__(self):
+        self.username = settings.JUJU_ADMIN_USER
+        self.password = settings.JUJU_ADMIN_PASSWORD
+        self.is_admin = False
 
-async def add_credential(username, credential, url, port):
+async def add_credential(username, credentials):
     try:
-        creds = ast.literal_eval(credential)
-        logger.info('Setting up connection with Redis')
-        users = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
-        user = json.loads(users.get(username))
-        if creds not in user['credentials']:
-            user['credentials'].append(creds)
-        users.set(username, json.dumps(user))
-        logger.info('Succesfully added credential for %s', username)
+        cred = ast.literal_eval(credentials)
+        token = JuJu_Token()
+        c_type = cred['type']
+        controllers = ds.get_cloud_controllers(c_type)
+        for con in controllers:
+            controller = juju.Controller_Connection(token, con)
+            if controller.c_type == c_type:
+                async with controller.connect(token) as con_juju:
+                    logger.info('%s -> Adding credentials', con)
+                    con_juju.add_credential(name=cred['name'], credential=cred['credential'],
+                                            cloud=c_type, owner=username)
+                    # cloud_facade = client.CloudFacade.from_connection(con_juju.connection)
+                    # credential = juju.generate_cred_file(c_type, cred['name'], cred['credential'])
+                    # cloud_cred = client.UpdateCloudCredential(
+                    #     client.CloudCredential(credential['key'], credential['type']),
+                    #     tag.credential(c_type, username, cred['name'])
+                    # )
+                    # await cloud_facade.UpdateCredentials([cloud_cred])
+                    logger.info('%s -> controller updated', con)
+        ds.add_credential(username, cred)
+        logger.info('Succesfully added credential')
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -43,8 +64,8 @@ async def add_credential(username, credential, url, port):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('add_credentials')
-    hdlr = logging.FileHandler('{}/log/add_credentials.log'.format(sys.argv[2]))
+    logger = logging.getLogger('add_credential')
+    hdlr = logging.FileHandler('{}/log/add_credential.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -53,5 +74,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(add_credential(sys.argv[1], sys.argv[3], sys.argv[4], sys.argv[5]))
+    loop.run_until_complete(add_credential(sys.argv[1], sys.argv[2]))
     loop.close()

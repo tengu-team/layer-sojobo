@@ -311,9 +311,9 @@ def add_credential(user):
         LOGGER.info('/USERS/%s/credentials [POST] => Authenticated!', user)
         if token.is_admin or token.username == user:
             if juju.user_exists(user):
-                juju.add_credential(user, data['type'], data['name'], data['credential'])
+                juju.add_credential(user, data)
                 LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
-                code, response = 200, juju.get_credentials(user)
+                code, response = 202, 'Credentials are being added'
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/credentials [POST] => User %s does not exist!', user, user)
