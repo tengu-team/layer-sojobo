@@ -138,6 +138,7 @@ def create_response(http_code, return_object, is_json=False):
 
 def check_input(data, input_type):
     regex_dict = {"controller":{"regex":"^(?!-).*^\S+$", "e_message": "Controller name can not start with a hyphen and can not contain spaces!"},
+                  "credential":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Credentials may only contain lowercase letters, digits and hyphens but can not start with a hyphen"},
                   "username":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Username may only contain lowercase letters, digits and hyphens but can not start with a hyphen"},
                   "model":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Model names may only contain lowercase letters, digits and hyphens but can not start with a hyphen"}}
     if input_type in regex_dict:
@@ -230,7 +231,7 @@ def create_controller(c_type, name, region, credentials):
         if datastore.get_controller(controller)['state'] == 'PENDING':
             return 503, 'An environment is already being created'
     Popen(["python3.6", "{}/scripts/add_controller.py".format(settings.SOJOBO_API_DIR),
-           c_type, name, region, json.dumps(credentials)])
+           c_type, name, region, credentials])
     return 202, 'Environment {} is being created in region {}'.format(name, region)
 
 
@@ -285,10 +286,6 @@ def get_controller_superusers(controller):
             result.append(user['name'])
     return result
 
-
-def get_controller_type(c_name):
-    controllers = get_controllers_info()
-    return controllers[c_name]['cloud']
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
@@ -741,9 +738,8 @@ def remove_credential(user, cred_name):
 def credential_exists(user, credential):
     for cred in get_credentials(user):
         if cred['name'] == credential:
-            pass
-    error = errors.does_not_exist('credential')
-    abort(error[0], error[1])
+            return True
+    return False
 
 def grant_user_to_controller(token, controller, user, access):
     Popen(["python3.6", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),

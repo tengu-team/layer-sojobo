@@ -19,6 +19,7 @@ import sys
 import traceback
 import logging
 import ast
+import hashlib
 sys.path.append('/opt')
 from juju import tag
 from juju.client import client
@@ -36,21 +37,22 @@ async def add_credential(username, credentials):
         cred = ast.literal_eval(credentials)
         token = JuJu_Token()
         c_type = cred['type']
+        credential_name = hashlib.md5(cred['name'].encode('utf')).hexdigest()
         controllers = ds.get_cloud_controllers(c_type)
         for con in controllers:
             controller = juju.Controller_Connection(token, con)
             if controller.c_type == c_type:
                 async with controller.connect(token) as con_juju:
                     logger.info('%s -> Adding credentials', con)
-                    con_juju.add_credential(name=cred['name'], credential=cred['credential'],
-                                            cloud=c_type, owner=username)
-                    # cloud_facade = client.CloudFacade.from_connection(con_juju.connection)
-                    # credential = juju.generate_cred_file(c_type, cred['name'], cred['credential'])
-                    # cloud_cred = client.UpdateCloudCredential(
-                    #     client.CloudCredential(credential['key'], credential['type']),
-                    #     tag.credential(c_type, username, cred['name'])
-                    # )
-                    # await cloud_facade.UpdateCredentials([cloud_cred])
+                    cloud_facade = client.CloudFacade.from_connection(con_juju.connection)
+                    credential = juju.generate_cred_file(c_type, credential_name, cred['credential'])
+                    logger.info('credentials generated %s', credential)
+
+                    cloud_cred = client.UpdateCloudCredential(
+                        client.CloudCredential(credential['key'], credential['type']),
+                        tag.credential(c_type, username, credential_name)
+                    )
+                    await cloud_facade.UpdateCredentials([cloud_cred])
                     logger.info('%s -> controller updated', con)
         ds.add_credential(username, cred)
         logger.info('Succesfully added credential')

@@ -18,6 +18,7 @@ import asyncio
 import sys
 import traceback
 import logging
+import hashlib
 sys.path.append('/opt')
 from juju import tag
 from juju.client import client
@@ -34,6 +35,8 @@ async def remove_credential(username, cred_name):
     try:
         token = JuJu_Token()
         cred = juju.get_credential(username, cred_name)
+        credential_name = hashlib.md5(cred_name.encode('utf')).hexdigest()
+        logger.info('Succesfully retrieved credential, removing credential now')
         c_type = cred['type']
         controllers = ds.get_cloud_controllers(c_type)
         for con in controllers:
@@ -41,8 +44,8 @@ async def remove_credential(username, cred_name):
             if controller.c_type == c_type:
                 async with controller.connect(token) as con_juju:
                     cloud_facade = client.CloudFacade.from_connection(con_juju.connection)
-                    cloud_cred = client.Entity(tag.credential(c_type, username, cred_name))
-                    await cloud_facade.RevokeCredentials(cloud_cred)
+                    cloud_cred = client.Entity(tag.credential(c_type, username, credential_name))
+                    await cloud_facade.RevokeCredentials([cloud_cred])
         ds.remove_credential(username, cred_name)
         logger.info('Succesfully removed credential')
     except Exception as e:
@@ -55,8 +58,8 @@ async def remove_credential(username, cred_name):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('add_credentials')
-    hdlr = logging.FileHandler('{}/log/add_credentials.log'.format(sys.argv[3]))
+    logger = logging.getLogger('remove_credential')
+    hdlr = logging.FileHandler('{}/log/remove_credential.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)

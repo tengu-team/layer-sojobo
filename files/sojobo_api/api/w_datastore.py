@@ -107,6 +107,17 @@ def create_controller(controller_name, c_type, region, cred_name):
         con.set(controller_name, json.dumps(controller))
         return True
 
+def get_cloud_controllers(c_type):
+    con = connect_to_controllers()
+    cons = con.keys()
+    result = []
+    for c_name in cons:
+        data = json.loads(con.get(c_name))
+        if data['type'] == c_type:
+            result.append(c_name)
+    return result
+
+
 def add_user_to_controller(c_name, user, access):
     con = connect_to_controllers()
     data = json.loads(con.get(c_name))
@@ -240,9 +251,8 @@ def delete_user(user):
 
 
 def get_controller_users(c_name):
-    con = connect_to_controllers()
-    data = json.loads(con.get(c_name))
-    return [get_user(u) for u in data['users']]
+    data = get_controller(c_name)
+    return data['users']
 
 def get_default_credential(c_name):
     con = connect_to_controllers()

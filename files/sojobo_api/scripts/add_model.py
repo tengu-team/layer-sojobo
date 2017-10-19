@@ -18,6 +18,7 @@ import asyncio
 import sys
 import traceback
 import logging
+import hashlib
 sys.path.append('/opt')
 from juju import tag
 from sojobo_api import settings  #pylint: disable=C0413
@@ -37,14 +38,15 @@ async def create_model(c_name, m_name, usr, pwd, cred_name):
         token = JuJu_Token()
         token.username = usr
         token.password = pwd
-        c_type = juju.get_controller_type(c_name)
         controller = juju.Controller_Connection(token, c_name)
+        c_type = controller.c_type
+        credential = hashlib.md5(cred_name.encode('utf')).hexdigest()
         async with controller.connect(token) as con_juju:
             logger.info('%s -> Creating model: %s', m_name, m_name)
             model = await con_juju.add_model(
                 m_name,
                 cloud_name=c_type,
-                credential_name=cred_name,
+                credential_name=credential,
                 owner=tag.user(usr)
             )
             logger.info('%s -> model deployed on juju', m_name)
@@ -56,6 +58,7 @@ async def create_model(c_name, m_name, usr, pwd, cred_name):
                     await model.add_ssh_key(usr, key)
                 except (JujuAPIError, JujuError):
                     pass
+            logger.info('%s -> retrieving users: %s', m_name, ds.get_controller_users(c_name))
             for u in ds.get_controller_users(c_name):
                 if u['access'] == 'superuser':
                     await model.grant(u['name'], acl='admin')
