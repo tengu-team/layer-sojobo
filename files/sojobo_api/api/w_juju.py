@@ -175,9 +175,13 @@ async def authenticate(api_key, auth):
         token = JuJu_Token(auth)
         try:
             controllers = get_all_controllers()
-            user_state = datastore.check_if_user_ready(token.username)
+            ready_cons = []
+            for con in controllers:
+                if datastore.get_controller(con)['state'] == 'ready':
+                    ready_cons.append(con)
+            user_state = datastore.get_user_state(token.username)
             if user_state == 'ready':
-                if len(controllers) > 0:
+                if len(ready_cons) > 0:
                     controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)])
                     async with controller.connect(token):  #pylint: disable=E1701
                         pass
@@ -236,7 +240,7 @@ def check_c_type(c_type):
 
 def create_controller(c_type, name, region, credentials):
     for controller in get_all_controllers():
-        if datastore.get_controller(controller)['state'] == 'PENDING':
+        if datastore.get_controller(controller)['state'] == 'accepted':
             return 503, 'An environment is already being created'
     Popen(["python3.6", "{}/scripts/add_controller.py".format(settings.SOJOBO_API_DIR),
            c_type, name, region, credentials])
@@ -430,7 +434,7 @@ async def get_gui_url(controller, model):
 
 def create_model(token, controller, model, credentials):
     state = datastore.check_model_state(controller, model)
-    if state != "error":
+    if state in ["ready", "accepted"]:
         code, response = errors.already_exists('model')
     elif credentials in datastore.get_credential_keys(token.username):
         datastore.add_model_to_controller(controller, model)

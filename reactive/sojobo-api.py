@@ -140,6 +140,7 @@ def status_update_not_leader():
 @when_not('redis.available')
 def redis_db_removed():
     remove_state('api.running')
+    remove_state('admin.created')
     status_set('blocked', 'Waiting for a connection with redis')
 
 

@@ -37,7 +37,7 @@ async def add_credential(username, credentials):
         cred = ast.literal_eval(credentials)
         token = JuJu_Token()
         c_type = cred['type']
-        credential_name = hashlib.md5(cred['name'].encode('utf')).hexdigest()
+        credential_name = 't{}'.format(hashlib.md5(cred['name'].encode('utf')).hexdigest())
         controllers = ds.get_cloud_controllers(c_type)
         for con in controllers:
             controller = juju.Controller_Connection(token, con)

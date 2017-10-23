@@ -47,7 +47,7 @@ async def create_controller(c_type, name, region, cred_name):
         logger.info('Bootstrapping controller')
         credential = juju.get_credential(token.username, cred_name)
         logger.info('credential found %s:', credential['credential'])
-        juju.get_controller_types()[c_type].create_controller(name, region, credential['credential'], hashlib.md5(cred_name.encode('utf')).hexdigest())
+        juju.get_controller_types()[c_type].create_controller(name, region, credential['credential'], 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest()))
         pswd = token.password
 
         logger.info('Setting admin password')
@@ -72,7 +72,7 @@ async def create_controller(c_type, name, region, cred_name):
         async with controller.connect(token) as juju_con:
             for cred in credentials:
                 if cred['name'] != cred_name:
-                    credential_name = hashlib.md5(cred['name'].encode('utf')).hexdigest()
+                    credential_name = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
                     cloud_facade = client.CloudFacade.from_connection(juju_con.connection)
                     credential = juju.generate_cred_file(c_type, credential_name, cred['credential'])
                     cloud_cred = client.UpdateCloudCredential(

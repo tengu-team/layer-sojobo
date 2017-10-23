@@ -431,9 +431,9 @@ def get_ucontroller_access(user, controller):
         LOGGER.info('/USERS/%s/controllers/%s [GET] => receiving call', user, controller)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS/%s/controllers/%s [GET] => Authenticated!', user, controller)
-        if token.is_admin or token.username == user:
+        con = juju.authorize(token, controller)
+        if token.is_admin or token.username == user or con.access == 'superuser':
             if juju.user_exists(user):
-                con = juju.authorize(token, controller)
                 LOGGER.info('/USERS/%s/controllers/%s [GET] => Authorized!', user, controller)
                 code, response = 200, juju.get_ucontroller_access(con, user)
                 LOGGER.info('/USERS/%s/controllers/%s [GET] => Succesfully retrieved controller access!', user, controller)
@@ -496,9 +496,9 @@ def get_models_access(user, controller):
         LOGGER.info('/USERS/%s/controllers/%s/models [GET] => receiving call', user, controller)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Authenticated!', user, controller)
-        if token.is_admin or token.username == user:
+        con = juju.authorize(token, controller)
+        if token.is_admin or token.username == user or con.access == 'superuser':
             if juju.user_exists(user):
-                con = juju.authorize(token, controller)
                 LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Authorized!', user, controller)
                 code, response = 200, juju.get_models_access(con, user)
                 LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Succesfully retrieved models access!', user, controller)
@@ -570,17 +570,18 @@ def get_model_access(user, controller, model):
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authenticated!', user, controller, model)
         con, mod = juju.authorize(token, controller, model)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authorized!', user, controller, model)
-        if juju.user_exists(user):
-            if token.is_admin or token.username == user:
+        if token.is_admin or token.username == user or mod.access == 'admin' or con.access == 'superuser':
+            if juju.user_exists(user):
                 access = juju.get_model_access(mod.m_name, con.c_name, user)
                 code, response = 200, {'access' : access}
                 LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Succesfully retrieved model access!', user, controller, model)
             else:
-                code, response = errors.no_permission()
-                LOGGER.error('/USERS/%s/controllers/%s/models/%s [GET] => No Permission to perform this action!', user, controller, model)
+                code, response = errors.does_not_exist('user')
+                LOGGER.error('/USERS/%s/controllers/%s/models/%s [GET] => User %s does not exist!', user, controller, model, user)
         else:
-            code, response = errors.does_not_exist('user')
-            LOGGER.error('/USERS/%s/controllers/%s/models/%s [GET] => User %s does not exist!', user, controller, model, user)
+            code, response = errors.no_permission()
+            LOGGER.error('/USERS/%s/controllers/%s/models/%s [GET] => No Permission to perform this action!', user, controller, model)
+
     except KeyError:
         code, response = errors.invalid_data()
         error_log()

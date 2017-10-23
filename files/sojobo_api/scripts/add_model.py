@@ -40,7 +40,7 @@ async def create_model(c_name, m_name, usr, pwd, cred_name):
         token.password = pwd
         controller = juju.Controller_Connection(token, c_name)
         c_type = controller.c_type
-        credential = hashlib.md5(cred_name.encode('utf')).hexdigest()
+        credential = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
         async with controller.connect(token) as con_juju:
             logger.info('%s -> Creating model: %s', m_name, m_name)
             model = await con_juju.add_model(

@@ -35,7 +35,7 @@ async def remove_credential(username, cred_name):
     try:
         token = JuJu_Token()
         cred = juju.get_credential(username, cred_name)
-        credential_name = hashlib.md5(cred_name.encode('utf')).hexdigest()
+        credential_name = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
         logger.info('Succesfully retrieved credential, removing credential now')
         c_type = cred['type']
         controllers = ds.get_cloud_controllers(c_type)
