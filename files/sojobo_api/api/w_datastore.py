@@ -204,16 +204,16 @@ def add_model_to_controller(c_name, m_name):
             exists = True
             break
     if not exists:
-        data['models'].append({'name': m_name, 'status': 'Model is being deployed', 'uuid': ''})
+        data['models'].append({'name': m_name, 'state': 'Model is being deployed', 'uuid': ''})
     con.set(c_name, json.dumps(data))
 
 
-def set_model_state(c_name, m_name, status, uuid=None):
+def set_model_state(c_name, m_name, state, uuid=None):
     con = connect_to_controllers()
     data = json.loads(con.get(c_name))
     for model in data['models']:
         if model['name'] == m_name:
-            model['status'] = status
+            model['state'] = state
             if uuid:
                 model['uuid'] = uuid
             break
@@ -224,7 +224,7 @@ def check_model_state(c_name, m_name):
     con = get_controller(c_name)
     for mod in con['models']:
         if mod['name'] == m_name:
-            return mod['status']
+            return mod['state']
     return 'error'
 
 

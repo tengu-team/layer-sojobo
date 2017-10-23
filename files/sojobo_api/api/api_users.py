@@ -410,6 +410,9 @@ def get_controllers_access(user):
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/controllers [GET] => User %s does not exist', user, user)
+        elif juju.check_controllers_access(token, user)[0]:
+                code, response = 200, juju.check_controllers_access(token, user)[1]
+                LOGGER.info('/USERS/%s/controllers [GET] => Succesfully retrieved controllers access!', user)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/controllers [GET] => No Permission to perform this action!', user)
@@ -505,6 +508,9 @@ def get_models_access(user, controller):
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/controllers/%s/models [GET] => User %s does not exist!', user, controller, user)
+        elif juju.check_models_access(token, controller, user)[0]:
+                code, response = 200, juju.check_models_access(token, controller, user)[1]
+                LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Succesfully retrieved models access!', user, controller)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/controllers/%s/models [GET] => No Permission to perform this action!', user, controller)

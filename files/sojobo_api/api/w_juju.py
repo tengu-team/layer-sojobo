@@ -339,9 +339,9 @@ async def get_model_info(token, controller, model):
             credentials = await get_model_creds(token, model)
         return {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
                 'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
-                'status': datastore.check_model_state(controller.c_name, model.m_name), 'credentials' : credentials}
+                'state': datastore.check_model_state(controller.c_name, model.m_name), 'credentials' : credentials}
     elif state == 'accepted' or state == 'error':
-        return {'name': model.m_name, 'status': state, 'users' : {"user" : token.username, "access" : "admin"}}
+        return {'name': model.m_name, 'state': state, 'users' : {"user" : token.username, "access" : "admin"}}
     else:
         return {}
 
@@ -381,7 +381,7 @@ async def get_applications_info(token, model):
     async with model.connect(token) as juju:
         for data in juju.state.state.get('application', {}).values():
             res = {'name': data[0]['name'], 'relations': [], 'charm': data[0]['charm-url'], 'exposed': data[0]['exposed'],
-                   'status': data[0]['status']}
+                   'state': data[0]['status']}
             for rels in juju.state.state['relation'].values():
                 keys = rels[0]['key'].split(" ")
                 if len(keys) == 1 and data[0]['name'] == keys[0].split(":")[0]:
@@ -799,7 +799,7 @@ def get_users_info(token):
         result = []
         for user in get_all_users():
             u_info = get_user_info(user)
-            if u_info['active']:
+            if u_info['state'] == 'ready':
                 result.append(u_info)
         return result
     else:
@@ -808,6 +808,17 @@ def get_users_info(token):
 
 def get_user_info(username):
     return datastore.get_user(username)
+
+
+def check_controllers_access(token, user):
+    result = []
+    for con in get_all_controllers():
+        if get_controller_access(con, token.username) == 'superusers':
+            result.append(get_ucontroller_access(con, user))
+    if len(result) > 0:
+        return True, result
+    else:
+        return False, result
 
 
 def get_controllers_access(usr):
@@ -824,6 +835,19 @@ def get_ucontroller_access(controller, username):
 
 def get_models_access(controller, name):
     return datastore.get_models_access(controller.c_name, name)
+
+
+def check_models_access(token, controller, user):
+    result = []
+    for mod_acc in get_models_access(controller, token.username):
+        if mod_acc['access'] == 'admin':
+            result.append(get_model_access(mod_acc['name'], controller, user))
+    if len(result) > 0:
+        return True, result
+    else:
+        return False, result
+
+
 #########################
 # extra Acces checks
 #########################
