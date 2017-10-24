@@ -35,7 +35,7 @@ async def set_controller_acc(c_name, access, user):
         con = datastore.get_controller(c_name)
         usr = datastore.get_user(user)
         logger.info('Connecting to controller %s', c_name)
-        controller = juju.Controller_Connection(token, con)
+        controller = juju.Controller_Connection(token, c_name)
         async with controller.connect(token) as con_juju:
             logger.info('Connected to controller %s ', c_name)
             await con_juju.grant(user, acl=access)
@@ -51,7 +51,7 @@ async def set_controller_acc(c_name, access, user):
                     if current_access:
                         await mod_con.revoke(user)
                     await mod_con.grant(user, acl='admin')
-                    datastore.set_model_access(c_name, mod['name'], user, access)
+                    datastore.set_model_access(c_name, mod['name'], user, 'admin')
                     logger.info('Admin Access granted for for %s:%s', c_name, mod['name'])
                 for key in usr['ssh-keys']:
                     logger.info('SSh key found... adding SSH key %s', key)
