@@ -34,8 +34,6 @@ async def remove_ssh_key(ssh_keys, username):
     try:
         current_keys = datastore.get_ssh_keys(username)
         new_keys = ast.literal_eval(ssh_keys)
-        add_keys = list(set(new_keys) - set(current_keys))
-        remove_keys = list(set(current_keys) - set(new_keys))
         user = datastore.get_user(username)
         token = JuJu_Token()
         for con in user['controllers']:
@@ -44,10 +42,10 @@ async def remove_ssh_key(ssh_keys, username):
                     logger.info('Setting up Modelconnection for model: %s', mod['name'])
                     model = juju.Model_Connection(token, con['name'], mod['name'])
                     async with model.connect(token) as mod_con:
-                        for a_key in add_keys:
-                            await mod_con.add_ssh_key(username, a_key['key'])
-                        for r_key in remove_keys:
-                            await mod_con.remove_ssh_key(username, r_key['key'])
+                        for a_key in current_keys:
+                            await mod_con.remove_ssh_key(username, a_key)
+                        for r_key in new_keys:
+                            await mod_con.add_ssh_key(username, r_key)
         datastore.update_ssh_keys(username, new_keys)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

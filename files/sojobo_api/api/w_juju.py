@@ -216,7 +216,7 @@ def authorize(token, controller, model=None):
     elif model:
         mod = Model_Connection(token, controller, model)
         if not m_access_exists(mod.m_access):
-            error = errors.does_not_exist('model')
+            error = errors.unauthorized()
             abort(error[0], error[1])
         return con, mod
     return con
@@ -755,8 +755,7 @@ def credential_exists(user, credential):
 
 def grant_user_to_controller(token, controller, user, access):
     Popen(["python3.6", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
-           token.username, token.password, settings.SOJOBO_API_DIR,
-           settings.REDIS_HOST, settings.REDIS_PORT, user, access, controller.c_name])
+           controller.c_name, access, settings.SOJOBO_API_DIR, user])
 
 
 async def controller_grant(token, controller, username, access):
@@ -813,7 +812,7 @@ def get_user_info(username):
 def check_controllers_access(token, user):
     result = []
     for con in get_all_controllers():
-        if get_controller_access(con, token.username) == 'superusers':
+        if datastore.get_controller_access(con, token.username) == 'superusers':
             result.append(get_ucontroller_access(con, user))
     if len(result) > 0:
         return True, result

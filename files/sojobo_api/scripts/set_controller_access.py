@@ -18,49 +18,44 @@ import asyncio
 import sys
 import traceback
 import logging
-import json
-import redis
-from juju.model import Model
-from juju.controller import Controller
+sys.path.append('/opt')
+from sojobo_api import settings  #pylint: disable=C0413
+from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
 
-async def set_controller_acc(c_name, access, user, username, password, url, port):
+class JuJu_Token(object):  #pylint: disable=R0903
+    def __init__(self):
+        self.username = settings.JUJU_ADMIN_USER
+        self.password = settings.JUJU_ADMIN_PASSWORD
+        self.is_admin = True
+
+async def set_controller_acc(c_name, access, user):
     try:
-        controllers = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
-        users = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
-        con = json.loads(controllers.get(c_name))
-        usr = json.loads(users.get(user))
+        token = JuJu_Token()
+        con = datastore.get_controller(c_name)
+        usr = datastore.get_user(user)
         logger.info('Connecting to controller %s', c_name)
-        controller = Controller()
-        await controller.connect(con['endpoints'][0], username, password, con['ca-cert'])
-        logger.info('Connected to controller %s ', c_name)
-        await controller.grant(user, acl=access)
-        exists = False
-        for contr in usr['controllers']:
-            if contr['name'] == c_name:
-                contr['access'] = access
-                exists = True
-                break
-        if not exists:
-            usr['controllers'].append({'name': c_name, 'access': access})
+        controller = juju.Controller_Connection(token, con)
+        async with controller.connect(token) as con_juju:
+            logger.info('Connected to controller %s ', c_name)
+            await con_juju.grant(user, acl=access)
+            datastore.set_controller_access(c_name, user, access)
         logger.info('Controller access set for  %s ', c_name)
         if access == 'superuser':
-            model = Model()
-            models = []
             for mod in con['models']:
-                logger.info('Setting up connection for model: %s', mod['name'])
-                await model.connect(con['endpoints'][0], mod['uuid'], username, password, con['ca-cert'])
-                await model.grant(user, acl='admin')
-                models.append({'name': mod['name'], 'access': 'admin'})
-                logger.info('Admin Access granted for for %s:%s', c_name, mod['name'])
+                model = juju.Model_Connection(token, con['name'], mod['name'])
+                async with model.connect(token) as mod_con:
+                    logger.info('Setting up connection for model: %s', mod['name'])
+                    current_access = datastore.get_model_access(c_name, mod['name'], user)
+                    logger.info('Current Access level: %s', current_access)
+                    if current_access:
+                        await mod_con.revoke(user)
+                    await mod_con.grant(user, acl='admin')
+                    datastore.set_model_access(c_name, mod['name'], user, access)
+                    logger.info('Admin Access granted for for %s:%s', c_name, mod['name'])
                 for key in usr['ssh-keys']:
-                    await model.add_ssh_key(user, key)
-                model.disconnect()
-            for contro in usr['controllers']:
-                if contro['name'] == c_name:
-                    contro['models'] = models
-        users.set(user, json.dumps(usr))
-        controller.disconnect()
+                    logger.info('SSh key found... adding SSH key %s', key)
+                    await mod_con.add_ssh_key(user, key)
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -81,6 +76,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    result = loop.run_until_complete(set_controller_acc(sys.argv[8], sys.argv[7], sys.argv[6],
-                                                        sys.argv[1], sys.argv[2], sys.argv[4], sys.argv[5]))
+    result = loop.run_until_complete(set_controller_acc(sys.argv[1], sys.argv[2], sys.argv[4]))
     loop.close()

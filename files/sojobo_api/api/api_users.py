@@ -253,7 +253,7 @@ def update_ssh_keys(user):
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => Authenticated!', user)
         if token.is_admin or token.username == user:
             if juju.user_exists(user):
-                juju.update_ssh_keys_user(user, data)
+                juju.update_ssh_keys_user(user, data['ssh-keys'])
                 LOGGER.info('/USERS/%s/ssh-keys [PUT] => SSH-keys are being updated, check update_ssh_keys.log for more information!', user)
                 code, response = 202, 'SSH-keys are being updated'
             else:
@@ -549,7 +549,8 @@ def grant_to_model(user, controller):
                 for mod in data:
                     if not mod['name'] in user_access:
                         LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => No Permission to perform this action!', user, controller)
-                        return juju.create_response(errors.no_permission())
+                        code, response = errors.no_permission()
+                        return juju.create_response(code, response)
                 juju.set_models_access(token, con, user, data)
                 LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Setting model access, check set_model_access.log for more information!', user, controller)
                 code, response = 202, 'The model access is being changed'
