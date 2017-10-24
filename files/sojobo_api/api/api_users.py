@@ -21,6 +21,7 @@ import re
 import sys
 import traceback
 from werkzeug.exceptions import HTTPException
+from sshpubkeys import SSHKey
 from flask import request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju
 from sojobo_api.api.w_juju import execute_task
@@ -253,6 +254,13 @@ def update_ssh_keys(user):
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => Authenticated!', user)
         if token.is_admin or token.username == user:
             if juju.user_exists(user):
+                for key in data['ssh-keys']:
+                    try:
+                        ssh = SSHKey(key, strict_mode=True)
+                        ssh.parse()
+                    except Exception:
+                        code, response = errors.invalid_ssh_key(key)
+                        return juju.create_response(code, response)
                 juju.update_ssh_keys_user(user, data['ssh-keys'])
                 LOGGER.info('/USERS/%s/ssh-keys [PUT] => SSH-keys are being updated, check update_ssh_keys.log for more information!', user)
                 code, response = 202, 'SSH-keys are being updated'

@@ -769,6 +769,14 @@ async def controller_revoke(token, controller, username):
 
 
 def set_models_access(token, controller, user, accesslist):
+    for mod in accesslist:
+        if model_exists(controller, mod['name']):
+            if not m_access_exists(mod['access']):
+                abort(400, 'Access Level {} is not supported. Change access for model{}'.format(mod['access'], mod['name']))
+            else:
+                pass
+        else:
+            abort(404, 'Model {} not found'.format(mod['name']))
     Popen(["python3.6", "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR), token.username,
            token.password, settings.SOJOBO_API_DIR,
            user, str(accesslist), controller.c_name])
