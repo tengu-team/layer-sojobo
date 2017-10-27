@@ -772,7 +772,7 @@ def set_models_access(token, controller, user, accesslist):
     for mod in accesslist:
         if model_exists(controller, mod['name']):
             if not m_access_exists(mod['access']):
-                abort(400, 'Access Level {} is not supported. Change access for model{}'.format(mod['access'], mod['name']))
+                abort(400, 'Access Level {} is not supported. Change access for model {}'.format(mod['access'], mod['name']))
             else:
                 pass
         else:

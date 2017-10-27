@@ -20,8 +20,8 @@ import logging
 import re
 import sys
 import traceback
+import base64, hashlib
 from werkzeug.exceptions import HTTPException
-from sshpubkeys import SSHKey
 from flask import request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju
 from sojobo_api.api.w_juju import execute_task
@@ -256,8 +256,9 @@ def update_ssh_keys(user):
             if juju.user_exists(user):
                 for key in data['ssh-keys']:
                     try:
-                        ssh = SSHKey(key, strict_mode=True)
-                        ssh.parse()
+                        fp_key = base64.b64decode(key.strip().split()[1].encode('ascii'))
+                        fp_plain = hashlib.md5(fp_key).hexdigest()
+                        output = ':'.join(a+b for a,b in zip(fp_plain[::2], fp_plain[1::2]))
                     except Exception:
                         code, response = errors.invalid_ssh_key(key)
                         return juju.create_response(code, response)

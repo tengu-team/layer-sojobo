@@ -147,7 +147,7 @@ def redis_db_removed():
 @when('sojobo.available', 'api.running')
 def configure(sojobo):
     api_key = db.get('api-key')
-    sojobo.configure('https://{}'.format(config()['host']), API_DIR, api_key, USER)
+    sojobo.configure('http://{}:{}'.format(config()['host'], config()['port']), API_DIR, api_key, db.get('password'), USER)
 
 
 @when('proxy.available', 'api.running')
@@ -182,7 +182,7 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 
 def install_api():
     for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler',
-                'gitpython', 'redis', 'asyncio_extras', 'requests', 'sshpubkeys']:
+                'gitpython', 'redis', 'asyncio_extras', 'requests']:
         subprocess.check_call(['python3.6', '-m', 'pip', 'install', pkg])
     subprocess.check_call(['python3.6', '-m', 'pip', 'install', 'juju==0.6.1'])
     mergecopytree('files/sojobo_api', API_DIR)
