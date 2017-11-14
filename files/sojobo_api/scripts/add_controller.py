@@ -84,7 +84,7 @@ async def create_controller(c_type, name, region, cred_name):
             for model in models.serialize()['user-models']:
                 model = model.serialize()['model'].serialize()
                 datastore.add_model_to_controller(name, model['name'])
-                datastore.set_model_state(name, model['name'], 'ready', model['uuid'])
+                datastore.set_model_state(name, model['name'], 'ready', credential=cred_name, uuid=model['uuid'])
                 datastore.set_model_access(name, model['name'], token.username, 'admin')
         logger.info('Controller succesfully created!')
     except Exception:  #pylint: disable=W0703

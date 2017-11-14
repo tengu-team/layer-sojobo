@@ -22,7 +22,7 @@ import shutil
 import subprocess
 from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
-from charmhelpers.core.hookenv import status_set, log, config, open_port, unit_private_ip, application_version_set, leader_get, leader_set
+from charmhelpers.core.hookenv import status_set, log, config, open_port, close_port, unit_private_ip, application_version_set, leader_get, leader_set
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charms.reactive import hook, when, when_not, set_state, remove_state
 import charms.leadership
@@ -51,12 +51,13 @@ def upgrade_charm():
     log('Updating Sojobo API')
     install_api()
     set_state('api.installed')
+    status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
 
 
 @when('api.installed', 'nginx.passenger.available')
 @when_not('api.configured')
 def configure_webapp():
-    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
+    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR, 'port': config()['port']}
     render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
     open_port(config()['port'])
     service_restart('nginx')
@@ -67,6 +68,8 @@ def configure_webapp():
 @when('config.changed', 'api.running')
 def config_changed():
     context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR, 'port': config()['port']}
+    close_port(config().previous(['port']))
+    open_port(config()['port'])
     render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
     service_restart('nginx')
 

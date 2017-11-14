@@ -48,9 +48,13 @@ async def set_model_acc(username, password, user, access, controller):
                 if mod['access'] in ['admin', 'write']:
                     for key in ssh_keys:
                         try:
+                            logger.info('Adding ssh-key: %s', key)
                             mod_con.add_ssh_key(user, key)
                         except (JujuAPIError, JujuError):
-                            pass
+                            exc_type, exc_value, exc_traceback = sys.exc_info()
+                            lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+                            for l in lines:
+                                logger.error(l)
             datastore.set_model_access(controller, mod['name'], user, mod['access'])
             logger.info('Model Access set for %s on %s!', user, mod['name'])
     except Exception:

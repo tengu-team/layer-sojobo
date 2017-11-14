@@ -208,12 +208,13 @@ def add_model_to_controller(c_name, m_name):
     con.set(c_name, json.dumps(data))
 
 
-def set_model_state(c_name, m_name, state, uuid=None):
+def set_model_state(c_name, m_name, state, credential=None, uuid=None):
     con = connect_to_controllers()
     data = json.loads(con.get(c_name))
     for model in data['models']:
         if model['name'] == m_name:
             model['state'] = state
+            model['credential'] = credential
             if uuid:
                 model['uuid'] = uuid
             break

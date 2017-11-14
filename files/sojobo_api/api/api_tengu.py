@@ -124,7 +124,7 @@ def get_controller_info(controller):
         LOGGER.info('/TENGU/controllers/%s [GET] => Authenticated!', controller)
         con = juju.authorize( token, controller)
         LOGGER.info('/TENGU/controllers/%s [GET] => Authorized!', controller)
-        code, response = 200, juju.get_controller_info(con)
+        code, response = 200, juju.get_controller_info(token, con)
         LOGGER.info('/TENGU/controllers/%s [GET] => Succesfully retrieved controller information!', controller)
     except KeyError:
         code, response = errors.invalid_data()
@@ -176,16 +176,16 @@ def create_model(controller):
         con = juju.authorize( token, controller)
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
         valid, model = juju.check_input(data['model'], "model")
-        if not 'credential' in data:
-            credentials = datastore.get_default_credential(controller)
-        else:
-            credentials = data['credential']
         if con.c_access == 'add-model' or con.c_access == 'superuser':
-            if valid:
-                LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
-                code, response = juju.create_model(token, con.c_name, model, credentials)
+            if juju.credential_exists(token.username, data['credential']):
+                credentials = data['credential']
+                if valid:
+                    LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
+                    code, response = juju.create_model(token, con.c_name, model, credentials)
+                else:
+                    code, response = 400, model
             else:
-                code, response = 400, model
+                code, response = 400, 'Credential {} not found for user {}'.format(data['credential'], token.username)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/TENGU/controllers/%s/models [POST] => No Permission to perform this action!', controller)
@@ -209,7 +209,7 @@ def get_models_info(controller):
         LOGGER.info('/TENGU/controllers/%s/models [GET] => Authenticated!', controller)
         con = juju.authorize( token, controller)
         LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
-        code, response = 200, juju.get_models_info(con)
+        code, response = 200, juju.get_models_info(token, con)
         LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
     except KeyError:
         code, response = errors.invalid_data()
@@ -286,7 +286,7 @@ def delete_model(controller, model):
         con, mod = juju.authorize( token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Authorized!', controller, model)
         if mod.m_access == 'admin':
-            code, response = 200, execute_task(juju.delete_model, token, con, mod)
+            code, response = 202, execute_task(juju.delete_model, token, con, mod)
             LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Model succesfully deleted!', controller, model)
         else:
             code, response = errors.no_permission()
@@ -537,7 +537,7 @@ def add_machine(controller, model):
             if juju.cloud_supports_series(con, series):
                 execute_task(juju.add_machine, token, mod, series, constraints)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller, model)
-                code, response = 202, 'machine is being deployed'
+                code, response = 202, 'Machine is being deployed!'
             else:
                 code, response = 400, 'This cloud does not support this version of Ubuntu'
                 LOGGER.error('/TENGU/controllers/%s/models/%s/machines [POST] => This cloud does not support this version of Ubuntu!', controller, model)

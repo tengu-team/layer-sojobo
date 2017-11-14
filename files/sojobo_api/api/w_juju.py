@@ -138,9 +138,9 @@ def create_response(http_code, return_object, is_json=False):
 
 def check_input(data, input_type):
     regex_dict = {"controller":{"regex":"^(?!-).*^\S+$", "e_message": "Controller name can not start with a hyphen and can not contain spaces!"},
-                  "credential":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Credentials may only contain lowercase letters, digits and hyphens but can not start with a hyphen"},
-                  "username":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Username may only contain lowercase letters, digits and hyphens but can not start with a hyphen"},
-                  "model":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Model names may only contain lowercase letters, digits and hyphens but can not start with a hyphen"}}
+                  "credential":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Credentials may only contain letters, digits and hyphens but can not start with a hyphen"},
+                  "username":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Username may only contain letters, digits and hyphens but can not start with a hyphen"},
+                  "model":{"regex":"^[0-9a-z]([0-9a-z.-]*[0-9a-z])$", "e_message": "model names may only contain lowercase letters, digits and hyphens"}}
     if input_type in regex_dict:
         pattern = re.compile(regex_dict[input_type]['regex'])
         if pattern.match(data):
@@ -173,6 +173,8 @@ async def authenticate(api_key, auth):
         if auth is None:
             abort(error[0], error[1])
         token = JuJu_Token(auth)
+        if not user_exists(token.username):
+            abort(error[0], error[1])
         try:
             controllers = get_all_controllers()
             ready_cons = []
@@ -277,14 +279,14 @@ def get_controllers_info():
     return [datastore.get_controller(c) for c in datastore.get_all_controllers()]
 
 
-def get_controller_info(controller):
+def get_controller_info(token, controller):
     if controller.c_access is not None:
         con = datastore.get_controller(controller.c_name)
         users = get_users_controller(controller.c_name)
         result = {'name': controller.c_name, 'type': controller.c_token.type,
                   'users': users, 'state': con['state'], 'models': []}
         if con['state'] == 'ready':
-            result['models'] = get_models_info(controller)
+            result['models'] = get_models_info(token, controller)
     else:
         result = None
     return result
@@ -318,13 +320,23 @@ def get_model_uuid(controller, model):
         if mod['name'] == model.m_name:
             return mod['uuid']
 
+def get_model_credential(controller, model):
+    for mod in get_all_models(controller):
+        if mod['name'] == model.m_name:
+            return mod['credential']
+
 
 def get_model_access(model, controller, username):
-    return datastore.get_model_access(controller, model, username)
+    return datastore.get_model_access(controller, model, username) if not None else "None"
 
 
-def get_models_info(controller):
-    return get_all_models(controller)
+def get_models_info(token, controller):
+    result = []
+    for mod in get_all_models(controller):
+        print(mod, datastore.get_model_access(controller.c_name, mod, token.username))
+        if datastore.get_model_access(controller.c_name, mod['name'], token.username) in ['read', 'write', 'admin']:
+            result.append(mod)
+    return result
 
 
 async def get_model_info(token, controller, model):
@@ -332,34 +344,17 @@ async def get_model_info(token, controller, model):
     if state == 'ready':
         async with model.connect(token):
             users = get_users_model(token, controller, model)
-            ssh = await get_ssh_keys(token, model)
             applications = await get_applications_info(token, model)
             machines = await get_machines_info(token, model)
             gui = await get_gui_url(controller, model)
-            credentials = await get_model_creds(token, model)
-        return {'name': model.m_name, 'users': users, 'ssh-keys': ssh,
+            credentials = {'cloud': controller.c_type, 'credential-name': get_model_credential(controller, model)}
+        return {'name': model.m_name, 'users': users,
                 'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
                 'state': datastore.check_model_state(controller.c_name, model.m_name), 'credentials' : credentials}
     elif state == 'accepted' or state == 'error':
         return {'name': model.m_name, 'state': state, 'users' : {"user" : token.username, "access" : "admin"}}
     else:
         return {}
-
-
-async def get_model_creds(token, model):
-    async with model.connect(token) as juju:
-        info = await juju.get_info()
-    cloud_cred = info.serialize()['cloud-credential-tag']
-    cloud_result = tag.untag('cloudcred-', cloud_cred)
-    return get_cloud_response(cloud_result)
-
-
-def get_cloud_response(data):
-    values = data.split('_')
-    if len(values) == 3:
-        result = {'cloud' : values[0], 'user' : values[1], 'credential-name' : values[2]}
-        return result
-    return None
 
 
 async def get_ssh_keys(token, model):
@@ -449,13 +444,10 @@ def create_model(token, controller, model, credentials):
 
 
 async def delete_model(token, controller, model):
-    if datastore.check_model_state(controller.c_name, model.m_name) != 'error':
-        async with controller.connect(token) as juju:
-            await juju.destroy_models(model.m_uuid)
-        datastore.delete_model(controller.c_name, model.m_name)
-        return "Model {} is being deleted".format(model.m_name)
-    else:
-        return "Model {} is in errorstate".format(model.m_name)
+    async with controller.connect(token) as juju:
+        await juju.destroy_models(model.m_uuid)
+    datastore.delete_model(controller.c_name, model.m_name)
+    return "Model {} is being deleted".format(model.m_name)
 #####################################################################################
 # Machines FUNCTIONS
 #####################################################################################

@@ -51,7 +51,7 @@ async def create_model(c_name, m_name, usr, pwd, cred_name):
             )
             logger.info('%s -> model deployed on juju', m_name)
             ds.set_model_access(c_name, m_name, usr, 'admin')
-            ds.set_model_state(c_name, m_name, 'ready', model.info.uuid)
+            ds.set_model_state(c_name, m_name, 'ready', cred_name, model.info.uuid)
             logger.info('%s -> Adding ssh-keys to model: %s', m_name, m_name)
             for key in ds.get_ssh_keys(usr):
                 try:
@@ -60,7 +60,7 @@ async def create_model(c_name, m_name, usr, pwd, cred_name):
                     pass
             logger.info('%s -> retrieving users: %s', m_name, ds.get_controller_users(c_name))
             for u in ds.get_controller_users(c_name):
-                if u['access'] == 'superuser':
+                if u['access'] == 'superuser' and u['name'] != usr:
                     await model.grant(u['name'], acl='admin')
                     ds.set_model_access(c_name, m_name, u['name'], 'admin')
                     for key in ds.get_ssh_keys(u['name']):
@@ -75,7 +75,7 @@ async def create_model(c_name, m_name, usr, pwd, cred_name):
         for l in lines:
             logger.error(l)
         if 'model' in locals():
-            ds.set_model_state(c_name, m_name, 'ready', model.info.uuid)
+            ds.set_model_state(c_name, m_name, 'ready', cred_name, model.info.uuid)
         else:
             ds.set_model_state(c_name, m_name, 'error: {}'.format(lines))
     finally:
