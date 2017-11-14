@@ -64,6 +64,10 @@ def no_permission():
     return 405, 'You do not have permission to perform this operation!'
 
 
+def invalid_ssh_key(key):
+    return 400, 'Invald ssh-key : {}'.format(key)
+
+
 def already_exists(item):
     return 409, 'The {} already exists!'.format(item)
 

@@ -1,8 +1,20 @@
-# pylint: disable=c0111,c0301
-#!/usr/bin/env python3.6
+# Copyright (C) 2017 Qrama
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# pylint: disable=c0111,c0301,c0325,c0326,w0406,e0401,e0611
 from functools import wraps
 import requests
-import json
 import yaml
 from flask import request, Blueprint, abort
 from sojobo_api.api.w_juju import create_response
@@ -69,7 +81,6 @@ def get_json(bundle):
     res = requests.get('https://raw.githubusercontent.com/{}/{}/master/bundle.yaml'.format(REPO, bundle))
     if res.status_code == 200:
         res_dict = yaml.load(res.text)
-        json_file = json.dumps(res_dict)
-        return json_file
+        return res_dict
     else:
         abort(404, 'The bundle {}:{} could not be found'.format(REPO, bundle))

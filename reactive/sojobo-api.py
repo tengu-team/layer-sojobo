@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0103,c0301
+# pylint: disable=c0111,c0103,c0301,e0401
 from base64 import b64encode
 from hashlib import sha256
 import os
@@ -22,7 +22,7 @@ import shutil
 import subprocess
 from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
-from charmhelpers.core.hookenv import status_set, log, config, open_port, unit_private_ip, application_version_set, leader_get, leader_set
+from charmhelpers.core.hookenv import status_set, log, config, open_port, close_port, unit_private_ip, application_version_set, leader_get, leader_set
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charms.reactive import hook, when, when_not, set_state, remove_state
 import charms.leadership
@@ -51,12 +51,13 @@ def upgrade_charm():
     log('Updating Sojobo API')
     install_api()
     set_state('api.installed')
+    status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
 
 
 @when('api.installed', 'nginx.passenger.available')
 @when_not('api.configured')
 def configure_webapp():
-    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
+    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR, 'port': config()['port']}
     render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
     open_port(config()['port'])
     service_restart('nginx')
@@ -66,7 +67,9 @@ def configure_webapp():
 
 @when('config.changed', 'api.running')
 def config_changed():
-    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR}
+    context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR, 'port': config()['port']}
+    close_port(config().previous(['port']))
+    open_port(config()['port'])
     render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
     service_restart('nginx')
 
@@ -120,16 +123,10 @@ def connect_to_redis(redis):
 @when_not('admin.created')
 def create_admin():
     if leader_get().get('admin') != 'Created':
-        res = requests.post('http://{}/users'.format(unit_private_ip()),
-                            json={'username': 'admin', 'password': db.get('password')},
-                            headers={'api-key': db.get('api-key')},
-                            auth=('admin', db.get('password')))
-        if res.status_code == 200:
-            leader_set({'admin': 'Created'})
-            status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
-            set_state('admin.created')
-        else:
-            status_set('blocked', 'error creating admin user')
+        subprocess.check_call(["python3.6", "{}/scripts/add_user.py".format(API_DIR), 'admin', db.get('password')])
+        leader_set({'admin': 'Created'})
+        status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
+        set_state('admin.created')
     else:
         leader_set({'admin': 'Created'})
 
@@ -146,13 +143,14 @@ def status_update_not_leader():
 @when_not('redis.available')
 def redis_db_removed():
     remove_state('api.running')
+    remove_state('admin.created')
     status_set('blocked', 'Waiting for a connection with redis')
 
 
 @when('sojobo.available', 'api.running')
 def configure(sojobo):
     api_key = db.get('api-key')
-    sojobo.configure('https://{}'.format(config()['host']), API_DIR, api_key, USER)
+    sojobo.configure('http://{}:{}'.format(config()['host'], config()['port']), API_DIR, api_key, db.get('password'), USER)
 
 
 @when('proxy.available', 'api.running')
@@ -189,7 +187,7 @@ def install_api():
     for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler',
                 'gitpython', 'redis', 'asyncio_extras', 'requests']:
         subprocess.check_call(['python3.6', '-m', 'pip', 'install', pkg])
-    subprocess.check_call(['python3.6', '-m', 'pip', 'install', 'juju==0.6.0'])
+    subprocess.check_call(['python3.6', '-m', 'pip', 'install', 'juju==0.6.1'])
     mergecopytree('files/sojobo_api', API_DIR)
     if not os.path.isdir('{}/files'.format(API_DIR)):
         os.mkdir('{}/files'.format(API_DIR))

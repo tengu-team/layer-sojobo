@@ -14,12 +14,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
+
+#
+# OUTDATED, not used in current api version
+#
+
 import asyncio
 import sys
 import traceback
 import logging
 import json
-
 import redis
 from juju.model import Model
 
@@ -29,20 +33,21 @@ async def remove_ssh_key(usr, pwd, ssh_key, url, port, username):
         controllers = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
         users = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=11)
         user = json.loads(users.get(username))
-        if ssh_key in user['ssh-keys']:
-            user['ssh-keys'].remove(ssh_key)
-            users.set(username, json.dumps(user))
-            for con in user['controllers']:
-                for mod in con['models']:
-                    controller = json.loads(controllers.get(con['name']))
-                    for modl in controller['models']:
-                        if modl['name'] == mod['name']:
-                            model = Model()
-                            logger.info('Setting up Modelconnection for model: %s', mod['name'])
-                            await model.connect(controller['endpoints'][0], modl['uuid'],
-                                                usr, pwd, controller['ca-cert'])
-                            await model.remove_ssh_key(username, ssh_key)
-                            await model.disconnect()
+        for key in user['ssh-keys']:
+            if key['ssh-key'] == ssh_key:
+                user['ssh-keys'].remove(key)
+                users.set(username, json.dumps(user))
+                for con in user['controllers']:
+                    for mod in con['models']:
+                        controller = json.loads(controllers.get(con['name']))
+                        for modl in controller['models']:
+                            if modl['name'] == mod['name']:
+                                model = Model()
+                                logger.info('Setting up Modelconnection for model: %s', mod['name'])
+                                await model.connect(controller['endpoints'][0], modl['uuid'],
+                                                    usr, pwd, controller['ca-cert'])
+                                await model.remove_ssh_key(username, ssh_key)
+                                await model.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

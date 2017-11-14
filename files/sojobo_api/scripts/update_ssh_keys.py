@@ -1,3 +1,4 @@
+
 # !/usr/bin/env python3
 # Copyright (C) 2017  Qrama
 #
@@ -15,47 +16,39 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
+import ast
 import sys
 import traceback
 import logging
-import ast
-import hashlib
 sys.path.append('/opt')
-from juju import tag
-from juju.client import client
 from sojobo_api import settings  #pylint: disable=C0413
-from sojobo_api.api import w_datastore as ds, w_juju as juju  #pylint: disable=C0413
+from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
 class JuJu_Token(object):  #pylint: disable=R0903
     def __init__(self):
         self.username = settings.JUJU_ADMIN_USER
         self.password = settings.JUJU_ADMIN_PASSWORD
-        self.is_admin = False
+        self.is_admin = True
 
-async def add_credential(username, credentials):
+async def remove_ssh_key(ssh_keys, username):
     try:
-        cred = ast.literal_eval(credentials)
+        current_keys = datastore.get_ssh_keys(username)
+        new_keys = ast.literal_eval(ssh_keys)
+        user = datastore.get_user(username)
         token = JuJu_Token()
-        c_type = cred['type']
-        credential_name = 't{}'.format(hashlib.md5(cred['name'].encode('utf')).hexdigest())
-        controllers = ds.get_cloud_controllers(c_type)
-        for con in controllers:
-            controller = juju.Controller_Connection(token, con)
-            if controller.c_type == c_type:
-                async with controller.connect(token) as con_juju:
-                    logger.info('%s -> Adding credentials', con)
-                    cloud_facade = client.CloudFacade.from_connection(con_juju.connection)
-                    credential = juju.generate_cred_file(c_type, credential_name, cred['credential'])
-                    logger.info('credentials generated %s', credential)
-
-                    cloud_cred = client.UpdateCloudCredential(
-                        client.CloudCredential(credential['key'], credential['type']),
-                        tag.credential(c_type, username, credential_name)
-                    )
-                    await cloud_facade.UpdateCredentials([cloud_cred])
-                    logger.info('%s -> controller updated', con)
-        ds.add_credential(username, cred)
-        logger.info('Succesfully added credential')
+        for con in user['controllers']:
+            for mod in con['models']:
+                if mod['access'] == 'write' or mod['access'] == 'admin':
+                    logger.info('Setting up Modelconnection for model: %s', mod['name'])
+                    model = juju.Model_Connection(token, con['name'], mod['name'])
+                    async with model.connect(token) as mod_con:
+                        for a_key in current_keys:
+                            logger.info('removing key: %s', a_key)
+                            await mod_con.remove_ssh_key(username, a_key)
+                        for r_key in new_keys:
+                            logger.info('adding key: %s', r_key)
+                            await mod_con.add_ssh_key(username, r_key)
+        datastore.update_ssh_keys(username, new_keys)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -66,15 +59,15 @@ async def add_credential(username, credentials):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('add_credential')
-    hdlr = logging.FileHandler('{}/log/add_credential.log'.format(sys.argv[3]))
+    logger = logging.getLogger('remove_ssh_keys')
+    hdlr = logging.FileHandler('{}/log/update_ssh_keys.log'.format(sys.argv[3]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
     ws_logger.setLevel(logging.DEBUG)
     logger.addHandler(hdlr)
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(add_credential(sys.argv[1], sys.argv[2]))
+    result = loop.run_until_complete(remove_ssh_key(sys.argv[1], sys.argv[2]))
     loop.close()

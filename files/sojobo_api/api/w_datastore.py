@@ -33,24 +33,9 @@ def create_user(user_name):
                 'controllers': [],
                 'ssh-keys': [],
                 'credentials': [],
-                'active': True}
+                'state': 'pending'}
         con = connect_to_users()
         con.set(user_name, json.dumps(user))
-
-
-def disable_user(user):
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    data['active'] = False
-    data['controllers'] = []
-    con.set(user, json.dumps(data))
-
-
-def enable_user(user):
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    data['active'] = True
-    con.set(user, json.dumps(data))
 
 
 def get_user(user):
@@ -58,19 +43,22 @@ def get_user(user):
     return json.loads(con.get(user))
 
 
-def add_ssh_key(user, ssh_key):
+def set_user_state(user_name, state):
     con = connect_to_users()
-    data = json.loads(con.get(user))
-    if ssh_key not in data['ssh-keys']:
-        data['ssh-keys'].append(ssh_key)
-    con.set(user, json.dumps(data))
+    data = json.loads(con.get(user_name))
+    data['state'] = state
+    con.set(user_name, json.dumps(data))
 
 
-def remove_ssh_key(user, ssh_key):
+def get_user_state(username):
+    data = get_user(username)
+    return data['state']
+
+
+def update_ssh_keys(user, ssh_keys):
     con = connect_to_users()
     data = json.loads(con.get(user))
-    if ssh_key in data['ssh-keys']:
-        data['ssh-keys'].remove(ssh_key)
+    data['ssh-keys'] = ssh_keys
     con.set(user, json.dumps(data))
 
 
@@ -87,11 +75,12 @@ def add_credential(user, cred):
     con.set(user, json.dumps(data))
 
 
-def remove_credential(user, cred):
+def remove_credential(user, cred_name):
     con = connect_to_users()
     data = json.loads(con.get(user))
-    if cred in data['credentials']:
-        data['credentials'].remove(cred)
+    for cred in data['credentials']:
+        if cred_name == cred['name']:
+            data['credentials'].remove(cred)
     con.set(user, json.dumps(data))
 
 
@@ -110,7 +99,7 @@ def get_all_users():
 ################################################################################
 # CONTROLLER FUNCTIONS
 ################################################################################
-def create_controller(controller_name, c_type, region):
+def create_controller(controller_name, c_type, region, cred_name):
     con = connect_to_controllers()
     if controller_name in con.keys():
         return False
@@ -124,10 +113,51 @@ def create_controller(controller_name, c_type, region):
             'endpoints': [],
             'uuid': '',
             'ca-cert': '',
-            'region': region
+            'region': region,
+            'default-credential' : cred_name
         }
         con.set(controller_name, json.dumps(controller))
         return True
+
+def get_cloud_controllers(c_type):
+    con = connect_to_controllers()
+    cons = con.keys()
+    result = []
+    for c_name in cons:
+        data = json.loads(con.get(c_name))
+        if data['type'] == c_type:
+            result.append(c_name)
+    return result
+
+
+def add_user_to_controller(c_name, user, access):
+    con = connect_to_controllers()
+    data = json.loads(con.get(c_name))
+    c_type = data['type']
+    exists = False
+    for usr in data['users']:
+        if usr['name'] == user:
+            exists = True
+            usr['name']['access'] = access
+            break
+    if not exists:
+        data['users'].append({'name': user, 'access': access})
+    con.set(c_name, json.dumps(data))
+    con = connect_to_users()
+    data = json.loads(con.get(user))
+    for controller in data['controllers']:
+        if controller['name'] == c_name:
+            controller['access'] = access
+            exists = True
+            break
+    if not exists:
+        data['controllers'].append({
+            'access' : access,
+            'name': c_name,
+            'models' : [],
+            'type': c_type
+        })
+    con.set(user, json.dumps(data))
 
 
 def set_controller_state(controller, state, endpoints=None, uuid=None, ca_cert=None):
@@ -174,16 +204,17 @@ def add_model_to_controller(c_name, m_name):
             exists = True
             break
     if not exists:
-        data['models'].append({'name': m_name, 'status': 'Model is being deployed', 'uuid': ''})
+        data['models'].append({'name': m_name, 'state': 'Model is being deployed', 'uuid': ''})
     con.set(c_name, json.dumps(data))
 
 
-def set_model_state(c_name, m_name, status, uuid=None):
+def set_model_state(c_name, m_name, state, credential=None, uuid=None):
     con = connect_to_controllers()
     data = json.loads(con.get(c_name))
     for model in data['models']:
         if model['name'] == m_name:
-            model['status'] = status
+            model['state'] = state
+            model['credential'] = credential
             if uuid:
                 model['uuid'] = uuid
             break
@@ -194,7 +225,7 @@ def check_model_state(c_name, m_name):
     con = get_controller(c_name)
     for mod in con['models']:
         if mod['name'] == m_name:
-            return mod['status']
+            return mod['state']
     return 'error'
 
 
@@ -221,56 +252,25 @@ def set_controller_access(c_name, user, access):
     con.set(c_name, json.dumps(data))
 
 
-def add_user_to_controller(c_name, user, access):
+def delete_user(user):
     con = connect_to_controllers()
-    data = json.loads(con.get(c_name))
-    c_type = data['type']
-    exists = False
-    for usr in data['users']:
-        if usr['name'] == user:
-            exists = True
-            usr['name']['access'] = access
-            break
-    if not exists:
-        data['users'].append({'name': user, 'access': access})
-    con.set(c_name, json.dumps(data))
+    for c_name in con.keys():
+        data = json.loads(con.get(c_name))
+        if user in data['users']:
+            data['users'].remove(user)
+            con.set(c_name, json.dumps(data))
     con = connect_to_users()
-    data = json.loads(con.get(user))
-    for controller in data['controllers']:
-        if controller['name'] == c_name:
-            controller['access'] = access
-            exists = True
-            break
-    if not exists:
-        data['controllers'].append({
-            'access' : access,
-            'name': c_name,
-            'models' : [],
-            'type': c_type
-        })
-    con.set(user, json.dumps(data))
-
-
-def remove_user_from_controller(c_name, user):
-    con = connect_to_controllers()
-    data = json.loads(con.get(c_name))
-    if user in data['users']:
-        data['users'].remove(user)
-    con.set(c_name, json.dumps(data))
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    for controller in data['controllers']:
-        if controller['name'] == c_name:
-            data['controllers'].remove(controller)
-            break
-    con.set(user, json.dumps(data))
+    con.delete(user)
 
 
 def get_controller_users(c_name):
+    data = get_controller(c_name)
+    return data['users']
+
+def get_default_credential(c_name):
     con = connect_to_controllers()
     data = json.loads(con.get(c_name))
-    return [get_user(u) for u in data['users']]
-
+    return data['default-credential']
 
 def get_all_controllers():
     con = connect_to_controllers()
@@ -321,16 +321,17 @@ def get_model_access(controller, model, user):
 def set_model_access(controller, model, user, access):
     con = connect_to_users()
     data = json.loads(con.get(user))
+    acces_set = False
     for contr in data['controllers']:
         if contr['name'] == controller:
-            if model not in contr['models']:
+            for mod in contr['models']:
+                if model == mod['name']:
+                    mod['access'] = access
+                    acces_set = True
+    if not acces_set:
+        for contr in data['controllers']:
+            if contr['name'] == controller:
                 contr['models'].append({'name': model, 'access': access})
-            else:
-                for mod in contr['models']:
-                    if mod['name'] == model:
-                        mod['access'] = access
-                    break
-            break
     con.set(user, json.dumps(data))
 
 
