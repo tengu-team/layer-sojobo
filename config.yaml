@@ -42,3 +42,7 @@ options:
     type: int
     default: 80
     description: listen port.
+  user:
+    type: string
+    default: sojobo
+    description: user to install the tools for
