@@ -1,6 +1,6 @@
 name: sojobo-api
 summary: This Charm sets up a Tengu Sojobo API.
-maintainer: Mathijs Moerman <mathijs.moerman@qrama.io>
+maintainer: Sebastien Pattyn <sebastien.pattyn@tengu.io>
 description: |
 tags:
   - big_data
