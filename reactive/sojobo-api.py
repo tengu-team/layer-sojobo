@@ -68,7 +68,7 @@ def configure_webapp():
 @when('config.changed', 'api.running')
 def config_changed():
     context = {'hostname': HOST, 'user': USER, 'rootdir': API_DIR, 'port': config()['port']}
-    close_port(config().previous(['port']))
+    close_port(config().previous('port'))
     open_port(config()['port'])
     render('http.conf', '/etc/nginx/sites-enabled/sojobo.conf', context)
     service_restart('nginx')
