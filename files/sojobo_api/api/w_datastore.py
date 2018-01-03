@@ -1,46 +1,82 @@
 # pylint: disable=c0111,c0301, E0611, E0401
-#!/usr/bin/env python3.6
+#!/usr/bin/env python3
 import json
-import redis
 from sojobo_api import settings
-################################################################################
-# Database Fucntions
-################################################################################
-def connect_to_controllers():
-    return redis.StrictRedis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        charset="utf-8",
-        decode_responses=True,
-        db=10
-    )
+import pyArango.connection as pyArango #Via wheelhouse?
 
 
-def connect_to_users():
-    return redis.StrictRedis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        charset="utf-8",
-        decode_responses=True,
-        db=11
-    )
+################################################################################
+#                               DATABASE FUNCTIONS                             #
+################################################################################
+
+
+def get_arangodb_connection():
+    """Creates entry point (connection) to work with ArangoDB."""
+    url = 'http://' + settings.ARANGO_HOST + ':' + settings.ARANGO_PORT
+    connection = pyArango.Connection(arangoURL=url,
+                                     username=settings.ARANGO_USER,
+                                     password=settings.ARANGO_PASS)
+    return connection
+
+
+def get_sojobo_database():
+    """Returns the sojobo database, creates one if it doesn't exist yet."""
+    con = get_arangodb_connection()
+    if con.hasDatabase("sojobo"):
+        return con["sojobo"]
+    else:
+        return con.createDatabase(name="sojobo")
+
+
+def get_users_collection():
+    db = get_sojobo_database()
+    if has_collection(db, "users"):
+        return db["users"]
+    else:
+        return db.createCollection(name="users")
+
+
+def has_collection(db, collection_name):
+    return collection_name in db.collections
+
+
 ################################################################################
 # USER FUNCTIONS
 ################################################################################
+
+
+def create_user_aql(user_name):
+    """Creates a user using AQL."""
+    # Make sure that the collection "users" exists.
+    get_users_collection()
+    db = get_sojobo_database()
+    user = {'name' : user_name,
+            'controllers': [],
+            'ssh-keys': [],
+            'credentials': [],
+            'state': 'pending'}
+    bind = {"user": user}
+    aql = "INSERT @user INTO users LET newUser = NEW RETURN newUser"
+    db.AQLQuery(aql, bindVars=bind)
+
+
 def create_user(user_name):
-    if not user_name in get_all_users():
-        user = {'name' : user_name,
-                'controllers': [],
-                'ssh-keys': [],
-                'credentials': [],
-                'state': 'pending'}
-        con = connect_to_users()
-        con.set(user_name, json.dumps(user))
+    #TODO: Check if user already exists.
+    users = get_users_collection()
+    user = users.createDocument()
+
+    user["name"] = user_name
+    user["controllers"] = []
+    user["ssh-keys"] = []
+    user["credentials"] = []
+    user["state"] = "pending"
+
+    user.save()
 
 
-def get_user(user):
-    con = connect_to_users()
-    return json.loads(con.get(user))
+def get_user(user_name):
+    users = get_users_collection()
+    return json.loads(users[user_name])
 
 
 def set_user_state(user_name, state):

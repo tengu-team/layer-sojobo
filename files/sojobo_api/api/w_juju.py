@@ -1,4 +1,4 @@
-#!/usr/bin/python3.6
+#!/usr/bin/python3
 # Copyright (C) 2017  Qrama
 #
 # This program is free software: you can redistribute it and/or modify
@@ -75,7 +75,7 @@ class Controller_Connection(object):
             await self.c_connection.connect(self.endpoint, token.username, token.password, self.c_cacert)
         else:
             nested = True
-        yield self.c_connection  #pylint: disable=E1700
+        await yield_(self.c_connection)   #pylint: disable=E1700
         if not nested:
             await self.c_connection.disconnect()
 
@@ -105,7 +105,7 @@ class Model_Connection(object):
                                             token.username, token.password, self.c_cacert)
         else:
             nested = True
-        yield self.m_connection  #pylint: disable=E1700
+        await yield_(self.m_connection) #pylint: disable=E1700
         if not nested:
             await self.m_connection.disconnect()
 
