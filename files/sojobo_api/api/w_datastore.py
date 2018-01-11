@@ -1,4 +1,4 @@
-# pylint: disable=c0111,c0301, E0611, E0401
+# pylint: disable=c0111,c0301, E0611, E0401, c0103, w0511
 #!/usr/bin/env python3
 import json
 from sojobo_api import settings
@@ -24,199 +24,281 @@ def get_sojobo_database():
     con = get_arangodb_connection()
     if con.hasDatabase("sojobo"):
         return con["sojobo"]
-    else:
-        return con.createDatabase(name="sojobo")
+    return con.createDatabase(name="sojobo")
 
 
-def get_users_collection():
+# def get_users_collection():
+#     """Returns the 'users' collection, creates one if it doesn't exist yet."""
+#     db = get_sojobo_database()
+#     if has_collection(db, "users"):
+#         return db["users"]
+#     return db.createCollection(name="users")
+
+
+def create_users_collection():
+    """Creates the collection 'users' if it doesn't exist yet."""
     db = get_sojobo_database()
-    if has_collection(db, "users"):
-        return db["users"]
-    else:
-        return db.createCollection(name="users")
+    if not has_collection(db, "users"):
+        db.createCollection(name="users")
+
+
+def create_controllers_collection():
+    """Creates the collection 'controllers' if it doesn't exist yet."""
+    db = get_sojobo_database()
+    if not has_collection(db, "controllers"):
+        db.createCollection(name="controllers")
+
+# def get_controllers_collection():
+#     """Returns the 'controllers' collection, creates one if it doesn't exist yet."""
+#     db = get_sojobo_database()
+#     if has_collection(db, "controllers"):
+#         return db["controllers"]
+#     return db.createCollection(name="controllers")
+
+
+def get_controller_access_collection():
+    db = get_sojobo_database()
+    if has_collection(db, "controllerAccess"):
+        return db["controllerAccess"]
+    return db.createCollection(className="Edges", name="controllerAccess")
 
 
 def has_collection(db, collection_name):
     return collection_name in db.collections
 
 
-################################################################################
-# USER FUNCTIONS
-################################################################################
-
-
-def create_user_aql(user_name):
-    """Creates a user using AQL."""
-    # Make sure that the collection "users" exists.
-    get_users_collection()
+def execute_aql_query(aql, rawResults=False, **bindings):
+    """Executes the given AQL query and returns its results."""
     db = get_sojobo_database()
-    user = {'name' : user_name,
-            'controllers': [],
-            'ssh-keys': [],
-            'credentials': [],
-            'state': 'pending'}
-    bind = {"user": user}
-    aql = "INSERT @user INTO users LET newUser = NEW RETURN newUser"
-    db.AQLQuery(aql, bindVars=bind)
+    bind = {}
+    for key in bindings:
+        bind[key] = bindings[key]
+    return db.AQLQuery(aql, rawResults=rawResults, bindVars=bind)
+
+
+################################################################################
+#                                USER FUNCTIONS                                #
+################################################################################
 
 
 def create_user(user_name):
-    #TODO: Check if user already exists.
-    users = get_users_collection()
-    user = users.createDocument()
-
-    user["name"] = user_name
-    user["controllers"] = []
-    user["ssh-keys"] = []
-    user["credentials"] = []
-    user["state"] = "pending"
-
-    user.save()
+    # Make sure that the collection exists.
+    create_users_collection()
+    user = {"_key": user_name,
+            "name": user_name,
+            "ssh-keys": [],
+            "credentials": [],
+            "state": "pending"}
+    aql = "INSERT @user INTO users"
+    execute_aql_query(aql, user=user)
 
 
-def get_user(user_name):
-    users = get_users_collection()
-    return json.loads(users[user_name])
+def get_user_doc(username):
+    """Returns the Document of a user from ArangoDB given the username (key)."""
+    aql = 'FOR u IN users FILTER u._key == @username RETURN u'
+    return  execute_aql_query(aql, username=username)[0]
 
 
-def set_user_state(user_name, state):
-    con = connect_to_users()
-    data = json.loads(con.get(user_name))
-    data['state'] = state
-    con.set(user_name, json.dumps(data))
+def get_user(username):
+    aql = 'FOR u IN users FILTER u._key == @username RETURN u'
+    return execute_aql_query(aql, rawResults=True, username=username)[0]
+
+
+def set_user_state(username, state):
+    aql = 'UPDATE {_key: @username, state: @state} IN users'
+    execute_aql_query(aql, username=username, state=state)
 
 
 def get_user_state(username):
-    data = get_user(username)
-    return data['state']
+    aql = 'FOR u IN users FILTER u._key == @username RETURN u.state'
+    return  execute_aql_query(aql, rawResults=True, username=username)[0]
 
 
-def update_ssh_keys(user, ssh_keys):
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    data['ssh-keys'] = ssh_keys
-    con.set(user, json.dumps(data))
+def user_exists(username):
+    aql = 'FOR u IN users FILTER u._key == @username RETURN u'
+    # Returns an empty list if no user is found.
+    user = execute_aql_query(aql, username=username)
+    return  bool(user)
 
 
-def get_ssh_keys(user):
-    con = connect_to_users()
-    return json.loads(con.get(user))['ssh-keys']
+def update_ssh_keys(username, ssh_keys):
+    aql = 'UPDATE {_key: @username, ssh_keys: @ssh} IN users'
+    execute_aql_query(aql, username=username, ssh=ssh_keys)
 
 
-def add_credential(user, cred):
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    if cred not in data['credentials']:
-        data['credentials'].append(cred)
-    con.set(user, json.dumps(data))
+def get_ssh_keys(username):
+    # TODO: Test.
+    aql = 'FOR u IN users FILTER u._key == @username RETURN u.ssh_keys'
+    return  execute_aql_query(aql, rawResults=True, username=username)[0]
 
 
-def remove_credential(user, cred_name):
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    for cred in data['credentials']:
+def add_credential(username, cred):
+    # TODO: Omvormen naar AQL, methode hieronder is een poging.
+    user = get_user_doc(username)
+    if cred not in user['credentials']:
+        user['credentials'].append(cred)
+    user.save()
+
+
+# def add_credential(username, cred):
+#     aql = ('UPDATE "users/@username" WITH {'
+#            'credentials: PUSH(doc.credentials, @cred, true)'
+#            '} IN users')
+#     execute_aql_query(aql, username=username, cred=cred)
+
+
+def remove_credential(username, cred_name):
+    # TODO: Omvormen naar AQL.
+    user = get_user_doc(username)
+    for cred in user['credentials']:
         if cred_name == cred['name']:
-            data['credentials'].remove(cred)
-    con.set(user, json.dumps(data))
+            user['credentials'].remove(cred)
+    user.save()
 
 
-def get_credentials(user):
-    con = connect_to_users()
-    return json.loads(con.get(user))['credentials']
+def get_credentials(username):
+    aql = 'FOR u IN users FILTER u._key == @username RETURN u.credentials'
+    return  execute_aql_query(aql, rawResults=True, username=username)[0]
 
 
 def get_credential_keys(user):
+    # TODO: To test.
     return [c['name'] for c in get_credentials(user)]
 
 
 def get_all_users():
-    con = connect_to_users()
-    return con.keys()
-################################################################################
-# CONTROLLER FUNCTIONS
-################################################################################
-def create_controller(controller_name, c_type, region, cred_name):
+    """Returns a list with all users from the collection 'users'."""
+    aql = "FOR u IN users RETURN u"
+    return execute_aql_query(aql, rawResults=True)
+
+def get_all_users_keys():
+    """Returns a list with all usernames (keys) from the collection 'users'."""
+    aql = "FOR u IN users RETURN u._key"
+    return execute_aql_query(aql, rawResults=True)
+
+
+
+def delete_user(user):
+    """Remove user from collection 'users' and from access (edges) collections."""
     con = connect_to_controllers()
-    if controller_name in con.keys():
-        return False
-    else:
-        controller = {
-            'name' : controller_name,
-            'state': 'accepted',
-            'users': [],
-            'type' : c_type,
-            'models' : [],
-            'endpoints': [],
-            'uuid': '',
-            'ca-cert': '',
-            'region': region,
-            'default-credential' : cred_name
-        }
-        con.set(controller_name, json.dumps(controller))
-        return True
+    for c_name in con.keys():
+        data = json.loads(con.get(c_name))
+        if user in data['users']:
+            data['users'].remove(user)
+            con.set(c_name, json.dumps(data))
+    con = connect_to_users()
+    con.delete(user)
+
+
+################################################################################
+#                           CONTROLLER FUNCTIONS                               #
+################################################################################
+
+
+def create_controller(controller_name, c_type, region, cred_name):
+    """Creates a controller using AQL."""
+    create_controllers_collection()
+    # TODO: Check if controller with that name already exists. In this layer?
+    controller = {
+        "_key": controller_name,
+        "name": controller_name,
+        "state": "accepted",
+        "type": c_type,
+        "models": [],
+        "endpoints": [],
+        "uuid": "",
+        "ca-cert": "",
+        "region": region,
+        "default-credential": cred_name}
+    aql = "INSERT @controller INTO controllers LET newController = NEW RETURN newController"
+    execute_aql_query(aql, controller=controller)
+
+
+def controller_exists(c_name):
+    aql = 'FOR c IN controllers FILTER c._key == @cname RETURN c'
+    # Returns an empty list if no controller is found.
+    controller = execute_aql_query(aql, cname=c_name)
+    return bool(controller)
+
 
 def get_cloud_controllers(c_type):
-    con = connect_to_controllers()
-    cons = con.keys()
-    result = []
-    for c_name in cons:
-        data = json.loads(con.get(c_name))
-        if data['type'] == c_type:
-            result.append(c_name)
-    return result
+    aql = 'FOR c IN controllers FILTER c.type == @cloud RETURN c'
+    return execute_aql_query(aql, cloud=c_type)
 
 
-def add_user_to_controller(c_name, user, access):
-    con = connect_to_controllers()
-    data = json.loads(con.get(c_name))
-    c_type = data['type']
-    exists = False
-    for usr in data['users']:
-        if usr['name'] == user:
-            exists = True
-            usr['name']['access'] = access
-            break
-    if not exists:
-        data['users'].append({'name': user, 'access': access})
-    con.set(c_name, json.dumps(data))
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    for controller in data['controllers']:
-        if controller['name'] == c_name:
-            controller['access'] = access
-            exists = True
-            break
-    if not exists:
-        data['controllers'].append({
-            'access' : access,
-            'name': c_name,
-            'models' : [],
-            'type': c_type
-        })
-    con.set(user, json.dumps(data))
+def get_users_controller(c_name):
+    # TODO: Use edge
+    """Returns a list with users of given controller."""
+    aql = ('FOR c IN controllers '
+           'FILTER c._key == @cname '
+           'RETURN c.users')
+    return execute_aql_query(aql, cname=c_name)
 
 
-def set_controller_state(controller, state, endpoints=None, uuid=None, ca_cert=None):
-    con = connect_to_controllers()
-    data = json.loads(con.get(controller))
-    data['state'] = state
-    if endpoints:
-        data['endpoints'] = endpoints
-    if uuid:
-        data['uuid'] = uuid
-    if ca_cert:
-        data['ca-cert'] = ca_cert
-    con.set(controller, json.dumps(data))
+def get_controllers_user(username):
+    u_id = "users/" + username
+    aql = ('FOR edge IN controllerAccess'
+               'FILTER edge._to == @user'
+               'LET c ='
+                   '(FOR c IN controllers FILTER c._id == edge._from RETURN c)'
+               'RETURN MERGE(c)')
+    return execute_aql_query(aql, rawResults=True, user=u_id)[0]
+
+
+def get_controller_doc(c_name):
+    """Returns the Document of a user from ArangoDB given the username (key)."""
+    aql = 'FOR c IN controllers FILTER c._key == @cname RETURN c'
+    return  execute_aql_query(aql, cname=c_name)[0]
+
+
+def get_controller(c_name):
+    aql = 'FOR c IN controllers FILTER c._key == @controller RETURN c'
+    return  execute_aql_query(aql, rawResults=True, controller=c_name)[0]
+
+
+def add_user_to_controller(c_name, username, access):
+    """Creates or updates an Edge (relation) between a controller and a user."""
+    c_id = "controllers/" + c_name
+    u_id = "users/" + username
+    aql = ("UPSERT { _from: @controller, _to: @user }"
+           "INSERT { _from: @controller, _to: @user, access: @access}"
+           "UPDATE { access : @access } in hasAccess")
+    execute_aql_query(aql, controller=c_id, user=u_id, access=access)
+
+
+def set_controller_state(c_name, state, endpoints=None, uuid=None, ca_cert=None):
+    # TODO: Erg dat bij error de None values worden gebruikt?
+    aql = ('UPDATE @controller WITH {'
+           'state: @state,'
+           'endpoints: @endpoints,'
+           'uuid: @uuid,'
+           'ca_cert: @cacert'
+           '} IN controllers')
+    execute_aql_query(aql, controller=c_name, state=state, endpoints=endpoints,
+                      uuid=uuid, cacert=ca_cert)
 
 
 def destroy_controller(c_name):
-    con = connect_to_controllers()
-    con.delete(c_name)
-    for user in get_all_users():
-        remove_controller(c_name, user)
+    # TODO: Test
+    # TODO: Give better name
+    # Remove controller from the collection 'controllers'
+    aql = 'REMOVE {_key: @controller} IN controllers'
+    execute_aql_query(aql, controller=c_name)
+
+
+def remove_edges_controller_access(c_name):
+    #TODO: Test.
+    """Removes all Edges from the collection 'controllerAccess' that contain
+    the given controller."""
+    c_id = "controllers/" + c_name
+    aql = ('FOR edge in controllerAccess'
+           'FILTER edge._from == @controller'
+           'REMOVE edge in controllerAccess')
+    execute_aql_query(aql, controller=c_id)
 
 
 def remove_controller(c_name, user):
+    # TODO: Where is this method used?
     con = connect_to_users()
     data = json.loads(con.get(user))
     for controller in data['controllers']:
@@ -226,25 +308,17 @@ def remove_controller(c_name, user):
     con.set(user, json.dumps(data))
 
 
-def get_controller(c_name):
-    con = connect_to_controllers()
-    return json.loads(con.get(c_name))
-
-
-def add_model_to_controller(c_name, m_name):
-    con = connect_to_controllers()
-    data = json.loads(con.get(c_name))
-    exists = False
-    for model in data['models']:
-        if model['name'] == m_name:
-            exists = True
-            break
-    if not exists:
-        data['models'].append({'name': m_name, 'state': 'Model is being deployed', 'uuid': ''})
-    con.set(c_name, json.dumps(data))
+    def add_model_to_controller(c_name, m_name):
+        c_id = "controllers/" + c_name
+        aql = ('LET doc = DOCUMENT(@controller)'
+               'UPDATE doc WITH {'
+               'models: PUSH(doc.models, @model, true)'
+               '} IN controllers')
+        execute_aql_query(aql, controller=c_id, model=m_name)
 
 
 def set_model_state(c_name, m_name, state, credential=None, uuid=None):
+    # TODO: Opspliten in 3? Set state, set cred, set uuid
     con = connect_to_controllers()
     data = json.loads(con.get(c_name))
     for model in data['models']:
@@ -257,46 +331,34 @@ def set_model_state(c_name, m_name, state, credential=None, uuid=None):
     con.set(c_name, json.dumps(data))
 
 
-def check_model_state(c_name, m_name):
-    con = get_controller(c_name)
-    for mod in con['models']:
-        if mod['name'] == m_name:
-            return mod['state']
-    return 'error'
+def check_model_state(m_name):
+    # TODO: To test
+    aql = ('FOR m IN models '
+           'FILTER m._key == @model '
+           'RETURN m.state')
+    return execute_aql_query(aql, rawResults=True, model=m_name)[0]
 
 
-def get_controller_access(c_name, user):
-    for controller in get_user(user)['controllers']:
-        if controller['name'] == c_name:
-            return controller['access']
+def get_controller_access(c_name, username):
+    # TODO: Test.
+    c_id = "controllers/" + c_name
+    u_id = "users/" + username
+    aql = ('FOR edge in controllerAccess',
+           'FILTER edge._from == @controller'
+           'FILTER edge._to == @user'
+           'RETURN edge.access')
+    return execute_aql_query(aql, rawResults=True, controller=c_id, user=u_id)[0]
 
 
-def set_controller_access(c_name, user, access):
-    con = connect_to_users()
-    data = json.loads(con.get(user))
-    for controller in data['controllers']:
-        if controller['name'] == c_name:
-            controller['access'] = access
-            break
-    con.set(user, json.dumps(data))
-    con = connect_to_controllers()
-    data = json.loads(con.get(c_name))
-    for usr in data['users']:
-        if usr['name'] == user:
-            usr['access'] = access
-            break
-    con.set(c_name, json.dumps(data))
-
-
-def delete_user(user):
-    con = connect_to_controllers()
-    for c_name in con.keys():
-        data = json.loads(con.get(c_name))
-        if user in data['users']:
-            data['users'].remove(user)
-            con.set(c_name, json.dumps(data))
-    con = connect_to_users()
-    con.delete(user)
+def set_controller_access(c_name, username, access):
+    # TODO: Test
+    c_id = "controllers/" + c_name
+    u_id = "users/" + username
+    aql = ('FOR edge in controllerAccess',
+           'FILTER edge._from == @controller'
+           'FILTER edge._to == @user'
+           'UPDATE edge WITH { access: @access } IN controllerAccess')
+    return execute_aql_query(aql, controller=c_id, user=u_id, access=access)[0]
 
 
 def get_controller_users(c_name):
@@ -304,22 +366,34 @@ def get_controller_users(c_name):
     return data['users']
 
 def get_default_credential(c_name):
-    con = connect_to_controllers()
-    data = json.loads(con.get(c_name))
-    return data['default-credential']
+    controller = get_controller(c_name)
+    return controller["default-credential"]
 
 def get_all_controllers():
-    con = connect_to_controllers()
-    return con.keys()
+    #TODO: Test
+    create_controllers_collection()
+    aql = 'FOR c in controllers RETURN c._key'
+    return execute_aql_query(aql, rawResults=True)
 
 
-def get_all_models(controller):
-    con = connect_to_controllers()
-    data = json.loads(con.get(controller))
-    return data['models']
+# def get_all_models(c_name):
+#     # TODO: Test
+#     aql = ('FOR c in controllers'
+#            'FILTER c._key == @controller'
+#            'RETURN c.models')
+#     return execute_aql_query(aql, rawResults=True, controller=c_name)
+
+def get_all_models(c_name):
+    # TODO: Test
+    controller = get_controller(c_name)
+    return controller["models"]
+
+
 ################################################################################
 # MODEL FUNCTIONS
 ################################################################################
+
+
 def delete_model(controller, model):
     con = connect_to_controllers()
     data = json.loads(con.get(controller))
@@ -345,13 +419,16 @@ def remove_model(controller, model, user):
     con.set(user, json.dumps(data))
 
 
-def get_model_access(controller, model, user):
-    data = get_user(user)
-    for con in data['controllers']:
-        if con['name'] == controller:
-            for mod in con['models']:
-                if mod['name'] == model:
-                    return mod['access']
+
+def get_model_access(modelname, username):
+    # TODO: Test.
+    m_id = "models" + modelname
+    u_id = "users/" + username
+    aql = ('FOR edge in modelAccess',
+           'FILTER edge._from == @model'
+           'FILTER edge._to == @user'
+           'RETURN edge.access')
+    return execute_aql_query(aql, rawResults=True, model=m_id, user=u_id)[0]
 
 
 def set_model_access(controller, model, user, access):
@@ -372,7 +449,7 @@ def set_model_access(controller, model, user, access):
 
 
 def get_models_access(controller, user):
-    data = get_user(user)
+    data = get_user_doc(user)
     for con in data['controllers']:
         if con['name'] == controller:
             return con['models']

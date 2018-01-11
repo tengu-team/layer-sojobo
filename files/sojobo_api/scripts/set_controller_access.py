@@ -33,7 +33,7 @@ async def set_controller_acc(c_name, access, user):
     try:
         token = JuJu_Token()
         con = datastore.get_controller(c_name)
-        usr = datastore.get_user(user)
+        usr = datastore.get_user_doc(user)
         logger.info('Connecting to controller %s', c_name)
         controller = juju.Controller_Connection(token, c_name)
         async with controller.connect(token) as con_juju:

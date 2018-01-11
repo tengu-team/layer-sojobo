@@ -30,17 +30,45 @@ class JuJu_Token(object):  #pylint: disable=R0903
         self.password = settings.JUJU_ADMIN_PASSWORD
         self.is_admin = True
 
-async def remove_ssh_key(ssh_keys, username):
+# async def update_ssh_key(ssh_keys, username):
+#     try:
+#         current_keys = datastore.get_ssh_keys(username)
+#         new_keys = ast.literal_eval(ssh_keys)
+#         user = datastore.get_user_doc(username)
+#         token = JuJu_Token()
+#         for con in user['controllers']:
+#             for mod in con['models']:
+#                 if mod['access'] == 'write' or mod['access'] == 'admin':
+#                     logger.info('Setting up Modelconnection for model: %s', mod['name'])
+#                     model = juju.Model_Connection(token, con['name'], mod['name'])
+#                     async with model.connect(token) as mod_con:
+#                         for a_key in current_keys:
+#                             logger.info('removing key: %s', a_key)
+#                             await mod_con.remove_ssh_key(username, a_key)
+#                         for r_key in new_keys:
+#                             logger.info('adding key: %s', r_key)
+#                             await mod_con.add_ssh_key(username, r_key)
+#         datastore.update_ssh_keys(username, new_keys)
+#     except Exception as e:
+#         exc_type, exc_value, exc_traceback = sys.exc_info()
+#         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+#         for l in lines:
+#             logger.error(l)
+
+
+async def update_ssh_key(ssh_keys, username):
     try:
-        current_keys = datastore.get_ssh_keys(username)
-        new_keys = ast.literal_eval(ssh_keys)
         user = datastore.get_user(username)
+        controllers = datastore.get_controllers_user(username)
+        current_keys = user["ssh_keys"]
+        new_keys = ast.literal_eval(ssh_keys)
         token = JuJu_Token()
-        for con in user['controllers']:
+        for con in controllers:
             for mod in con['models']:
-                if mod['access'] == 'write' or mod['access'] == 'admin':
-                    logger.info('Setting up Modelconnection for model: %s', mod['name'])
-                    model = juju.Model_Connection(token, con['name'], mod['name'])
+                mod_access = datastore.get_model_access(mod, username)
+                if mod_access == 'write' or mod_access == 'admin':
+                    logger.info('Setting up Modelconnection for model: %s', mod)
+                    model = juju.Model_Connection(token, con['name'], mod)
                     async with model.connect(token) as mod_con:
                         for a_key in current_keys:
                             logger.info('removing key: %s', a_key)
@@ -69,5 +97,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    result = loop.run_until_complete(remove_ssh_key(sys.argv[1], sys.argv[2]))
+    result = loop.run_until_complete(update_ssh_key(sys.argv[1], sys.argv[2]))
     loop.close()

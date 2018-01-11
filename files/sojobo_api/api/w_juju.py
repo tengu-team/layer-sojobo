@@ -244,7 +244,7 @@ def create_controller(c_type, name, region, credentials):
     for controller in get_all_controllers():
         if datastore.get_controller(controller)['state'] == 'accepted':
             return 503, 'An environment is already being created'
-    Popen(["python3.6", "{}/scripts/add_controller.py".format(settings.SOJOBO_API_DIR),
+    Popen(["python3", "{}/scripts/add_controller.py".format(settings.SOJOBO_API_DIR),
            c_type, name, region, credentials])
     return 202, 'Environment {} is being created in region {}'.format(name, region)
 
@@ -256,7 +256,7 @@ def remove_cred_file(c_type, name):
     return get_controller_types()[c_type].remove_cred_file(name)
 
 def delete_controller(con):
-    Popen(["python3.6", "{}/scripts/remove_controller.py".format(settings.SOJOBO_API_DIR),
+    Popen(["python3", "{}/scripts/remove_controller.py".format(settings.SOJOBO_API_DIR),
            con.c_name, con.c_type])
 
 def get_supported_regions(c_type):
@@ -367,8 +367,8 @@ async def get_ssh_keys(token, model):
         return data
 
 
-def get_ssh_keys_user(user):
-    return datastore.get_ssh_keys(user)
+def get_ssh_keys_user(username):
+    return datastore.get_user(username)["ssh-keys"]
 
 
 async def get_applications_info(token, model):
@@ -435,7 +435,7 @@ def create_model(token, controller, model, credentials):
         datastore.add_model_to_controller(controller, model)
         datastore.set_model_state(controller, model, 'accepted')
         datastore.set_model_access(controller, model, token.username, 'admin')
-        Popen(["python3.6", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), controller,
+        Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), controller,
                model, settings.SOJOBO_API_DIR, token.username, token.password, credentials])
         code, response = 202, "Model is being deployed"
     else:
@@ -536,7 +536,7 @@ async def machine_exists(token, model, machine):
 
 
 def remove_machine(token, controller, model, machine):
-    Popen(["python3.6", "{}/scripts/remove_machine.py".format(settings.SOJOBO_API_DIR), token.username,
+    Popen(["python3", "{}/scripts/remove_machine.py".format(settings.SOJOBO_API_DIR), token.username,
            token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT,
            controller.c_name, model.m_name, machine])
 #####################################################################################
@@ -551,7 +551,7 @@ async def app_exists(token, controller, model, app_name):
 
 
 def add_bundle(token, controller, model, bundle):
-    Popen(["python3.6", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR),
+    Popen(["python3", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR),
            token.username, token.password, settings.SOJOBO_API_DIR, controller, model,
            str(bundle), settings.REDIS_HOST, settings.REDIS_PORT])
 
@@ -622,7 +622,7 @@ async def get_unit_info(token, model, application, unitnumber):
 
 
 def add_unit(token, controller, model, app_name, amount, target):
-    Popen(["python3.6", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), token.username,
+    Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), token.username,
            token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT,
            controller.c_name, model.m_name, app_name, str(amount), target])
 
@@ -685,11 +685,11 @@ async def get_application_config(token, model, app_name):
 # USER FUNCTIONS
 ###############################################################################
 def create_user(username, password):
-    Popen(["python3.6", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR), username, password])
+    Popen(["python3", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR), username, password])
 
 
 def delete_user(username):
-    Popen(["python3.6", "{}/scripts/delete_user.py".format(settings.SOJOBO_API_DIR), username])
+    Popen(["python3", "{}/scripts/delete_user.py".format(settings.SOJOBO_API_DIR), username])
 
 
 async def change_user_password(token, username, password):
@@ -701,7 +701,7 @@ async def change_user_password(token, username, password):
 
 def update_ssh_keys_user(user, ssh_keys):
     Popen([
-        "python3.6",
+        "python3",
         "{}/scripts/update_ssh_keys.py".format(settings.SOJOBO_API_DIR),
         str(ssh_keys), user, settings.SOJOBO_API_DIR])
 
@@ -732,11 +732,11 @@ def get_credential(user, credential):
 
 
 def add_credential(user, credential):
-    Popen(["python3.6", "{}/scripts/add_credential.py".format(settings.SOJOBO_API_DIR), user, str(credential), settings.SOJOBO_API_DIR])
+    Popen(["python3", "{}/scripts/add_credential.py".format(settings.SOJOBO_API_DIR), user, str(credential), settings.SOJOBO_API_DIR])
 
 
 def remove_credential(user, cred_name):
-    Popen(["python3.6", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR), user, cred_name, settings.SOJOBO_API_DIR])
+    Popen(["python3", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR), user, cred_name, settings.SOJOBO_API_DIR])
 
 
 def credential_exists(user, credential):
@@ -746,7 +746,7 @@ def credential_exists(user, credential):
     return False
 
 def grant_user_to_controller(token, controller, user, access):
-    Popen(["python3.6", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
+    Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
            controller.c_name, access, settings.SOJOBO_API_DIR, user])
 
 
@@ -769,7 +769,7 @@ def set_models_access(token, controller, user, accesslist):
                 pass
         else:
             abort(404, 'Model {} not found'.format(mod['name']))
-    Popen(["python3.6", "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR), token.username,
+    Popen(["python3", "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR), token.username,
            token.password, settings.SOJOBO_API_DIR,
            user, str(accesslist), controller.c_name])
 
@@ -786,7 +786,7 @@ async def remove_user_from_model(token, controller, model, username):
 
 
 def user_exists(username):
-    return username in get_all_users()
+    return username in datastore.get_all_users_keys()
 
 
 def get_all_users():
@@ -797,12 +797,11 @@ def get_users_info(token):
     if token.is_admin:
         result = []
         for user in get_all_users():
-            u_info = get_user_info(user)
-            if u_info['state'] == 'ready':
-                result.append(u_info)
+            if user['state'] == 'ready':
+                result.append(user)
         return result
     else:
-        return datastore.get_user(token.username)
+        return datastore.get_user_json(token.username)
 
 
 def get_user_info(username):
