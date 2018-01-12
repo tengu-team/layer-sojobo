@@ -67,7 +67,7 @@ async def create_controller(c_type, name, region, cred_name):
         logger.info('Connecting to controller')
         controller = juju.Controller_Connection(token, name)
 
-        logger.info('Adding existing credentials and models to database')
+        logger.info('Adding existing credentials and default models to database')
         credentials = datastore.get_credentials(token.username)
         async with controller.connect(token) as juju_con:
             for cred in credentials:

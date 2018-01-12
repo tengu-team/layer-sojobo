@@ -179,7 +179,7 @@ async def authenticate(api_key, auth):
             controllers = get_all_controllers()
             ready_cons = []
             for con in controllers:
-                if datastore.get_controller(con)['state'] == 'ready':
+                if con['state'] == 'ready':
                     ready_cons.append(con)
             user_state = datastore.get_user_state(token.username)
             if user_state == 'ready':
@@ -242,7 +242,7 @@ def check_c_type(c_type):
 
 def create_controller(c_type, name, region, credentials):
     for controller in get_all_controllers():
-        if datastore.get_controller(controller)['state'] == 'accepted':
+        if controller['state'] == 'accepted':
             return 503, 'An environment is already being created'
     Popen(["python3", "{}/scripts/add_controller.py".format(settings.SOJOBO_API_DIR),
            c_type, name, region, credentials])
@@ -267,16 +267,11 @@ def get_all_controllers():
 
 
 def controller_exists(c_name):
-    controllers = get_all_controllers()
-    return c_name in controllers
+    return datastore.controller_exists(c_name)
 
 
 def get_controller_access(con, username):
     return datastore.get_controller_access(con.c_name, username)
-
-
-def get_controllers_info():
-    return [datastore.get_controller(c) for c in datastore.get_all_controllers()]
 
 
 def get_controller_info(token, controller):
@@ -368,7 +363,7 @@ async def get_ssh_keys(token, model):
 
 
 def get_ssh_keys_user(username):
-    return datastore.get_user(username)["ssh-keys"]
+    return datastore.get_ssh_keys_user(username)
 
 
 async def get_applications_info(token, model):
@@ -707,8 +702,7 @@ def update_ssh_keys_user(user, ssh_keys):
 
 
 def get_users_controller(controller):
-    cont_info = datastore.get_controller(controller)
-    return cont_info['users']
+    return datastore.get_users_controller(controller)
 
 
 def get_users_model(token, controller, model):
@@ -786,7 +780,7 @@ async def remove_user_from_model(token, controller, model, username):
 
 
 def user_exists(username):
-    return username in datastore.get_all_users_keys()
+    return datastore.user_exists(username)
 
 
 def get_all_users():
