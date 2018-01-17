@@ -26,6 +26,7 @@ from charmhelpers.core.hookenv import status_set, log, config, open_port, close_
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charms.reactive import hook, when, when_not, set_state, remove_state
 import charms.leadership
+import pyArango.connection as pyArango
 
 
 API_DIR = '/opt/sojobo_api'
@@ -115,6 +116,9 @@ def connect_to_arango(arango):
         'REPO_NAME': config()['github-repo'],
         'SOJOBO_API_PORT' : config()['port']
     })
+    con = get_arangodb_connection(arango.host(), arango.port(), arango.username(), arango.password())
+    sojobo_db = create_arangodb_database(con)
+    create_arangodb_collections(sojobo_db)
     service_restart('nginx')
     status_set('active', 'admin-password: {} api-key: {}'.format(password, api_key))
     set_state('api.running')
@@ -205,3 +209,38 @@ def install_api():
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
+
+
+def get_arangodb_connection(host, port, username, password):
+    """Creates entry point (connection) to work with ArangoDB."""
+    url = 'http://' + host + ':' + port
+    connection = pyArango.Connection(arangoURL=url,
+                                     username=username,
+                                     password=password)
+    return connection
+
+
+def create_arangodb_database(connection):
+    if connection.hasDatabase("sojobo"):
+        return connection["sojobo"]
+    return connection.createDatabase(name="sojobo")
+
+
+def create_arangodb_collection(sojobo_db, collection_name, edges=False):
+    if not has_collection(sojobo_db, collection_name):
+        if edges:
+            sojobo_db.createCollection(className="Edges", name=collection_name)
+        else:
+            sojobo_db.createCollection(name=collection_name)
+
+
+def create_arangodb_collections(sojobo_db):
+    create_arangodb_collection(sojobo_db, "users")
+    create_arangodb_collection(sojobo_db, "controllers")
+    create_arangodb_collection(sojobo_db, "models")
+    create_arangodb_collection(sojobo_db, "controllerAccess", edges=True)
+    create_arangodb_collection(sojobo_db, "modelAccess", edges=True)
+
+
+def has_collection(db, collection_name):
+    return collection_name in db.collections
