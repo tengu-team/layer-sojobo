@@ -42,6 +42,7 @@ async def create_controller(c_type, name, region, cred_name):
         logger.info('Adding controller to database')
         token = JuJu_Token()
         datastore.create_controller(name, c_type, region, cred_name)
+        logger.info('Adding admin to controller')
         datastore.add_user_to_controller(name, 'admin', 'superuser')
 
         logger.info('Bootstrapping controller')
@@ -83,12 +84,13 @@ async def create_controller(c_type, name, region, cred_name):
             models = await juju_con.get_models()
             for model in models.serialize()['user-models']:
                 model = model.serialize()['model'].serialize()
-                datastore.add_model_to_controller(name, model['name'])
-                datastore.set_model_state(name, model['name'], 'ready', credential=cred_name, uuid=model['uuid'])
-                datastore.set_model_access(name, model['name'], token.username, 'admin')
+                # TODO: Checken of model al bestaat?
+                new_model = datastore.create_model(model, state='Model is being deployed', uuid='')
+                datastore.add_model_to_controller(name, new_model["_key"])
+                datastore.set_model_state(new_model["_key"], 'ready', credential=cred_name, uuid=model['uuid'])
+                datastore.set_model_access(new_model["_key"], token.username, 'admin')
         logger.info('Controller succesfully created!')
     except Exception:  #pylint: disable=W0703
-        datastore.destroy_controller(name)
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:

@@ -22,6 +22,7 @@ import re
 from subprocess import check_output, check_call, Popen
 import json
 from asyncio_extras import async_contextmanager
+from async_generator import yield_
 from flask import abort, Response
 from juju import tag
 from juju.controller import Controller
@@ -59,7 +60,7 @@ class Controller_Connection(object):
     async def set_controller(self, token, c_name):
         await self.c_connection.disconnect()
         self.c_name = c_name
-        self.c_access = datastore.get_controller_access(token.username, c_name)
+        self.c_access = datastore.get_controller_access(c_name, token.username)
         self.c_connection = Controller()
         con = datastore.get_controller(c_name)
         self.c_type = con['type']
@@ -186,7 +187,7 @@ async def authenticate(api_key, auth):
             user_state = datastore.get_user_state(token.username)
             if user_state == 'ready':
                 if len(ready_cons) > 0:
-                    controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)])
+                    controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)]["_key"])
                     async with controller.connect(token):  #pylint: disable=E1701
                         pass
                     return token
@@ -432,10 +433,10 @@ def create_model(token, controller, model, credentials):
     if state in ["ready", "accepted"]:
         code, response = errors.already_exists('model')
     elif credentials in datastore.get_credential_keys(token.username):
-        model = create_model(model, state='Model is being deployed', uuid='')
-        datastore.add_model_to_controller(controller, model)
-        datastore.set_model_state(model["_key"], 'accepted')
-        datastore.set_model_access(controller, model, token.username, 'admin')
+        new_model = datastore.create_model(model, state='Model is being deployed', uuid='')
+        datastore.add_model_to_controller(controller, new_model["_key"])
+        datastore.set_model_state(new_model["_key"], 'accepted')
+        datastore.set_model_access(new_model["_key"], token.username, 'admin')
         Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), controller,
                model, settings.SOJOBO_API_DIR, token.username, token.password, credentials])
         code, response = 202, "Model is being deployed"
@@ -726,6 +727,7 @@ def get_credentials(user):
 
 
 def get_credential(user, credential):
+    #TODO: AQL methode in w_datastore maken
     for cred in get_credentials(user):
         if cred['name'] == credential:
             return cred

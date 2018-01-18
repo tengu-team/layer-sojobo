@@ -36,7 +36,7 @@ async def create_user(username, password):
     try:
         datastore.create_user(username)
         logger.info('Succesfully created user %s', username)
-        controllers = datastore.get_all_controllers()
+        controllers = datastore.get_keys_controllers()
         token = JuJu_Token()
         for con in controllers:
             logger.info('Setting up Controllerconnection for %s', con)

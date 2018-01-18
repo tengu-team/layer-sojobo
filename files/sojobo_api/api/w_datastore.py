@@ -222,6 +222,7 @@ def create_controller(controller_name, c_type, region, cred_name):
     aql = "INSERT @controller INTO controllers LET newController = NEW RETURN newController"
     return execute_aql_query(aql, controller=controller)
 
+
 def create_manual_controller(name, c_type, url):
     controller = {
         "_key": name,
@@ -237,7 +238,6 @@ def create_manual_controller(name, c_type, url):
     return execute_aql_query(aql, controller=controller)
 
 
-
 def controller_exists(c_name):
     aql = 'FOR c IN controllers FILTER c._key == @cname RETURN c'
     # Returns an empty list if no controller is found.
@@ -246,8 +246,8 @@ def controller_exists(c_name):
 
 
 def get_cloud_controllers(c_type):
-    aql = 'FOR c IN controllers FILTER c.type == @cloud RETURN c'
-    return execute_aql_query(aql, cloud=c_type)
+    aql = 'FOR c IN controllers FILTER c.type == @cloud RETURN c._key'
+    return execute_aql_query(aql, rawResults=True, cloud=c_type)
 
 
 def get_users_controller(c_name):
@@ -289,7 +289,7 @@ def add_user_to_controller(c_name, username, access):
     u_id = "users/" + username
     aql = ("UPSERT { _from: @controller, _to: @user }"
            "INSERT { _from: @controller, _to: @user, access: @access}"
-           "UPDATE { access : @access } in hasAccess")
+           "UPDATE { access : @access } in controllerAccess")
     execute_aql_query(aql, controller=c_id, user=u_id, access=access)
 
 
@@ -339,6 +339,17 @@ def add_model_to_controller(c_name, m_key):
     execute_aql_query(aql, controller=c_id, model=m_key)
 
 
+def get_controllers_access(username):
+    u_id = "users/" + username
+    aql = ('LET u = DOCUMENT(@username) '
+           'LET controllers = '
+                '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
+                    'RETURN controller) '
+            'RETURN controllers')
+    return execute_aql_query(aql, rawResults=True, username=u_id)
+
+
+
 def get_controller_access(c_name, username):
     c_id = "controllers/" + c_name
     u_id = "users/" + username
@@ -369,20 +380,17 @@ def get_default_credential(c_name):
     return controller["default-credential"]
 
 def get_all_controllers():
-    #create_controllers_collection()
     aql = 'FOR c in controllers RETURN c'
     return execute_aql_query(aql, rawResults=True)
 
 
 def get_keys_controllers():
-    #create_controllers_collection()
     aql = 'FOR c in controllers RETURN c._key'
     return execute_aql_query(aql, rawResults=True)
 
 
 def get_all_con_keys():
     """Returns a list with all the controllers their key."""
-    #create_controllers_collection()
     aql = 'FOR c in controllers RETURN c._key'
     return execute_aql_query(aql, rawResults=True)
 
@@ -411,8 +419,8 @@ def create_model(m_name, state, uuid):
         "name": m_name,
         "state": state,
         "uuid": uuid}
-    aql = "INSERT @model INTO model LET newModel = NEW RETURN newModel"
-    return execute_aql_query(aql, rawResults=True, model=model)
+    aql = "INSERT @model INTO models LET newModel = NEW RETURN newModel"
+    return execute_aql_query(aql, rawResults=True, model=model)[0]
 
 
 def delete_model(c_name, m_key):
@@ -451,8 +459,8 @@ def set_model_state(m_key, state, credential=None, uuid=None):
     # TODO: Erg dat bij error de None values worden gebruikt?
     # TODO: Methode opsplitsen in 3? 1 methode per veld.
     aql = ('UPDATE @model WITH {'
-           'state: @state,'
-           'credential: @credential',
+           'state: @state, '
+           'credential: @credential, '
            'uuid: @uuid'
            '} IN models')
     execute_aql_query(aql, model=m_key, state=state, credential=credential, uuid=uuid)
@@ -477,17 +485,29 @@ def get_model_access(modelname, username):
     return execute_aql_query(aql, rawResults=True, model=m_id, user=u_id)[0]
 
 
+# def set_model_access(m_key, username, access):
+#     # TODO: Aanpassen in andere files.
+#     # TODO: Gaat er van uit dat er al access edge is. UPSERT gebruiken?
+#     # TODO: Testen.
+#     m_id = "models/" + m_key
+#     u_id = "users/" + username
+#     aql = ('FOR edge in modelAccess',
+#            'FILTER edge._from == @model'
+#            'FILTER edge._to == @user'
+#            'UPDATE edge WITH { access: @access } IN modelAccess')
+#     return execute_aql_query(aql, model=m_id, user=u_id, access=access)[0]
+
+
 def set_model_access(m_key, username, access):
     # TODO: Aanpassen in andere files.
     # TODO: Gaat er van uit dat er al access edge is. UPSERT gebruiken?
     # TODO: Testen.
     m_id = "models/" + m_key
     u_id = "users/" + username
-    aql = ('FOR edge in modelAccess',
-           'FILTER edge._from == @model'
-           'FILTER edge._to == @user'
-           'UPDATE edge WITH { access: @access } IN modelAccess')
-    return execute_aql_query(aql, model=m_id, user=u_id, access=access)[0]
+    aql = ("UPSERT { _from: @model, _to: @user }"
+           "INSERT { _from: @model, _to: @user, access: @access}"
+           "UPDATE { access : @access } in modelAccess")
+    execute_aql_query(aql, model=m_id, user=u_id, access=access)
 
 
 def get_models_access(username):

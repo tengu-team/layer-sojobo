@@ -144,9 +144,9 @@ def delete_controller(controller):
         LOGGER.info('/TENGU/controllers/%s [DELETE] => receiving call', controller)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers/%s [DELETE] => Authenticated!', controller)
-        con = juju.authorize( token, controller)
+        con = juju.authorize(token, controller)
         LOGGER.info('/TENGU/controllers/%s [DELETE] => Authorized!', controller)
-        if con.c_access == 'superuser':
+        if token.is_admin:
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Deleting Controller!', controller)
             juju.delete_controller(con)
             code, response = 202, 'Controller {} is being deleted'.format(controller)
