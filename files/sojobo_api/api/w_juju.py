@@ -220,6 +220,8 @@ def authorize(token, controller, model=None):
         abort(error[0], error[1])
     elif model:
         mod = Model_Connection(token, controller, model)
+        print("=======DEBUGGING======")
+        print(mod)
         if not m_access_exists(mod.m_access):
             error = errors.unauthorized()
             abort(error[0], error[1])
@@ -292,14 +294,6 @@ def get_controller_info(token, controller):
         result = None
     return result
 
-
-def get_controller_superusers(controller):
-    users = datastore.get_controller_users(controller)
-    result = []
-    for user in users:
-        if datastore.get_controller_access(controller, user['name']) == 'superuser':
-            result.append(user['name'])
-    return result
 
 ###############################################################################
 # MODEL FUNCTIONS
@@ -791,7 +785,7 @@ def get_all_users():
 
 def get_users_info(token):
     """An admin user is allowed to access info of all other users. Users who
-    have no admin rights have only access to info about theirself."""
+    have no admin rights have only access to info about themselves."""
     if token.is_admin:
         result = []
         for user in get_all_users():

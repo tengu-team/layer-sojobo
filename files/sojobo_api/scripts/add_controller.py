@@ -85,7 +85,7 @@ async def create_controller(c_type, name, region, cred_name):
             for model in models.serialize()['user-models']:
                 model = model.serialize()['model'].serialize()
                 # TODO: Checken of model al bestaat?
-                new_model = datastore.create_model(model, state='Model is being deployed', uuid='')
+                new_model = datastore.create_model(model['name'], state='Model is being deployed', uuid='')
                 datastore.add_model_to_controller(name, new_model["_key"])
                 datastore.set_model_state(new_model["_key"], 'ready', credential=cred_name, uuid=model['uuid'])
                 datastore.set_model_access(new_model["_key"], token.username, 'admin')

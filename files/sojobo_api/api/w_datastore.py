@@ -1,6 +1,5 @@
 # pylint: disable=c0111,c0301, E0611, E0401, c0103, w0511, c0330
 #!/usr/bin/env python3
-import json
 from sojobo_api import settings
 import pyArango.connection as pyArango #Via wheelhouse?
 
@@ -22,6 +21,7 @@ def get_arangodb_connection():
 def get_sojobo_database():
     """Returns the sojobo database, creates one if it doesn't exist yet."""
     con = get_arangodb_connection()
+    #TODO: naar reactive, naam settings.py
     if con.hasDatabase("sojobo"):
         return con["sojobo"]
     return con.createDatabase(name="sojobo")
@@ -49,29 +49,33 @@ def execute_aql_query(aql, rawResults=False, **bindings):
 ################################################################################
 
 
-def create_user(user_name):
-    # TODO: Maybe place this 'if' in w_juju?
-    if not user_exists(user_name):
-        user = {"_key": user_name,
-                "name": user_name,
-                "ssh_keys": [],
-                "credentials": [],
-                "state": "pending"}
-        aql = "INSERT @user INTO users"
-        execute_aql_query(aql, user=user)
+def create_user(username):
+    # TODO: CHECK
+    user = {"_key": username,
+            "name": username,
+            "ssh_keys": [],
+            "credentials": [],
+            "state": "pending"}
+    aql = "INSERT @user INTO users"
+    execute_aql_query(aql, user=user)
 
 
 def user_exists(username):
-    aql = 'FOR u IN users FILTER u._key == @username RETURN u'
-    # Returns an empty list if no user is found.
-    user = execute_aql_query(aql, username=username)
-    return  bool(user)
+    # TODO: Test.
+    # TODO: CHECK
+    u_id = "users/" + username
+    aql = 'RETURN DOCUMENT(@u_id)'
+    # Returns a list with "null" if no user is found.
+    user = execute_aql_query(aql, u_id=u_id)[0]
+    return user == "null"
 
 
 def get_user(username):
+    #TODO: CHECK
     """Returns the dict of a user."""
-    aql = 'FOR u IN users FILTER u._key == @username RETURN u'
-    return execute_aql_query(aql, rawResults=True, username=username)[0]
+    u_id = "users/" + username
+    aql = 'RETURN DOCUMENT(@u_id)'
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 
 def get_user_doc(username):
@@ -81,6 +85,7 @@ def get_user_doc(username):
 
 
 def get_user_info(username):
+    # TODO: CHECK
     """Returns info of the given user, including which controllers and models
     that the user has access to."""
     u_id = "users/" + username
@@ -89,7 +94,7 @@ def get_user_info(username):
                 '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
                     'LET models = '
                         '(FOR model, mEdge in 1..1 INBOUND u._id modelAccess '
-                            'FILTER model._id in controller.models '
+                            'FILTER model._key in controller.models '
                             'RETURN {name: model.name, '
                                     'access: mEdge.access}) '
                     'RETURN {name: controller.name, '
@@ -109,38 +114,37 @@ def set_user_state(username, state):
 
 
 def get_user_state(username):
-    aql = 'FOR u IN users FILTER u._key == @username RETURN u.state'
-    return  execute_aql_query(aql, rawResults=True, username=username)[0]
+    #TODO: CHECK
+    u_id = "users/" + username
+    aql = 'LET u = DOCUMENT(@u_id) RETURN u.state'
+    return  execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 
 def get_ssh_keys(username):
-    # TODO: Test.
-    aql = 'FOR u IN users FILTER u._key == @username RETURN u.ssh_keys'
-    return  execute_aql_query(aql, rawResults=True, username=username)[0]
+    # TODO: CHECK
+    u_id = "users/" + username
+    aql = 'LET u = DOCUMENT(@u_id) RETURN u.ssh_keys'
+    return  execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 
 def update_ssh_keys(username, ssh_keys):
+    # TODO: CHECK
     aql = 'UPDATE {_key: @username, ssh_keys: @ssh} IN users'
     execute_aql_query(aql, username=username, ssh=ssh_keys)
 
 
 def add_credential(username, cred):
-    # TODO: Omvormen naar AQL, methode hieronder is een poging.
+    # TODO: Omvormen naar AQL.
+    # TODO: CHECK
     user = get_user_doc(username)
     if cred not in user['credentials']:
         user['credentials'].append(cred)
     user.save()
 
 
-# def add_credential(username, cred):
-#     aql = ('UPDATE "users/@username" WITH {'
-#            'credentials: PUSH(doc.credentials, @cred, true)'
-#            '} IN users')
-#     execute_aql_query(aql, username=username, cred=cred)
-
-
 def remove_credential(username, cred_name):
     # TODO: Omvormen naar AQL.
+    # TODO: CHECK
     user = get_user_doc(username)
     for cred in user['credentials']:
         if cred_name == cred['name']:
@@ -149,8 +153,10 @@ def remove_credential(username, cred_name):
 
 
 def get_credentials(username):
-    aql = 'FOR u IN users FILTER u._key == @username RETURN u.credentials'
-    return  execute_aql_query(aql, rawResults=True, username=username)[0]
+    # TODO: CHECK
+    u_id = "users/" + username
+    aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
+    return  execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 
 def get_credential_keys(user):
@@ -262,13 +268,12 @@ def get_users_controller(c_name):
 
 
 def get_controllers_user(username):
+    # TODO: Test.
+    # TODO: CHECK
     u_id = "users/" + username
-    aql = ('FOR edge IN controllerAccess '
-           'FILTER edge._to == @user '
-           'LET c = '
-               '(FOR c IN controllers FILTER c._id == edge._from RETURN c) '
-           'RETURN MERGE(c)')
-    return execute_aql_query(aql, rawResults=True, user=u_id)
+    aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess  '
+               'RETURN controller')
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)
 
 
 def get_controller(c_name):
@@ -340,24 +345,21 @@ def add_model_to_controller(c_name, m_key):
 
 
 def get_controllers_access(username):
+    #TODO: CHECK
     u_id = "users/" + username
-    aql = ('LET u = DOCUMENT(@username) '
-           'LET controllers = '
-                '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
-                    'RETURN controller) '
-            'RETURN controllers')
-    return execute_aql_query(aql, rawResults=True, username=u_id)
-
+    aql = ('FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
+               'RETURN {name: c.name, access: c.access, models: c.models, type: c.type}')
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)
 
 
 def get_controller_access(c_name, username):
+    # TODO: CHECK
     c_id = "controllers/" + c_name
     u_id = "users/" + username
-    aql = ('FOR edge in controllerAccess '
-           'FILTER edge._from == @controller '
-           'FILTER edge._to == @user '
-           'RETURN edge.access ')
-    return execute_aql_query(aql, rawResults=True, controller=c_id, user=u_id)[0]
+    aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess  '
+               'FILTER cEdge._from == @c_id '
+               'RETURN cEdge.access ')
+    return execute_aql_query(aql, rawResults=True, c_id=c_id, u_id=u_id)[0]
 
 
 def set_controller_access(c_name, username, access):
@@ -379,7 +381,9 @@ def get_default_credential(c_name):
     controller = get_controller(c_name)
     return controller["default-credential"]
 
+
 def get_all_controllers():
+    # TODO: CHECK
     aql = 'FOR c in controllers RETURN c'
     return execute_aql_query(aql, rawResults=True)
 
@@ -404,8 +408,12 @@ def get_all_con_keys():
 
 def get_all_models(c_name):
     # TODO: Test
-    controller = get_controller(c_name)
-    return controller["models"]
+    c_id = "controllers/" + c_name
+    aql = ('LET c = DOCUMENT(@controller) '
+           'FOR m_key in c.models '
+                'LET m = DOCUMENT(CONCAT("models/",m_key)) '
+                'RETURN m')
+    return execute_aql_query(aql, rawResults=True, controller=c_id)
 
 
 ################################################################################
@@ -474,16 +482,25 @@ def check_model_state(m_name):
     return execute_aql_query(aql, rawResults=True, model=m_name)[0]
 
 
-def get_model_access(modelname, username):
-    # TODO: Test.
-    m_id = "models" + modelname
+def get_model_access(c_name, m_name, username):
+    #TODO: CHECK
+    c_id = "controllers/" + c_name
     u_id = "users/" + username
-    aql = ('FOR edge in modelAccess',
-           'FILTER edge._from == @model'
-           'FILTER edge._to == @user'
-           'RETURN edge.access')
-    return execute_aql_query(aql, rawResults=True, model=m_id, user=u_id)[0]
+    aql = ('LET c = DOCUMENT(@controller) '
+           'FOR model, mEdge in 1..1 INBOUND @user modelAccess '
+                'FILTER model._key in c.models '
+                'FILTER model.name == @model '
+                'RETURN mEdge.access ')
+    return execute_aql_query(aql, rawResults=True, controller=c_id, model=m_name, user=u_id)[0]
 
+
+# def get_model_access(m_key, username):
+#     u_id = "users/" + username
+#     aql = ('FOR model, mEdge in 1..1 INBOUND @user modelAccess '
+#                 'FILTER model._key == @mkey '
+#                 'RETURN {name: model.name, access: mEdge.access} '
+#             )
+#     return execute_aql_query(aql, rawResults=True, mkey=m_key, user=u_id)
 
 # def set_model_access(m_key, username, access):
 #     # TODO: Aanpassen in andere files.
@@ -510,14 +527,26 @@ def set_model_access(m_key, username, access):
     execute_aql_query(aql, model=m_id, user=u_id, access=access)
 
 
-def get_models_access(username):
-    # TODO: Test.
-    # TODO: Returns models/key, should return names of models
+# def get_models_access(username):
+#     # TODO: Test.
+#     # TODO: Returns models/key, should return names of models
+#     u_id = "users/" + username
+#     aql = ('FOR edge in modelAccess',
+#            'FILTER edge._to == @user'
+#            'RETURN edge._from ')
+#     return execute_aql_query(aql, user=u_id)
+
+
+def get_models_access(c_name, username):
     u_id = "users/" + username
-    aql = ('FOR edge in modelAccess',
-           'FILTER edge._to == @user'
-           'RETURN edge._from ')
-    return execute_aql_query(aql, user=u_id)
+    c_id = "controllers/" + c_name
+    aql = ('LET c = DOCUMENT(@controller) '
+           'LET models = '
+                '(FOR model, mEdge in 1..1 INBOUND @user modelAccess '
+                    'FILTER model._key in c.models '
+                    'RETURN {name: model.name, access: mEdge.access}) '
+            'RETURN models')
+    return execute_aql_query(aql, rawResults=True, controller=c_id, user=u_id)[0]
 
 
 def get_model_key(c_name, m_name):
