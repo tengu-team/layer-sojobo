@@ -34,7 +34,7 @@ class JuJu_Token(object):  #pylint: disable=R0903
 async def update_ssh_key(ssh_keys, username):
     try:
         user = datastore.get_user(username)
-        controllers = datastore.get_controllers_user(username)
+        controllers = datastore.get_controllers_access(username)
         current_keys = user["ssh_keys"]
         new_keys = ast.literal_eval(ssh_keys)
         token = JuJu_Token()

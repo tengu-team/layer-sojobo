@@ -58,8 +58,8 @@ async def create_model(c_name, m_name, usr, pwd, cred_name):
                     await model.add_ssh_key(usr, key)
                 except (JujuAPIError, JujuError):
                     pass
-            logger.info('%s -> retrieving users: %s', m_name, ds.get_controller_users(c_name))
-            for u in ds.get_controller_users(c_name):
+            logger.info('%s -> retrieving users: %s', m_name, ds.get_users_controller(c_name))
+            for u in ds.get_users_controller(c_name):
                 if u['access'] == 'superuser' and u['name'] != usr:
                     await model.grant(u['name'], acl='admin')
                     ds.set_model_access(c_name, m_name, u['name'], 'admin')

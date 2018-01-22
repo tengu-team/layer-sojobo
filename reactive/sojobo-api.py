@@ -17,8 +17,8 @@
 from base64 import b64encode
 from hashlib import sha256
 import os
-import requests
 import shutil
+import requests
 import subprocess
 from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
@@ -242,5 +242,5 @@ def create_arangodb_collections(sojobo_db):
     create_arangodb_collection(sojobo_db, "modelAccess", edges=True)
 
 
-def has_collection(db, collection_name):
-    return collection_name in db.collections
+def has_collection(sojobo_db, collection_name):
+    return collection_name in sojobo_db.collections

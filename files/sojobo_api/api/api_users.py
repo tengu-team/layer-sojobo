@@ -344,6 +344,7 @@ def add_credential(user):
         code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
+
 @USERS.route('/<user>/credentials/<credential>', methods=['GET'])
 def get_credential(user, credential):
     try:
@@ -373,6 +374,7 @@ def get_credential(user, credential):
         ers = error_log()
         code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
+
 
 @USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
 def remove_credential(user, credential):

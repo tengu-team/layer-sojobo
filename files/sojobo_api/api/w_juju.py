@@ -89,13 +89,13 @@ class Model_Connection(object):
         self.m_name = model
         self.m_key = datastore.get_model_key(controller, model)
         self.m_access = datastore.get_model_access(controller, self.m_name, token.username)
-        self.m_uuid = datastore.get_model(controller, self.m_key)['uuid']
+        self.m_uuid = datastore.get_model(self.m_key)['uuid']
         self.m_connection = Model()
 
     async def set_model(self, token, controller, modelname):
         await self.m_connection.disconnect()
         self.m_name = modelname
-        self.m_uuid = datastore.get_model(controller, self.m_name)['uuid']
+        self.m_uuid = datastore.get_model(self.m_key)['uuid']
         # TODO: Hier key ook setten?
         self.m_connection = Model()
         self.m_access = datastore.get_model_access(controller, self.m_name, token.username)
@@ -269,6 +269,9 @@ def get_supported_regions(c_type):
 
 def get_all_controllers():
     return datastore.get_all_controllers()
+
+def get_all_controllers_names():
+    return datastore.get_all_controllers_names()
 
 def get_keys_controllers():
     return datastore.get_keys_controllers()
@@ -803,7 +806,7 @@ def get_user_info(username):
 def check_controllers_access(token, user):
     result = []
     for con in get_keys_controllers():
-        if datastore.get_controller_access(con, token.username) == 'superusers':
+        if datastore.get_controller_access(con, token.username) == 'superuser':
             result.append(get_ucontroller_access(con, user))
     if len(result) > 0:
         return True, result
@@ -816,10 +819,7 @@ def get_controllers_access(usr):
 
 
 def get_ucontroller_access(controller, username):
-    controllers = get_controllers_access(username)
-    for con in controllers:
-        if con['name'] == controller.c_name:
-            return con
+    return datastore.get_controller_and_access(controller, username)
 
 
 def get_models_access(controller, name):
@@ -855,12 +855,3 @@ def check_access(access):
     else:
         error = errors.invalid_access('access')
         abort(error[0], error[1])
-
-
-def check_same_access(user, new_access, controller, model=None):
-    if model is None:
-        old_acc = get_ucontroller_access(controller, user)
-        return old_acc == new_access
-    else:
-        old_acc = get_model_access(model, controller, user)
-        return old_acc == new_access

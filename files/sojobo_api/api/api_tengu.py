@@ -51,7 +51,7 @@ def get_all_controllers():
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
         if token.is_admin:
-            code, response = 200, juju.get_all_controllers()
+            code, response = 200, juju.get_all_controllers_names()
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
         else:
             code, response = errors.no_permission()
