@@ -21,7 +21,7 @@ def get_arangodb_connection():
 def get_sojobo_database():
     """Returns the sojobo database, creates one if it doesn't exist yet."""
     con = get_arangodb_connection()
-    #TODO: naar reactive, naam settings.py
+    #TODO: Naar reactive, naam settings.py
     if con.hasDatabase("sojobo"):
         return con["sojobo"]
     return con.createDatabase(name="sojobo")
@@ -131,6 +131,14 @@ def update_ssh_keys(username, ssh_keys):
     execute_aql_query(aql, username=username, ssh=ssh_keys)
 
 
+def add_credential(username, cred):
+    # TODO: Omvormen naar AQL.
+    user = get_user_doc(username)
+    if cred not in user['credentials']:
+        user['credentials'].append(cred)
+    user.save()
+
+
 def get_credentials(username):
     u_id = "users/" + username
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
@@ -139,14 +147,6 @@ def get_credentials(username):
 
 def get_credential_keys(user):
     return [c['name'] for c in get_credentials(user)]
-
-
-def add_credential(username, cred):
-    # TODO: Omvormen naar AQL.
-    user = get_user_doc(username)
-    if cred not in user['credentials']:
-        user['credentials'].append(cred)
-    user.save()
 
 
 def remove_credential(username, cred_name):
@@ -237,12 +237,14 @@ def get_controller(c_name):
     """Returns the dict of a controller."""
     c_id = "controllers/" + c_name
     aql = 'RETURN DOCUMENT(@c_id)'
-    return  execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
+    # TODO: Is [0] nodig?
+    return execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
 
 
 def get_all_controllers():
     aql = 'FOR c in controllers RETURN c'
     return execute_aql_query(aql, rawResults=True)
+
 
 def get_all_controllers_names():
     aql = 'FOR c in controllers RETURN c._key'
@@ -265,8 +267,20 @@ def get_users_controller(c_name):
 def get_controllers_access(username):
     u_id = "users/" + username
     aql = ('FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
-               'RETURN {name: c.name, access: c.access, models: c.models, type: c.type}')
-    return execute_aql_query(aql, rawResults=True, u_id=u_id)
+             'LET models = '
+               '(FOR model, mEdge in 1..1 INBOUND @u_id modelAccess '
+                    'FILTER model._key in c.models '
+                    'RETURN {name: model.name, '
+                            'access: mEdge.access}) '
+           'RETURN {name: c.name, access: cEdge.access, models: models, type: c.type}')
+    controllers = execute_aql_query(aql, rawResults=True, u_id=u_id)
+    # The variable 'controllers' is NOT a list but an iterator so we can not return that.
+    # We have to iterate over 'controllers' and add every element to a list because
+    # a list is JSON serializable and an iterator is not.
+    results = []
+    for c in controllers:
+        results.append(c)
+    return results
 
 
 def add_user_to_controller(c_name, username, access):
@@ -338,19 +352,23 @@ def get_controller_and_access(c_name, username):
     u_id = "users/" + username
     aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess  '
                'FILTER cEdge._from == @c_id '
+               'LET models = '
+                 '(FOR model, mEdge in 1..1 INBOUND @u_id modelAccess '
+                      'FILTER model._key in controller.models '
+                      'RETURN {name: model.name, '
+                              'access: mEdge.access}) '
                'RETURN {access: cEdge.access, name: controller.name, '
-                       'models: controller.models, type: controller.type}')
+                       'models: models, type: controller.type}')
     return execute_aql_query(aql, rawResults=True, c_id=c_id, u_id=u_id)[0]
 
 
 def set_controller_access(c_name, username, access):
     c_id = "controllers/" + c_name
     u_id = "users/" + username
-    aql = ('FOR edge in controllerAccess',
-           'FILTER edge._from == @controller'
-           'FILTER edge._to == @user'
-           'UPDATE edge WITH { access: @access } IN controllerAccess')
-    return execute_aql_query(aql, controller=c_id, user=u_id, access=access)[0]
+    aql = ("UPSERT { _from: @c_id, _to: @u_id }"
+           "INSERT { _from: @c_id, _to: @u_id, access: @access}"
+           "UPDATE { access : @access } in controllerAccess")
+    execute_aql_query(aql, c_id=c_id, u_id=u_id, access=access)
 
 
 def get_keys_controllers():
@@ -359,8 +377,9 @@ def get_keys_controllers():
 
 
 ################################################################################
-# MODEL FUNCTIONS
+#                               MODEL FUNCTIONS                                #
 ################################################################################
+
 
 def create_model(m_name, state, uuid):
     #create_models_collection()
@@ -401,7 +420,6 @@ def remove_model_m_col(m_key):
 
 
 def remove_edges_models_access(m_key):
-    #TODO: Test.
     """Removes all Edges from the collection 'modelAccess' that contain
     the given model."""
     m_id = "models/" + m_key
@@ -448,7 +466,9 @@ def get_model_access(c_name, m_name, username):
                 'FILTER model._key in c.models '
                 'FILTER model.name == @model '
                 'RETURN mEdge.access ')
-    return execute_aql_query(aql, rawResults=True, controller=c_id, model=m_name, user=u_id)[0]
+    result = execute_aql_query(aql, rawResults=True, controller=c_id, model=m_name, user=u_id)
+    if bool(result):
+        return result[0]
 
 
 def get_models_access(c_name, username):

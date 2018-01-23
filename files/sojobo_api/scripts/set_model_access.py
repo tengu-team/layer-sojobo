@@ -55,7 +55,8 @@ async def set_model_acc(username, password, user, access, controller):
                             lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
                             for l in lines:
                                 logger.error(l)
-            datastore.set_model_access(controller, mod['name'], user, mod['access'])
+            m_key = get_model_key(controller, mod['name'])
+            datastore.set_model_access(m_key, user, mod['access'])
             logger.info('Model Access set for %s on %s!', user, mod['name'])
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
