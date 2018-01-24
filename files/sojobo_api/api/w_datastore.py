@@ -241,12 +241,26 @@ def get_controller(c_name):
     return execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
 
 
+def get_controller_info(c_name):
+    # TODO: Function info
+    c_id = "controllers/" + c_name
+    aql = ( 'LET c = DOCUMENT(@c_id) '
+            'LET models = '
+                '(FOR m_key in c.models '
+                    'RETURN DOCUMENT(CONCAT("models/", m_key))) '
+            'LET users = '
+                '(FOR u, cEdge IN 1..1 OUTBOUND @c_id controllerAccess '
+                    'RETURN {name: u.name, access: cEdge.access}) '
+            'RETURN {name: c.name, state: c.state, type: c.type, '
+                    'models: models, users: users}' )
+    return execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
+
+
 def get_all_controllers():
     aql = 'FOR c in controllers RETURN c'
     return execute_aql_query(aql, rawResults=True)
 
-
-def get_all_controllers_names():
+def get_keys_controllers():
     aql = 'FOR c in controllers RETURN c._key'
     return execute_aql_query(aql, rawResults=True)
 
@@ -261,7 +275,7 @@ def get_users_controller(c_name):
     c_id = "controllers/" + c_name
     aql = ('FOR u, cEdge IN 1..1 OUTBOUND @c_id controllerAccess '
                'RETURN {name: u.name, access: cEdge.access}')
-    return execute_aql_query(aql, rawResults=True, controller=c_id)
+    return execute_aql_query(aql, rawResults=True, c_id=c_id)
 
 
 def get_controllers_access(username):
@@ -371,9 +385,7 @@ def set_controller_access(c_name, username, access):
     execute_aql_query(aql, c_id=c_id, u_id=u_id, access=access)
 
 
-def get_keys_controllers():
-    aql = 'FOR c in controllers RETURN c._key'
-    return execute_aql_query(aql, rawResults=True)
+
 
 
 ################################################################################
@@ -431,9 +443,9 @@ def remove_edges_models_access(m_key):
 
 def remove_model_from_controller(c_name, m_key):
     c_id = "controllers/" + c_name
-    aql = ('LET doc = DOCUMENT(@controller)'
-           'UPDATE doc WITH {'
-           'models: REMOVE_VALUE(doc.models, @model)'
+    aql = ('LET doc = DOCUMENT(@controller) '
+           'UPDATE doc WITH { '
+           'models: REMOVE_VALUE(doc.models, @model) '
            '} IN controllers)')
     execute_aql_query(aql, controller=c_id, model=m_key)
 
@@ -449,12 +461,14 @@ def set_model_state(m_key, state, credential=None, uuid=None):
     execute_aql_query(aql, model=m_key, state=state, credential=credential, uuid=uuid)
 
 
-def check_model_state(m_name):
-    # TODO: To test
-    aql = ('FOR m IN models '
-           'FILTER m._key == @model '
-           'RETURN m.state')
-    return execute_aql_query(aql, rawResults=True, model=m_name)[0]
+def check_model_state(c_name, m_name):
+    m_key = get_model_key(c_name, m_name)
+    if m_key is not None:
+        m_id = "models/" + m_key
+        aql = ( 'LET model = DOCUMENT(@m_id) '
+                'RETURN model.state' )
+        return execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
+    return 'error'
 
 
 def get_model_access(c_name, m_name, username):
@@ -512,9 +526,6 @@ def find_model_key(model_keys, m_name):
 
 def get_users_model(m_key):
     m_id = "models/" + m_key
-    aql = ('FOR edge in modelAccess '
-           'FILTER edge._from == @model '
-           'LET u = '
-           '(FOR u in users FILTER u._id == edge._to RETURN u) '
-           'RETURN MERGE(u)')
-    return execute_aql_query(aql, model=m_id)
+    aql = ('FOR u, mEdge IN 1..1 OUTBOUND @m_id modelAccess '
+               'RETURN {name: u.name, access: mEdge.access}')
+    return execute_aql_query(aql, rawResults=True, m_id=m_id)

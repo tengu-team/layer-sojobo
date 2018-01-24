@@ -63,7 +63,7 @@ def configure_webapp():
     open_port(config()['port'])
     service_restart('nginx')
     set_state('api.configured')
-    status_set('blocked', 'Waiting for a connection with Redis')
+    status_set('blocked', 'Waiting for a connection with ArangoDB')
 
 
 @when('config.changed', 'api.running')

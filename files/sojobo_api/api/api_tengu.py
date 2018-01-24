@@ -51,7 +51,7 @@ def get_all_controllers():
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
         if token.is_admin:
-            code, response = 200, juju.get_all_controllers_names()
+            code, response = 200, juju.get_keys_controllers()
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
         else:
             code, response = errors.no_permission()
@@ -122,7 +122,7 @@ def get_controller_info(controller):
         LOGGER.info('/TENGU/controllers/%s [GET] => receiving call', controller)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers/%s [GET] => Authenticated!', controller)
-        con = juju.authorize( token, controller)
+        con = juju.authorize(token, controller)
         LOGGER.info('/TENGU/controllers/%s [GET] => Authorized!', controller)
         code, response = 200, juju.get_controller_info(token, con)
         LOGGER.info('/TENGU/controllers/%s [GET] => Succesfully retrieved controller information!', controller)
@@ -260,7 +260,7 @@ def add_bundle(controller, model):
                 bundle['services'] = bundle['applications']
                 bundle.pop('applications')
             LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Bundle is being deployed, check bundle_deployment.log for more information!', controller, model)
-            juju.add_bundle(token, con.c_name, mod.m_name, bundle)
+            juju.add_bundle(token, con.c_name, mod.m_key, bundle)
             code, response = 202, "Bundle is being deployed"
         else:
             code, response = errors.no_permission()

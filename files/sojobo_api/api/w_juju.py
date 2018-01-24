@@ -220,8 +220,6 @@ def authorize(token, controller, model=None):
         abort(error[0], error[1])
     elif model:
         mod = Model_Connection(token, controller, model)
-        print("=======DEBUGGING======")
-        print(mod)
         if not m_access_exists(mod.m_access):
             error = errors.unauthorized()
             abort(error[0], error[1])
@@ -270,11 +268,8 @@ def get_supported_regions(c_type):
 def get_all_controllers():
     return datastore.get_all_controllers()
 
-def get_all_controllers_names():
-    return datastore.get_all_controllers_names()
-
 def get_keys_controllers():
-    return datastore.get_keys_controllers()
+    return [key for key in datastore.get_keys_controllers()]
 
 
 def controller_exists(c_name):
@@ -287,15 +282,12 @@ def get_controller_access(con, username):
 
 def get_controller_info(token, controller):
     if controller.c_access is not None:
-        con = datastore.get_controller(controller.c_name)
-        users = get_users_controller(controller.c_name)
-        result = {'name': controller.c_name, 'type': controller.c_token.type,
-                  'users': users, 'state': con['state'], 'models': []}
-        if con['state'] == 'ready':
-            result['models'] = get_models_info(token, controller)
+        con_info = datastore.get_controller_info(controller.c_name)
+        if con_info['state'] == 'ready':
+            con_info['models'] = get_models_info(token, controller)
     else:
-        result = None
-    return result
+        con_info = None
+    return con_info
 
 
 ###############################################################################
@@ -431,11 +423,12 @@ def create_model(token, controller, model, credentials):
         code, response = errors.already_exists('model')
     elif credentials in datastore.get_credential_keys(token.username):
         new_model = datastore.create_model(model, state='Model is being deployed', uuid='')
+        new_model_key = new_model["_key"]
         datastore.add_model_to_controller(controller, new_model["_key"])
         datastore.set_model_state(new_model["_key"], 'accepted')
         datastore.set_model_access(new_model["_key"], token.username, 'admin')
         Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), controller,
-               model, settings.SOJOBO_API_DIR, token.username, token.password, credentials])
+               new_model_key, settings.SOJOBO_API_DIR, token.username, token.password, credentials])
         code, response = 202, "Model is being deployed"
     else:
         code, response = 404, "Credentials {} not found!".format(credentials)
@@ -552,7 +545,7 @@ async def app_exists(token, controller, model, app_name):
 def add_bundle(token, controller, model, bundle):
     Popen(["python3", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR),
            token.username, token.password, settings.SOJOBO_API_DIR, controller, model,
-           str(bundle), settings.REDIS_HOST, settings.REDIS_PORT])
+           str(bundle)])
 
 
 async def deploy_app(token, con, model, app_name, data):
@@ -711,7 +704,8 @@ def get_users_controller(controller):
 
 def get_users_model(token, controller, model):
     if model.m_access == 'admin' or model.m_access == 'write':
-        users = datastore.get_users_model(controller.c_name, model.m_key)
+        aql_data = datastore.get_users_model(model.m_key)
+        users = [user for user in aql_data]
     elif model.m_access == 'read':
         users = [{'name': token.username, 'access': model.m_access}]
     else:
