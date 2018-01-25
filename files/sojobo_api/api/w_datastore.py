@@ -1,7 +1,7 @@
 # pylint: disable=c0111,c0301, E0611, E0401, c0103, w0511, c0330
 #!/usr/bin/env python3
 from sojobo_api import settings
-import pyArango.connection as pyArango #Via wheelhouse?
+import pyArango.connection as pyArango
 
 
 ################################################################################
@@ -18,15 +18,6 @@ def get_arangodb_connection():
     return connection
 
 
-def get_sojobo_database():
-    """Returns the sojobo database, creates one if it doesn't exist yet."""
-    con = get_arangodb_connection()
-    #TODO: Naar reactive, naam settings.py
-    if con.hasDatabase("sojobo"):
-        return con["sojobo"]
-    return con.createDatabase(name="sojobo")
-
-
 def execute_aql_query(aql, rawResults=False, **bindings):
     """Executes the given AQL query and returns its results.
 
@@ -37,11 +28,14 @@ def execute_aql_query(aql, rawResults=False, **bindings):
     @user in AQL query then this function will look like this: execute_aql_query(aql, user='admin').
     If you have two parameters @user and @model then it will look like this:
     execute_aql_query(aql, user='admin', model='testmodel')."""
-    db = get_sojobo_database()
+    connection = get_arangodb_connection()
+    db = connection[settings.ARANGO_DB]
     bind = {}
     for key in bindings:
         bind[key] = bindings[key]
-    return db.AQLQuery(aql, rawResults=rawResults, bindVars=bind)
+    results = db.AQLQuery(aql, rawResults=rawResults, bindVars=bind)
+    connection.disconnectSession()
+    return results
 
 
 ################################################################################

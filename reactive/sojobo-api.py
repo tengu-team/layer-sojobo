@@ -113,6 +113,7 @@ def connect_to_arango(arango):
         'ARANGO_PORT': arango.port(),
         'ARANGO_USER': arango.username(),
         'ARANGO_PASS': arango.password(),
+        'ARANGO_DB': 'sojobo',
         'REPO_NAME': config()['github-repo'],
         'SOJOBO_API_PORT' : config()['port']
     })
