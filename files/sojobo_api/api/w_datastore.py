@@ -68,13 +68,12 @@ def get_user(username):
 
 
 def get_all_users():
-    """Returns a list with all users from the collection 'users'."""
     aql = "FOR u IN users RETURN u"
     return execute_aql_query(aql, rawResults=True)
 
 
 def get_user_doc(username):
-    # TODO: Als credentials methoden werken dan is deze overbodig.
+    # TODO: If credential methods work with AQL then this function becomes obsolete.
     """Returns the Document of a user."""
     aql = 'FOR u IN users FILTER u._key == @username RETURN u'
     return  execute_aql_query(aql, username=username)[0]
@@ -125,14 +124,6 @@ def update_ssh_keys(username, ssh_keys):
     execute_aql_query(aql, username=username, ssh=ssh_keys)
 
 
-def add_credential(username, cred):
-    # TODO: Omvormen naar AQL.
-    user = get_user_doc(username)
-    if cred not in user['credentials']:
-        user['credentials'].append(cred)
-    user.save()
-
-
 def get_credentials(username):
     u_id = "users/" + username
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
@@ -141,6 +132,14 @@ def get_credentials(username):
 
 def get_credential_keys(user):
     return [c['name'] for c in get_credentials(user)]
+
+
+def add_credential(username, cred):
+    # TODO: Omvormen naar AQL.
+    user = get_user_doc(username)
+    if cred not in user['credentials']:
+        user['credentials'].append(cred)
+    user.save()
 
 
 def remove_credential(username, cred_name):
@@ -161,26 +160,26 @@ def delete_user(username):
 
 def remove_user_u_col(username):
     """Removes the user from the collection 'users'."""
-    aql = 'REMOVE {_key: @user} IN users'
-    execute_aql_query(aql, user=username)
+    aql = 'REMOVE {_key: @username} IN users'
+    execute_aql_query(aql, username=username)
 
 
 def remove_user_c_access(username):
     """Removes every Edge from controllerAccess that contains given user."""
     u_id = "users/" + username
     aql = ('FOR edge in controllerAccess '
-           'FILTER edge._to == @user '
+           'FILTER edge._to == @u_id '
            'REMOVE edge in controllerAccess')
-    execute_aql_query(aql, user=u_id)
+    execute_aql_query(aql, u_id=u_id)
 
 
 def remove_user_m_access(username):
     """Removes every Edge from modelAccess that contains given user."""
     u_id = "users/" + username
     aql = ('FOR edge in modelAccess '
-           'FILTER edge._to == @user '
+           'FILTER edge._to == @u_id '
            'REMOVE edge in modelAccess')
-    execute_aql_query(aql, user=u_id)
+    execute_aql_query(aql, u_id=u_id)
 
 
 ################################################################################
@@ -236,7 +235,8 @@ def get_controller(c_name):
 
 
 def get_controller_info(c_name):
-    # TODO: Function info
+    """Returns the info of a controller. This includes the models (and their info)
+    and the users that have access to the controller."""
     c_id = "controllers/" + c_name
     aql = ( 'LET c = DOCUMENT(@c_id) '
             'LET models = '
@@ -253,6 +253,7 @@ def get_controller_info(c_name):
 def get_all_controllers():
     aql = 'FOR c in controllers RETURN c'
     return execute_aql_query(aql, rawResults=True)
+
 
 def get_keys_controllers():
     aql = 'FOR c in controllers RETURN c._key'
@@ -302,7 +303,6 @@ def add_user_to_controller(c_name, username, access):
 
 
 def set_controller_state(c_name, state, endpoints=None, uuid=None, ca_cert=None):
-    # TODO: Erg dat bij error de None values worden gebruikt?
     aql = ('UPDATE @controller WITH {'
            'state: @state,'
            'endpoints: @endpoints,'
@@ -379,16 +379,12 @@ def set_controller_access(c_name, username, access):
     execute_aql_query(aql, c_id=c_id, u_id=u_id, access=access)
 
 
-
-
-
 ################################################################################
 #                               MODEL FUNCTIONS                                #
 ################################################################################
 
 
 def create_model(m_name, state, uuid):
-    #create_models_collection()
     # TODO: Check if model with that name already exists. In this layer?
     model = {
         "name": m_name,
@@ -402,6 +398,15 @@ def get_model(m_key):
     m_id = "models/" + m_key
     aql = 'RETURN DOCUMENT(@m_id)'
     return  execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
+
+
+def get_model_key(c_name, m_name):
+    controller = get_controller(c_name)
+    for key in controller["models"]:
+        model = get_model(key)
+        if model["name"] == m_name:
+            return key
+    return None
 
 
 def get_all_models(c_name):
@@ -445,8 +450,6 @@ def remove_model_from_controller(c_name, m_key):
 
 
 def set_model_state(m_key, state, credential=None, uuid=None):
-    # TODO: Erg dat bij error de None values worden gebruikt?
-    # TODO: Methode opsplitsen in 3? 1 methode per veld.
     aql = ('UPDATE @model WITH {'
            'state: @state, '
            'credential: @credential, '
@@ -466,7 +469,6 @@ def check_model_state(c_name, m_name):
 
 
 def get_model_access(c_name, m_name, username):
-    #TODO: CHECK
     c_id = "controllers/" + c_name
     u_id = "users/" + username
     aql = ('LET c = DOCUMENT(@controller) '
@@ -492,30 +494,12 @@ def get_models_access(c_name, username):
 
 
 def set_model_access(m_key, username, access):
-    # TODO: Aanpassen in andere files.
-    # TODO: Gaat er van uit dat er al access edge is. UPSERT gebruiken?
-    # TODO: Testen.
     m_id = "models/" + m_key
     u_id = "users/" + username
     aql = ("UPSERT { _from: @model, _to: @user }"
            "INSERT { _from: @model, _to: @user, access: @access}"
            "UPDATE { access : @access } in modelAccess")
     execute_aql_query(aql, model=m_id, user=u_id, access=access)
-
-
-def get_model_key(c_name, m_name):
-    controller = get_controller(c_name)
-    key = find_model_key(controller["models"], m_name)
-    return key
-
-
-def find_model_key(model_keys, m_name):
-    # TODO: Rename function
-    for key in model_keys:
-        model = get_model(key)
-        if model["name"] == m_name:
-            return key
-    return None
 
 
 def get_users_model(m_key):
