@@ -14,6 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302,e0611
+
 import asyncio
 from importlib import import_module
 from random import randint
@@ -30,9 +31,13 @@ from juju.errors import JujuAPIError, JujuError
 from juju.model import Model
 from sojobo_api.api import w_errors as errors, w_datastore as datastore
 from sojobo_api import settings
+
+
 ################################################################################
 # TENGU FUNCTIONS
 ################################################################################
+
+
 class JuJu_Token(object):  #pylint: disable=R0903
     def __init__(self, auth):
         self.username = auth.username
@@ -44,6 +49,8 @@ class JuJu_Token(object):  #pylint: disable=R0903
 
 
 class Controller_Connection(object):
+    """Object to interact with controller in JuJu."""
+
     def __init__(self, token, c_name):
         self.c_name = c_name
         self.c_access = datastore.get_controller_access(c_name, token.username)
@@ -57,6 +64,7 @@ class Controller_Connection(object):
             self.endpoint = None
             self.c_cacert = None
         self.c_token = getattr(get_controller_types()[self.c_type], 'Token')(self.endpoint, token.username, token.password)
+
     async def set_controller(self, token, c_name):
         await self.c_connection.disconnect()
         self.c_name = c_name
@@ -114,12 +122,16 @@ class Model_Connection(object):
 
 
 def get_controller_types():
-    c_list = {}
+    """Returns the types of the controllers (google, aws, etc.). This depends on
+    which subordinates (f.e. controller_google) are connected to the sojobo-api charm.
+    Each controller subordinate creates a file in the controllers dir."""
+    types = {}
     for f_path in os.listdir('{}/controllers'.format(settings.SOJOBO_API_DIR)):
+        # TODO: Why the .pyc check?
         if 'controller_' in f_path and '.pyc' not in f_path:
             name = f_path.split('.')[0]
-            c_list[name.split('_')[1]] = import_module('sojobo_api.controllers.{}'.format(name))
-    return c_list
+            types[name.split('_')[1]] = import_module('sojobo_api.controllers.{}'.format(name))
+    return types
 
 
 def execute_task(command, *args, **kwargs):
@@ -322,7 +334,8 @@ def get_model_access(model, controller, username):
 
 def get_models_info(token, controller):
     result = []
-    for mod in get_all_models(controller):
+    models = get_all_models(controller)
+    for mod in models:
         print(mod, datastore.get_model_access(controller.c_name, mod, token.username))
         if datastore.get_model_access(controller.c_name, mod['name'], token.username) in ['read', 'write', 'admin']:
             result.append(mod)

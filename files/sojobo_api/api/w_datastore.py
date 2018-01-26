@@ -1,4 +1,3 @@
-# pylint: disable=c0111,c0301, E0611, E0401, c0103, w0511, c0330
 #!/usr/bin/env python3
 from sojobo_api import settings
 import pyArango.connection as pyArango
@@ -445,7 +444,7 @@ def remove_model_from_controller(c_name, m_key):
     aql = ('LET doc = DOCUMENT(@controller) '
            'UPDATE doc WITH { '
            'models: REMOVE_VALUE(doc.models, @model) '
-           '} IN controllers)')
+           '} IN controllers')
     execute_aql_query(aql, controller=c_id, model=m_key)
 
 

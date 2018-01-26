@@ -53,7 +53,7 @@ async def set_controller_acc(c_name, access, user):
                     await mod_con.grant(user, acl='admin')
                     datastore.set_model_access(mod["_key"], user, 'admin')
                     logger.info('Admin Access granted for for %s:%s', c_name, mod['name'])
-                for key in usr['ssh-keys']:
+                for key in usr['ssh_keys']:
                     logger.info('SSh key found... adding SSH key %s', key)
                     await mod_con.add_ssh_key(user, key)
     except Exception:

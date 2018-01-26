@@ -13,7 +13,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
 import sys
 import traceback
@@ -26,27 +25,26 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: di
 from juju.client import client
 from juju.errors import JujuAPIError, JujuError
 
+
 class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = settings.JUJU_ADMIN_USER
-        self.password = settings.JUJU_ADMIN_PASSWORD
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
         self.is_admin = False
 
 
 async def create_model(c_name, m_key, usr, pwd, cred_name):
     try:
-        token = JuJu_Token()
-        token.username = usr
-        token.password = pwd
+        token = JuJu_Token(usr, pwd)
         controller = juju.Controller_Connection(token, c_name)
-        c_type = controller.c_type
         m_name = datastore.get_model(m_key)["name"]
         credential = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
+
         async with controller.connect(token) as con_juju:
             logger.info('%s -> Creating model: %s', m_name, m_name)
             model = await con_juju.add_model(
                 m_name,
-                cloud_name=c_type,
+                cloud_name=controller.c_type,
                 credential_name=credential,
                 owner=tag.user(usr)
             )
@@ -69,6 +67,7 @@ async def create_model(c_name, m_key, usr, pwd, cred_name):
                             await model.add_ssh_key(u['name'], key['key'])
                         except (JujuAPIError, JujuError):
                             pass
+            await model.disconnect()
             logger.info('%s -> succesfully deployed model', m_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -94,6 +93,8 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[4],
-                                         sys.argv[5], sys.argv[6]))
-    loop.close()
+    try:
+        loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[4],
+                                             sys.argv[5], sys.argv[6]))
+    finally:
+        loop.close()
