@@ -13,7 +13,6 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
 import sys
 import traceback
@@ -22,52 +21,53 @@ import hashlib
 sys.path.append('/opt')
 from juju import tag
 from sojobo_api import settings  #pylint: disable=C0413
-from sojobo_api.api import w_datastore as ds, w_juju as juju  #pylint: disable=C0413
+from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 from juju.client import client
 from juju.errors import JujuAPIError, JujuError
 
+
 class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = settings.JUJU_ADMIN_USER
-        self.password = settings.JUJU_ADMIN_PASSWORD
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
         self.is_admin = False
 
 
-async def create_model(c_name, m_name, usr, pwd, cred_name):
+async def create_model(c_name, m_key, usr, pwd, cred_name):
     try:
-        token = JuJu_Token()
-        token.username = usr
-        token.password = pwd
+        token = JuJu_Token(usr, pwd)
         controller = juju.Controller_Connection(token, c_name)
-        c_type = controller.c_type
+        m_name = datastore.get_model(m_key)["name"]
         credential = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
+
         async with controller.connect(token) as con_juju:
             logger.info('%s -> Creating model: %s', m_name, m_name)
             model = await con_juju.add_model(
                 m_name,
-                cloud_name=c_type,
+                cloud_name=controller.c_type,
                 credential_name=credential,
                 owner=tag.user(usr)
             )
             logger.info('%s -> model deployed on juju', m_name)
-            ds.set_model_access(c_name, m_name, usr, 'admin')
-            ds.set_model_state(c_name, m_name, 'ready', cred_name, model.info.uuid)
+            datastore.set_model_access(m_key, usr, 'admin')
+            datastore.set_model_state(m_key, 'ready', cred_name, model.info.uuid)
             logger.info('%s -> Adding ssh-keys to model: %s', m_name, m_name)
-            for key in ds.get_ssh_keys(usr):
+            for key in datastore.get_ssh_keys(usr):
                 try:
                     await model.add_ssh_key(usr, key)
                 except (JujuAPIError, JujuError):
                     pass
-            logger.info('%s -> retrieving users: %s', m_name, ds.get_controller_users(c_name))
-            for u in ds.get_controller_users(c_name):
+            logger.info('%s -> retrieving users: %s', m_name, datastore.get_users_controller(c_name))
+            for u in datastore.get_users_controller(c_name):
                 if u['access'] == 'superuser' and u['name'] != usr:
                     await model.grant(u['name'], acl='admin')
-                    ds.set_model_access(c_name, m_name, u['name'], 'admin')
-                    for key in ds.get_ssh_keys(u['name']):
+                    datastore.set_model_access(m_key, u['name'], 'admin')
+                    for key in datastore.get_ssh_keys(u['name']):
                         try:
                             await model.add_ssh_key(u['name'], key['key'])
                         except (JujuAPIError, JujuError):
                             pass
+            await model.disconnect()
             logger.info('%s -> succesfully deployed model', m_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -75,13 +75,9 @@ async def create_model(c_name, m_name, usr, pwd, cred_name):
         for l in lines:
             logger.error(l)
         if 'model' in locals():
-            ds.set_model_state(c_name, m_name, 'ready', cred_name, model.info.uuid)
+            datastore.set_model_state(m_key, 'ready', cred_name, model.info.uuid)
         else:
-            ds.set_model_state(c_name, m_name, 'error: {}'.format(lines))
-    finally:
-        if 'model' in locals():
-            await model.disconnect()
-        await controller.disconnect()
+            datastore.set_model_state(m_key, 'error: {}'.format(lines))
 
 
 if __name__ == '__main__':
@@ -97,6 +93,8 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[4],
-                                         sys.argv[5], sys.argv[6]))
-    loop.close()
+    try:
+        loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[4],
+                                             sys.argv[5], sys.argv[6]))
+    finally:
+        loop.close()

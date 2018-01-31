@@ -19,7 +19,9 @@
 import logging
 import re
 import sys
+import time
 import traceback
+import time
 import base64, hashlib
 from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint
@@ -69,7 +71,11 @@ def login():
 def get_users_info():
     try:
         LOGGER.info('/USERS [GET] => receiving call')
+        time1 = time.time()
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        time2 = time.time()
+        print("===== TIMING =====")
+        print ('%s function took %0.3f ms' % ("get_users_info", (time2-time1)*1000.0))
         LOGGER.info('/USERS [GET] => Authenticated!')
         code, response = 200, juju.get_users_info(token)
         LOGGER.info('/USERS [GET] => Succesfully retieved all users!')
@@ -344,6 +350,7 @@ def add_credential(user):
         code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
 
+
 @USERS.route('/<user>/credentials/<credential>', methods=['GET'])
 def get_credential(user, credential):
     try:
@@ -373,6 +380,7 @@ def get_credential(user, credential):
         ers = error_log()
         code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
+
 
 @USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
 def remove_credential(user, credential):
@@ -447,7 +455,7 @@ def get_ucontroller_access(user, controller):
         if token.is_admin or token.username == user or con.access == 'superuser':
             if juju.user_exists(user):
                 LOGGER.info('/USERS/%s/controllers/%s [GET] => Authorized!', user, controller)
-                code, response = 200, juju.get_ucontroller_access(con, user)
+                code, response = 200, juju.get_ucontroller_access(con.c_name, user)
                 LOGGER.info('/USERS/%s/controllers/%s [GET] => Succesfully retrieved controller access!', user, controller)
             else:
                 code, response = errors.does_not_exist('user')
@@ -475,7 +483,7 @@ def grant_to_controller(user, controller):
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authenticated!', user, controller)
         con = juju.authorize(token, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authorized!', user, controller)
-        if (token.is_admin or con.c_access == 'superuser') and 'admin' != user:
+        if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
             if juju.user_exists(user):
                 if request.json['access'] and juju.c_access_exists(request.json['access'].lower()):
                     juju.grant_user_to_controller(token, con, user, request.json['access'].lower())
@@ -544,8 +552,10 @@ def grant_to_model(user, controller):
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authenticated!', user, controller)
         con = juju.authorize(token, controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authorized!', user, controller)
-        if (token.is_admin or con.c_access == 'superuser') and 'admin' != user:
+        if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
             if juju.user_exists(user):
+                print("=====DEBUGGING=====")
+                print("USER EXISTS according to juju.user_exists(user)")
                 juju.set_models_access(token, con, user, data)
                 LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Setting model access, check set_model_access.log for more information!', user, controller)
                 code, response = 202, 'The model access is being changed'
@@ -553,10 +563,14 @@ def grant_to_model(user, controller):
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => User %s does not exist!', user, controller, user)
         else:
+            # TODO: Cleanup
             user_access = juju.get_models_access(con, user)
+            m_names = []
+            for mode in user_access:
+                m_names.append(mode["name"])
             if juju.user_exists(user):
                 for mod in data:
-                    if not mod['name'] in user_access:
+                    if not mod['name'] in m_names:
                         LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => No Permission to perform this action!', user, controller)
                         code, response = errors.no_permission()
                         return juju.create_response(code, response)
