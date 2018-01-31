@@ -87,6 +87,12 @@ def create_controller():
                 if juju.controller_exists(controller):
                     code, response = errors.already_exists('controller')
                     LOGGER.error('%s [POST] => Controller %s already exists', url, controller)
+                elif c_type == 'manual':
+                    if 'url' in data:
+                        code, response = juju.bootstrap_manual_controller(name, data['url'])
+                        LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
+                    else:
+                        code, response = 400, 'Please provide an URL to bootstrap your environment'
                 else:
                     sup_clouds = juju.get_supported_regions(c_type)
                     if data['region'] in sup_clouds:
@@ -534,7 +540,9 @@ def add_machine(controller, model):
             if constraints:
                 juju.check_constraints(data.get(constraints, True))
             series = data.get('series', None)
-            if juju.cloud_supports_series(con, series):
+            if 'url' in data and juju.cloud_supports_series(con, series):
+                execute_task(juju.add_machine, token, mod, series, constraints, spec='ssh:ubuntu@{}'.format(data['url']))
+            elif juju.cloud_supports_series(con, series):
                 execute_task(juju.add_machine, token, mod, series, constraints)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller, model)
                 code, response = 202, 'Machine is being deployed!'

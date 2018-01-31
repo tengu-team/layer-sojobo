@@ -47,7 +47,7 @@ async def create_controller(c_type, name, region, cred_name):
         logger.info('Bootstrapping controller')
         credential = juju.get_credential(token.username, cred_name)
         logger.info('credential found %s:', credential['credential'])
-        juju.get_controller_types()[c_type].create_controller(name, region, credential['credential'], 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest()))
+        juju.get_controller_types()[c_type].bootstrap_controller(name, region, credential['credential'], 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest()))
         pswd = token.password
 
         logger.info('Setting admin password')

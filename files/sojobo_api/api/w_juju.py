@@ -240,23 +240,27 @@ def check_c_type(c_type):
         abort(error[0], error[1])
 
 
-def create_controller(c_type, name, region, credentials):
+def create_controller(c_type, name, data):
+    return get_controller_types()[c_type].create_controller(name, data)
+
+
+def bootstrap_manual_controller(name, url):
     for controller in get_all_controllers():
         if datastore.get_controller(controller)['state'] == 'accepted':
             return 503, 'An environment is already being created'
-    Popen(["python3.6", "{}/scripts/add_controller.py".format(settings.SOJOBO_API_DIR),
-           c_type, name, region, credentials])
-    return 202, 'Environment {} is being created in region {}'.format(name, region)
-
+    Popen(["python3", "{}/bootstrap_manual_controller.py".format(settings.SOJOBO_API_DIR),
+           'manual', name, url])
+    return 202, 'Environment {} is being created in region {}'.format(name)
 
 def generate_cred_file(c_type, name, credentials):
-    return get_controller_types()[c_type].generate_cred_file(name, credentials)
+    try:
+        return get_controller_types()[c_type].generate_cred_file(name, credentials)
+except NotImplementedError as e:
+        raise
 
-def remove_cred_file(c_type, name):
-    return get_controller_types()[c_type].remove_cred_file(name)
 
 def delete_controller(con):
-    Popen(["python3.6", "{}/scripts/remove_controller.py".format(settings.SOJOBO_API_DIR),
+    Popen(["python3", "{}/scripts/remove_controller.py".format(settings.SOJOBO_API_DIR),
            con.c_name, con.c_type])
 
 def get_supported_regions(c_type):
