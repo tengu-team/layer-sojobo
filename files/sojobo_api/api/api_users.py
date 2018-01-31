@@ -19,7 +19,9 @@
 import logging
 import re
 import sys
+import time
 import traceback
+import time
 import base64, hashlib
 from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint
@@ -69,7 +71,11 @@ def login():
 def get_users_info():
     try:
         LOGGER.info('/USERS [GET] => receiving call')
+        time1 = time.time()
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        time2 = time.time()
+        print("===== TIMING =====")
+        print ('%s function took %0.3f ms' % ("get_users_info", (time2-time1)*1000.0))
         LOGGER.info('/USERS [GET] => Authenticated!')
         code, response = 200, juju.get_users_info(token)
         LOGGER.info('/USERS [GET] => Succesfully retieved all users!')

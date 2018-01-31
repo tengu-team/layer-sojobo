@@ -20,10 +20,12 @@ import zipfile
 import sys
 import traceback
 import logging
+import json
 from werkzeug.exceptions import HTTPException
 from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task
+import time
 
 
 TENGU = Blueprint('tengu', __name__)
@@ -506,7 +508,11 @@ def get_machines_info(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => Authenticated!', controller, model)
         con, mod = juju.authorize( token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => Authorized!', controller, model)
+        time1 = time.time()
         code, response = 200, execute_task(juju.get_machines_info, token, mod)
+        time2 = time.time()
+        print("===== TIMING =====")
+        print ('%s function took %0.3f ms' % ("get_machines_info", (time2-time1)*1000.0))
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => Succesfully retrieved machine information!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
@@ -531,8 +537,12 @@ def add_machine(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Authorized!', controller, model)
         if mod.m_access == 'write' or mod.m_access == 'admin':
             constraints = data.get('constraints', None)
+            print("==== DEBUGGING ====")
+            print("Constraints: ")
+            print(type(constraints))
+            print(constraints)
             if constraints:
-                juju.check_constraints(data.get(constraints, True))
+                juju.check_constraints(constraints)
             series = data.get('series', None)
             if juju.cloud_supports_series(con, series):
                 execute_task(juju.add_machine, token, mod, series, constraints)

@@ -30,6 +30,7 @@ class JuJu_Token(object):  #pylint: disable=R0903
         self.is_admin = True
 
 async def set_controller_acc(c_name, access, user):
+    print("===== DEBUGGING =====")
     try:
         token = JuJu_Token()
         con = datastore.get_controller(c_name)
@@ -42,20 +43,27 @@ async def set_controller_acc(c_name, access, user):
             datastore.set_controller_access(c_name, user, access)
         logger.info('Controller access set for  %s ', c_name)
         if access == 'superuser':
+            print("===== Access is superuser =====")
             for mod in datastore.get_all_models(c_name):
+                print("===== Model =====")
                 model = juju.Model_Connection(token, con['name'], mod['name'])
+                print(model)
                 async with model.connect(token) as mod_con:
                     logger.info('Setting up connection for model: %s', mod['name'])
                     current_access = datastore.get_model_access(c_name, mod['name'], user)
                     logger.info('Current Access level: %s', current_access)
                     if current_access:
+                        print("===== REVOKING =====")
                         await mod_con.revoke(user)
+                        print("===== DONE REVOKING =====")
+                    print("===== GRANTING ADMIN RIGHTS =====")
                     await mod_con.grant(user, acl='admin')
+                    print("===== DONE GRANTING =====")
                     datastore.set_model_access(mod["_key"], user, 'admin')
                     logger.info('Admin Access granted for for %s:%s', c_name, mod['name'])
-                for key in usr['ssh_keys']:
-                    logger.info('SSh key found... adding SSH key %s', key)
-                    await mod_con.add_ssh_key(user, key)
+                    for key in usr['ssh_keys']:
+                        logger.info('SSh key found... adding SSH key %s', key)
+                        await mod_con.add_ssh_key(user, key)
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

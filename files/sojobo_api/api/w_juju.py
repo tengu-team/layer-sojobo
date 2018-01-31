@@ -219,6 +219,8 @@ async def authenticate(api_key, auth):
 
 
 def authorize(token, controller, model=None):
+    # TODO: Dit zou niet meer Controller_Connection en Model_Connection mogen
+    # gebruiken maar in plaats daarvan enkel de datastore.
     if not controller_exists(controller):
         error = errors.does_not_exist('controller')
         abort(error[0], error[1])
@@ -448,6 +450,11 @@ def create_model(token, controller, model, credentials):
     return code, response
 
 
+# TODO: Functie die bij iedere POST die iets verandert aan een model checkt
+# of het model er klaar voor is en een gepast bericht teruggeeft. Maak gebruik van
+# abort zoals in authorize.
+
+
 async def delete_model(token, controller, model):
     async with controller.connect(token) as juju:
         await juju.destroy_models(model.m_uuid)
@@ -542,11 +549,14 @@ async def machine_exists(token, model, machine):
 
 def remove_machine(token, controller, model, machine):
     Popen(["python3", "{}/scripts/remove_machine.py".format(settings.SOJOBO_API_DIR), token.username,
-           token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT,
-           controller.c_name, model.m_name, machine])
+           token.password, settings.SOJOBO_API_DIR, controller.c_name, model.m_name, machine])
+
+
 #####################################################################################
 # APPLICATION FUNCTIONS
 #####################################################################################
+
+
 async def app_exists(token, controller, model, app_name):
     model_info = await get_model_info(token, controller, model)
     for app in model_info['applications']:
@@ -628,8 +638,8 @@ async def get_unit_info(token, model, application, unitnumber):
 
 def add_unit(token, controller, model, app_name, amount, target):
     Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), token.username,
-           token.password, settings.SOJOBO_API_DIR, settings.REDIS_HOST, settings.REDIS_PORT,
-           controller.c_name, model.m_name, app_name, str(amount), target])
+           token.password, settings.SOJOBO_API_DIR, controller.c_name, model.m_name,
+           app_name, str(amount), target])
 
 
 async def remove_unit(token, model, application, unit_number):
@@ -685,7 +695,11 @@ async def set_application_config(token, model, app_name, config):
 async def get_application_config(token, model, app_name):
     async with model.connect(token):
         app = await get_application_entity(token, model, app_name)
-        return await app.get_config()
+        try:
+            return await app.get_config()
+        except AttributeError:
+            return errors.does_not_exist("application" + str(app_name))
+
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################

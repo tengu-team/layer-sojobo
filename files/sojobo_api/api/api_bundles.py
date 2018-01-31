@@ -45,11 +45,11 @@ def authenticate(func):
 @authenticate
 def get_bundles():
     i = 1
-    res = requests.get('https://api.github.com/orgs/{}/repos'.format(REPO))
+    res = requests.get('https://api.github.com/orgs/{}/repos?per_page=1000'.format(REPO))
     data = []
     while res.json() != [] and res.status_code == 200:
         for b in res.json():
-            if 'bundle' in b['name']:
+            if b['name'].startswith("bundle"):
                 data.append({
                     'name': b['name'],
                     'description': b['description'],

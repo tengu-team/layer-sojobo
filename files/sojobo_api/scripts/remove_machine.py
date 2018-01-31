@@ -19,23 +19,25 @@ import sys
 import traceback
 import logging
 import json
-import redis
 from juju.model import Model
+sys.path.append('/opt')
+from sojobo_api.api import w_datastore
 
 
-async def remove_machine(c_name, m_name, usr, pwd, url, port, machine):
+async def remove_machine(c_name, m_name, usr, pwd, machine):
     try:
-        controllers = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
-        controller = json.loads(controllers.get(c_name))
-        model = Model()
+        controller = w_datastore.get_controller(c_name)
+        # We need the key of the model to get the actual model. Maybe one function
+        # can be made 'get_model(m_name)'.
+        m_key = w_datastore.get_model_key(c_name, m_name)
+        mod = w_datastore.get_model(m_key)
+        mod_con = Model()
         logger.info('Setting up Model connection for %s:%s', c_name, m_name)
-        for mod in controller['models']:
-            if mod['name'] == m_name:
-                await model.connect(controller['endpoints'][0], mod['uuid'], usr, pwd, controller['ca-cert'])
-                for mach, entity in model.state.machines.items():
-                    if mach == machine:
-                        logger.info('Destroying machine %s', machine)
-                        await entity.destroy(force=True)
+        await mod_con.connect(controller['endpoints'][0], mod['uuid'], usr, pwd, controller['ca-cert'])
+        for mach, entity in mod_con.state.machines.items():
+            if mach == machine:
+                logger.info('Destroying machine %s', machine)
+                await entity.destroy(force=True)
         logger.info('Machine %s destroyed', machine)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -43,8 +45,8 @@ async def remove_machine(c_name, m_name, usr, pwd, url, port, machine):
         for l in lines:
             logger.error(l)
     finally:
-        if 'model' in locals():
-            await model.disconnect()
+        #if 'mod_con' in locals():
+        await mod_con.disconnect()
 
 
 if __name__ == '__main__':
@@ -60,6 +62,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(remove_machine(sys.argv[6], sys.argv[7], sys.argv[1],
-                                         sys.argv[2], sys.argv[4], sys.argv[5], sys.argv[8]))
+    loop.run_until_complete(remove_machine(sys.argv[4], sys.argv[5], sys.argv[1],
+                                         sys.argv[2], sys.argv[6]))
     loop.close()
