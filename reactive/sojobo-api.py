@@ -213,6 +213,40 @@ def install_api():
     application_version_set('1.0.0')
 
 
+def get_arangodb_connection(host, port, username, password):
+    """Creates entry point (connection) to work with ArangoDB."""
+    url = 'http://' + host + ':' + port
+    connection = pyArango.Connection(arangoURL=url,
+                                     username=username,
+                                     password=password)
+    return connection
+
+
+def create_arangodb_database(connection):
+    if connection.hasDatabase("sojobo"):
+        return connection["sojobo"]
+    return connection.createDatabase(name="sojobo")
+
+
+def create_arangodb_collection(sojobo_db, collection_name, edges=False):
+    if not has_collection(sojobo_db, collection_name):
+        if edges:
+            sojobo_db.createCollection(className="Edges", name=collection_name)
+        else:
+            sojobo_db.createCollection(name=collection_name)
+
+
+def create_arangodb_collections(sojobo_db):
+    create_arangodb_collection(sojobo_db, "users")
+    create_arangodb_collection(sojobo_db, "controllers")
+    create_arangodb_collection(sojobo_db, "models")
+    create_arangodb_collection(sojobo_db, "controllerAccess", edges=True)
+    create_arangodb_collection(sojobo_db, "modelAccess", edges=True)
+
+
+def has_collection(sojobo_db, collection_name):
+    return collection_name in sojobo_db.collections
+
 
 def overwrite_juju_model_file():
     """We are waiting on a bugfix in libjuju. In order to circumvent the problem
