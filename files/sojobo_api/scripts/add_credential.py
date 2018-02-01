@@ -47,7 +47,6 @@ async def add_credential(username, credentials):
                     cloud_facade = client.CloudFacade.from_connection(con_juju.connection)
                     credential = juju.generate_cred_file(c_type, credential_name, cred['credential'])
                     logger.info('credentials generated %s', credential)
-
                     cloud_cred = client.UpdateCloudCredential(
                         client.CloudCredential(credential['key'], credential['type']),
                         tag.credential(c_type, username, credential_name)

@@ -89,18 +89,12 @@ def create_controller():
                 if juju.controller_exists(controller):
                     code, response = errors.already_exists('controller')
                     LOGGER.error('%s [POST] => Controller %s already exists', url, controller)
-                elif c_type == 'manual':
-                    if 'url' in data:
-                        code, response = juju.bootstrap_manual_controller(data['name'], data['url'])
-                        LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
-                    else:
-                        code, response = 400, 'Please provide an URL to bootstrap your environment'
                 else:
                     sup_clouds = juju.get_supported_regions(c_type)
                     if data['region'] in sup_clouds:
                         if juju.credential_exists(token.username, data['credential']):
-                            code, response = juju.create_controller(c_type,
-                                                                    controller, data['region'], data['credential'])
+                            code, response = juju.create_controller(token, c_type,
+                                                                    controller, data)
                             LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
                         else:
                             code, response = 400, 'Credential {} not found for user {}'.format(data['credential'], token.username)

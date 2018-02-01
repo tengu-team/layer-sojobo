@@ -26,6 +26,7 @@ from asyncio_extras import async_contextmanager
 from async_generator import yield_
 from flask import abort, Response
 from juju import tag
+from juju.client import client
 from juju.controller import Controller
 from juju.errors import JujuAPIError, JujuError
 from juju.model import Model
@@ -257,20 +258,14 @@ def check_c_type(c_type):
         abort(error[0], error[1])
 
 
-def create_controller(c_type, name, region, credentials):
+def create_controller(token, c_type, name, data):
     for controller in get_all_controllers():
         if controller['state'] == 'accepted':
             return 503, 'An environment is already being created'
-    Popen(["python3", "{}/scripts/add_controller.py".format(settings.SOJOBO_API_DIR),
-           c_type, name, region, credentials])
-   return 202, 'Environment {} is being created in region {}'.format(name, region)
-
-
-def generate_cred_file(c_type, name, credentials):
-    try:
-        return get_controller_types()[c_type].generate_cred_file(name, credentials)
-    except NotImplementedError as e:
-        raise
+    datastore.create_controller(name, c_type, data['region'], data['credential'])
+    datastore.add_user_to_controller(name, 'admin', 'superuser')
+    credential = get_credential(token.username, data['credential'])
+    return get_controller_types()[c_type].create_controller(name, region, data)
 
 
 def delete_controller(con):
@@ -752,8 +747,23 @@ def get_credential(user, credential):
             return cred
 
 
-def add_credential(user, credential):
+def add_credential(user, data):
+    try:
+        return get_controller_types()[data['type']].add_credential(user, data)
+    except NotImplementedError as e:
+        return 400, "This type of controller does not need credentials"
     Popen(["python3", "{}/scripts/add_credential.py".format(settings.SOJOBO_API_DIR), user, str(credential), settings.SOJOBO_API_DIR])
+
+
+def update_cloud(controller, credential, username):
+    credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
+    cloud_facade = client.CloudFacade.from_connection(controller.connection)
+    credential = get_controller_types()[c_type](credential_name, credential)
+    cloud_cred = client.UpdateCloudCredential(
+        client.CloudCredential(credential['key'], credential['type']),
+        tag.credential(c_type, username, credential_name)
+    )
+    await cloud_facade.UpdateCredentials([cloud_cred])
 
 
 def remove_credential(user, cred_name):

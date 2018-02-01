@@ -90,5 +90,5 @@ Documentation of the api can be found under the Wiki Tab of this repository.
 Report bugs on [Github](https://github.com/tengu-team/layer-sojobo/issues)
 
 # Authors
-- Mathijs Moerman <mathijs.moerman@tengu.io>
 - Sébastien Pattyn <sebastien.pattyn@tengu.io>
+- Michiel Ghyselinck <michiel.ghyselinck@tengu.io>
