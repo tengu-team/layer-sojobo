@@ -19,25 +19,27 @@ import sys
 import traceback
 import logging
 import json
-import redis
 from juju.model import Model
+sys.path.append('/opt')
+from sojobo_api.api import w_datastore
 
 
-async def add_unit(c_name, m_name, usr, pwd, url, port, app_name, amount, target):
+async def add_unit(c_name, m_name, usr, pwd, app_name, amount, target):
     try:
-        controllers = redis.StrictRedis(host=url, port=port, charset="utf-8", decode_responses=True, db=10)
-        controller = json.loads(controllers.get(c_name))
-        model = Model()
+        controller = w_datastore.get_controller(c_name)
+        # We need the key of the model to get the actual model. Maybe one function
+        # can be made 'get_model(m_name)'.
+        m_key = w_datastore.get_model_key(c_name, m_name)
+        mod = w_datastore.get_model(m_key)
+        mod_con = Model()
         logger.info('Setting up Model connection for %s:%s', c_name, m_name)
-        for mod in controller['models']:
-            if mod['name'] == m_name:
-                await model.connect(controller['endpoints'][0], mod['uuid'], usr, pwd, controller['ca-cert'])
-                for app, entity in model.state.applications.items():
-                    if app == app_name:
-                        logger.info('Adding units to %s', app_name)
-                        if target == 'None':
-                            target = None
-                        await entity.add_unit(count=int(amount), to=target)
+        await mod_con.connect(controller['endpoints'][0], mod['uuid'], usr, pwd, controller['ca-cert'])
+        for app, entity in mod_con.state.applications.items():
+            if app == app_name:
+                logger.info('Adding units to %s', app_name)
+                if target == 'None':
+                    target = None
+                await entity.add_unit(count=int(amount), to=target)
         logger.info('Units added to %s', app_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -45,8 +47,8 @@ async def add_unit(c_name, m_name, usr, pwd, url, port, app_name, amount, target
         for l in lines:
             logger.error(l)
     finally:
-        if 'model' in locals():
-            await model.disconnect()
+        if 'mod_con' in locals():
+            await mod_con.disconnect()
 
 
 if __name__ == '__main__':
@@ -62,7 +64,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(add_unit(sys.argv[6], sys.argv[7], sys.argv[1],
-                                     sys.argv[2], sys.argv[4], sys.argv[5],
-                                     sys.argv[8],sys.argv[9],sys.argv[10]))
+    loop.run_until_complete(add_unit(sys.argv[4], sys.argv[5], sys.argv[1],
+                                     sys.argv[2], sys.argv[6],sys.argv[7],sys.argv[8]))
     loop.close()
