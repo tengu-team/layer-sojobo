@@ -11,6 +11,6 @@ provides:
   proxy:
     interface: http
 requires:
-  redis:
-    interface: redis
+  arango:
+    interface: arangodb
 series: [ 'xenial' ]

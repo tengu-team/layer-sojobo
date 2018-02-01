@@ -38,7 +38,7 @@ async def delete_user(username):
     try:
         token = JuJu_Token()
         #TO DO => libjuju implementation
-        controllers = datastore.get_all_controllers()
+        controllers = datastore.get_keys_controllers()
         datastore.set_user_state(username, 'deleting')
         for con in controllers:
             logger.info('Setting up Controllerconnection for %s', con)

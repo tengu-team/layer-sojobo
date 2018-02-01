@@ -20,10 +20,12 @@ import zipfile
 import sys
 import traceback
 import logging
+import json
 from werkzeug.exceptions import HTTPException
 from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task
+import time
 
 
 TENGU = Blueprint('tengu', __name__)
@@ -51,7 +53,7 @@ def get_all_controllers():
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
         if token.is_admin:
-            code, response = 200, juju.get_all_controllers()
+            code, response = 200, juju.get_keys_controllers()
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
         else:
             code, response = errors.no_permission()
@@ -89,7 +91,7 @@ def create_controller():
                     LOGGER.error('%s [POST] => Controller %s already exists', url, controller)
                 elif c_type == 'manual':
                     if 'url' in data:
-                        code, response = juju.bootstrap_manual_controller(name, data['url'])
+                        code, response = juju.bootstrap_manual_controller(data['name'], data['url'])
                         LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
                     else:
                         code, response = 400, 'Please provide an URL to bootstrap your environment'
@@ -128,7 +130,7 @@ def get_controller_info(controller):
         LOGGER.info('/TENGU/controllers/%s [GET] => receiving call', controller)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers/%s [GET] => Authenticated!', controller)
-        con = juju.authorize( token, controller)
+        con = juju.authorize(token, controller)
         LOGGER.info('/TENGU/controllers/%s [GET] => Authorized!', controller)
         code, response = 200, juju.get_controller_info(token, con)
         LOGGER.info('/TENGU/controllers/%s [GET] => Succesfully retrieved controller information!', controller)
@@ -150,9 +152,9 @@ def delete_controller(controller):
         LOGGER.info('/TENGU/controllers/%s [DELETE] => receiving call', controller)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers/%s [DELETE] => Authenticated!', controller)
-        con = juju.authorize( token, controller)
+        con = juju.authorize(token, controller)
         LOGGER.info('/TENGU/controllers/%s [DELETE] => Authorized!', controller)
-        if con.c_access == 'superuser':
+        if token.is_admin:
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Deleting Controller!', controller)
             juju.delete_controller(con)
             code, response = 202, 'Controller {} is being deleted'.format(controller)
@@ -266,7 +268,7 @@ def add_bundle(controller, model):
                 bundle['services'] = bundle['applications']
                 bundle.pop('applications')
             LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Bundle is being deployed, check bundle_deployment.log for more information!', controller, model)
-            juju.add_bundle(token, con.c_name, mod.m_name, bundle)
+            juju.add_bundle(token, con.c_name, mod.m_key, bundle)
             code, response = 202, "Bundle is being deployed"
         else:
             code, response = errors.no_permission()
@@ -512,7 +514,11 @@ def get_machines_info(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => Authenticated!', controller, model)
         con, mod = juju.authorize( token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => Authorized!', controller, model)
+        time1 = time.time()
         code, response = 200, execute_task(juju.get_machines_info, token, mod)
+        time2 = time.time()
+        print("===== TIMING =====")
+        print ('%s function took %0.3f ms' % ("get_machines_info", (time2-time1)*1000.0))
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => Succesfully retrieved machine information!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
@@ -537,8 +543,12 @@ def add_machine(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Authorized!', controller, model)
         if mod.m_access == 'write' or mod.m_access == 'admin':
             constraints = data.get('constraints', None)
+            print("==== DEBUGGING ====")
+            print("Constraints: ")
+            print(type(constraints))
+            print(constraints)
             if constraints:
-                juju.check_constraints(data.get(constraints, True))
+                juju.check_constraints(constraints)
             series = data.get('series', None)
             if 'url' in data and juju.cloud_supports_series(con, series):
                 execute_task(juju.add_machine, token, mod, series, constraints, spec='ssh:ubuntu@{}'.format(data['url']))
