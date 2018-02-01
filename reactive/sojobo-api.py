@@ -17,8 +17,8 @@
 from base64 import b64encode
 from hashlib import sha256
 import os
-import requests
 import shutil
+import requests
 import subprocess
 from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
@@ -26,6 +26,7 @@ from charmhelpers.core.hookenv import status_set, log, config, open_port, close_
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charms.reactive import hook, when, when_not, set_state, remove_state
 import charms.leadership
+import pyArango.connection as pyArango
 
 
 API_DIR = '/opt/sojobo_api'
@@ -62,7 +63,7 @@ def configure_webapp():
     open_port(config()['port'])
     service_restart('nginx')
     set_state('api.configured')
-    status_set('blocked', 'Waiting for a connection with Redis')
+    status_set('blocked', 'Waiting for a connection with ArangoDB')
 
 
 @when('config.changed', 'api.running')
@@ -95,10 +96,9 @@ def set_secrets_local():
     db.set('password', leader_get()['password'])
 
 
-@when('api.configured', 'redis.available')
+@when('api.configured', 'arango.available')
 @when_not('api.running')
-def connect_to_redis(redis):
-    redis_db = redis.redis_data()
+def connect_to_arango(arango):
     api_key = db.get('api-key')
     password = db.get('password')
     render('settings.py', '{}/settings.py'.format(API_DIR), {
@@ -109,11 +109,17 @@ def connect_to_redis(redis):
         'LOCAL_CHARM_DIR': config()['charm-dir'],
         'SOJOBO_IP': 'http://{}'.format(HOST),
         'SOJOBO_USER': USER,
-        'REDIS_HOST': redis_db['host'],
-        'REDIS_PORT': redis_db['port'],
+        'ARANGO_HOST': arango.host(),
+        'ARANGO_PORT': arango.port(),
+        'ARANGO_USER': arango.username(),
+        'ARANGO_PASS': arango.password(),
+        'ARANGO_DB': 'sojobo',
         'REPO_NAME': config()['github-repo'],
         'SOJOBO_API_PORT' : config()['port']
     })
+    con = get_arangodb_connection(arango.host(), arango.port(), arango.username(), arango.password())
+    sojobo_db = create_arangodb_database(con)
+    create_arangodb_collections(sojobo_db)
     service_restart('nginx')
     status_set('active', 'admin-password: {} api-key: {}'.format(password, api_key))
     set_state('api.running')
@@ -123,7 +129,7 @@ def connect_to_redis(redis):
 @when_not('admin.created')
 def create_admin():
     if leader_get().get('admin') != 'Created':
-        subprocess.check_call(["python3.6", "{}/scripts/add_user.py".format(API_DIR), 'admin', db.get('password')])
+        subprocess.check_call(["python3", "{}/scripts/add_user.py".format(API_DIR), 'admin', db.get('password')])
         leader_set({'admin': 'Created'})
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
         set_state('admin.created')
@@ -140,11 +146,11 @@ def status_update_not_leader():
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
 
 
-@when_not('redis.available')
-def redis_db_removed():
+@when_not('arango.available')
+def arango_db_removed():
     remove_state('api.running')
     remove_state('admin.created')
-    status_set('blocked', 'Waiting for a connection with redis')
+    status_set('blocked', 'Waiting for a connection with ArangoDB')
 
 
 @when('sojobo.available', 'api.running')
@@ -184,10 +190,9 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 
 
 def install_api():
-    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler',
-                'gitpython', 'redis', 'asyncio_extras', 'requests']:
-        subprocess.check_call(['python3.6', '-m', 'pip', 'install', pkg])
-    subprocess.check_call(['python3.6', '-m', 'pip', 'install', 'juju==0.6.1'])
+    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments','gitpython',
+                'asyncio_extras', 'requests', 'juju==0.6.1', 'async_generator']:
+        subprocess.check_call(['pip3', 'install', pkg])
     mergecopytree('files/sojobo_api', API_DIR)
     if not os.path.isdir('{}/files'.format(API_DIR)):
         os.mkdir('{}/files'.format(API_DIR))
@@ -205,3 +210,38 @@ def install_api():
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
+
+
+def get_arangodb_connection(host, port, username, password):
+    """Creates entry point (connection) to work with ArangoDB."""
+    url = 'http://' + host + ':' + port
+    connection = pyArango.Connection(arangoURL=url,
+                                     username=username,
+                                     password=password)
+    return connection
+
+
+def create_arangodb_database(connection):
+    if connection.hasDatabase("sojobo"):
+        return connection["sojobo"]
+    return connection.createDatabase(name="sojobo")
+
+
+def create_arangodb_collection(sojobo_db, collection_name, edges=False):
+    if not has_collection(sojobo_db, collection_name):
+        if edges:
+            sojobo_db.createCollection(className="Edges", name=collection_name)
+        else:
+            sojobo_db.createCollection(name=collection_name)
+
+
+def create_arangodb_collections(sojobo_db):
+    create_arangodb_collection(sojobo_db, "users")
+    create_arangodb_collection(sojobo_db, "controllers")
+    create_arangodb_collection(sojobo_db, "models")
+    create_arangodb_collection(sojobo_db, "controllerAccess", edges=True)
+    create_arangodb_collection(sojobo_db, "modelAccess", edges=True)
+
+
+def has_collection(sojobo_db, collection_name):
+    return collection_name in sojobo_db.collections
