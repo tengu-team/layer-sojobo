@@ -26,6 +26,7 @@ from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task
 import time
+from flask import abort
 
 
 TENGU = Blueprint('tengu', __name__)
@@ -183,15 +184,15 @@ def create_model(controller):
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
         con = juju.authorize( token, controller)
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
-        valid, model = juju.check_input(data['model'], "model")
+        valid, model_name = juju.check_input(data['model'], "model")
         if con.c_access == 'add-model' or con.c_access == 'superuser':
             if juju.credential_exists(token.username, data['credential']):
-                credentials = data['credential']
+                credential_name = data['credential']
                 if valid:
                     LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
-                    code, response = juju.create_model(token, con.c_name, model, credentials)
+                    code, response = juju.create_model(token, con.c_name, model_name, credential_name)
                 else:
-                    code, response = 400, model
+                    code, response = 400, model_name
             else:
                 code, response = 400, 'Credential {} not found for user {}'.format(data['credential'], token.username)
         else:
@@ -237,7 +238,7 @@ def get_model_info(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => receiving call', controller, model)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => Authenticated!', controller, model)
-        con, mod = juju.authorize( token, controller, model)
+        con, mod = juju.authorize(token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => Authorized!', controller, model)
         code, response = 200, execute_task(juju.get_model_info, token, con, mod)
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => model information retrieved!', controller, model)
@@ -262,6 +263,9 @@ def add_bundle(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authenticated!', controller, model)
         con, mod = juju.authorize( token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authorized!', controller, model)
+        if not juju.check_model_state(mod.m_key, ['ready']):
+            state = juju.get_model_state(mod.m_key)
+            return juju.create_response(400, 'The bundle cannot be deployed because the model is in following state: ' + state)
         if mod.m_access == 'admin' or mod.m_access == 'write':
             bundle = data['bundle']
             if 'applications' in bundle:
