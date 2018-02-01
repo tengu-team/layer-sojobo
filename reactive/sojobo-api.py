@@ -167,7 +167,7 @@ def configure_proxy(proxy):
 # UTILS
 ###############################################################################
 def mergecopytree(src, dst, symlinks=False, ignore=None):
-    """"Recursive copy src to dst, mergecopy directory if dst exists.
+    """Recursive copy src to dst, mergecopy directory if dst exists.
     OVERWRITES EXISTING FILES!!"""
     if not os.path.exists(dst):
         os.makedirs(dst)
@@ -207,6 +207,7 @@ def install_api():
         os.mkdir('/home/{}'.format(USER))
     chownr('/home/{}'.format(USER), USER, USER, chowntopdir=True)
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
+    overwrite_juju_model_file()
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
@@ -245,3 +246,9 @@ def create_arangodb_collections(sojobo_db):
 
 def has_collection(sojobo_db, collection_name):
     return collection_name in sojobo_db.collections
+
+
+def overwrite_juju_model_file():
+    """We are waiting on a bugfix in libjuju. In order to circumvent the problem
+    we must manually edit the model.py file of the juju package."""
+    shutil.copy('files/model.py', '/usr/local/lib/python3.5/dist-packages/juju/model.py')

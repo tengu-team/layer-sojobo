@@ -219,25 +219,26 @@ async def authenticate(api_key, auth):
         abort(error[0], error[1])
 
 
-def authorize(token, controller, model=None):
-    # TODO: Dit zou niet meer Controller_Connection en Model_Connection mogen
-    # gebruiken maar in plaats daarvan enkel de datastore.
-    if not controller_exists(controller):
+def authorize(token, c_name, m_name=None):
+    """Checks if a user is authorized to access a given controller and optionally
+    given model. Returns appropriate error messages if a user is not allowed access."""
+    if not controller_exists(c_name):
         error = errors.does_not_exist('controller')
         abort(error[0], error[1])
     else:
-        con = Controller_Connection(token, controller)
+        con = Controller_Connection(token, c_name)
         if not c_access_exists(con.c_access):
             error = errors.does_not_exist('controller')
             abort(error[0], error[1])
-    if model and not model_exists(con, model):
+    if m_name and not model_exists(con, m_name):
         error = errors.does_not_exist('model')
         abort(error[0], error[1])
-    elif model:
-        mod = Model_Connection(token, controller, model)
+    elif m_name:
+        mod = Model_Connection(token, c_name, m_name)
         if not m_access_exists(mod.m_access):
             error = errors.unauthorized()
             abort(error[0], error[1])
+
         return con, mod
     return con
 ###############################################################################
@@ -341,7 +342,7 @@ def get_models_info(token, controller):
 
 
 async def get_model_info(token, controller, model):
-    state = datastore.check_model_state(controller.c_name, model.m_name)
+    state = datastore.get_model_state(model.m_key)
     if state == 'ready':
         async with model.connect(token):
             users = get_users_model(token, controller, model)
@@ -351,7 +352,7 @@ async def get_model_info(token, controller, model):
             credentials = {'cloud': controller.c_type, 'credential-name': get_model_credential(controller, model)}
         return {'name': model.m_name, 'users': users,
                 'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
-                'state': datastore.check_model_state(controller.c_name, model.m_name), 'credentials' : credentials}
+                'state': datastore.get_model_state(model.m_key), 'credentials' : credentials}
     elif state == 'accepted' or state == 'error':
         return {'name': model.m_name, 'state': state, 'users' : {"user" : token.username, "access" : "admin"}}
     else:
@@ -428,27 +429,44 @@ async def get_gui_url(controller, model):
     return 'https://{}/gui/{}'.format(controller.endpoint, model.m_uuid)
 
 
-def create_model(token, controller, model, credentials):
-    state = datastore.check_model_state(controller, model)
-    if state in ["ready", "accepted"]:
-        code, response = errors.already_exists('model')
-    elif credentials in datastore.get_credential_keys(token.username):
-        new_model = datastore.create_model(model, state='Model is being deployed', uuid='')
-        new_model_key = new_model["_key"]
-        datastore.add_model_to_controller(controller, new_model["_key"])
-        datastore.set_model_state(new_model["_key"], 'accepted')
-        datastore.set_model_access(new_model["_key"], token.username, 'admin')
-        Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), controller,
-               new_model_key, settings.SOJOBO_API_DIR, token.username, token.password, credentials])
-        code, response = 202, "Model is being deployed"
+def create_model(token, c_name, m_name, cred_name):
+    """Creates model in database and then in JuJu (background script)."""
+    if not datastore.model_exists(m_name):
+        if cred_name in datastore.get_credential_keys(token.username):
+            # Create the model in ArangoDB. Add model key to controller and
+            # set the model access level of the user.
+            new_model = datastore.create_model(m_name, state='deploying')
+            new_model_key = new_model["_key"]
+            datastore.add_model_to_controller(c_name, new_model["_key"])
+            datastore.set_model_state(new_model["_key"], 'accepted')
+            datastore.set_model_access(new_model["_key"], token.username, 'admin')
+
+            # Run the background script, this creates the model in JuJu.
+            Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), c_name,
+                   new_model_key, settings.SOJOBO_API_DIR, token.username, token.password, cred_name])
+
+            code, response = 202, "Model is being deployed."
+        else:
+            code, response = 404, "Credentials {} not found!".format(cred_name)
     else:
-        code, response = 404, "Credentials {} not found!".format(credentials)
+        code, response = errors.already_exists('model')
     return code, response
+
+
+def check_model_state(m_key, required_states):
+    """Checks if a model its state is one of the required states. Certain API calls
+    can only succeed if the model is in a certain state. F.e. the call to deploy
+    a bundle requires that the model is 'ready' or else a deployment will fail.
+    The call to delete a model requires that the model is in 'error' or 'ready' state."""
+    state = datastore.get_model_state(m_key)
+    return if state in required_states
 
 
 # TODO: Functie die bij iedere POST die iets verandert aan een model checkt
 # of het model er klaar voor is en een gepast bericht teruggeeft. Maak gebruik van
-# abort zoals in authorize.
+# abort zoals in authorize. Bundle deployment, applicatie toevoegen, user access
+# veranderen, machines. "Model access aangepast voor dit, dit en dit model maar voor dit
+# model nog niet"
 
 
 async def delete_model(token, controller, model):
@@ -880,10 +898,10 @@ def m_access_exists(access):
     return access in ['read', 'write', 'admin']
 
 
-def check_access(access):
-    acc = access.lower()
-    if c_access_exists(acc) or m_access_exists(acc):
-        return acc
-    else:
-        error = errors.invalid_access('access')
-        abort(error[0], error[1])
+# def check_access(access):
+#     acc = access.lower()
+#     if c_access_exists(acc) or m_access_exists(acc):
+#         return acc
+#     else:
+#         error = errors.invalid_access('access')
+#         abort(error[0], error[1])

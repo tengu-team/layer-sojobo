@@ -383,7 +383,7 @@ def set_controller_access(c_name, username, access):
 ################################################################################
 
 
-def create_model(m_name, state, uuid):
+def create_model(m_name, state, uuid=''):
     # TODO: Check if model with that name already exists. In this layer?
     model = {
         "name": m_name,
@@ -391,6 +391,13 @@ def create_model(m_name, state, uuid):
         "uuid": uuid}
     aql = "INSERT @model INTO models LET newModel = NEW RETURN newModel"
     return execute_aql_query(aql, rawResults=True, model=model)[0]
+
+
+def model_exists(m_name):
+    aql = 'FOR m in models FILTER m.name == @m_name RETURN m'
+    # Returns an empty list if no model is found.
+    model = execute_aql_query(aql, m_name=m_name)
+    return bool(model)
 
 
 def get_model(m_key):
@@ -457,14 +464,11 @@ def set_model_state(m_key, state, credential=None, uuid=None):
     execute_aql_query(aql, model=m_key, state=state, credential=credential, uuid=uuid)
 
 
-def check_model_state(c_name, m_name):
-    m_key = get_model_key(c_name, m_name)
-    if m_key is not None:
-        m_id = "models/" + m_key
-        aql = ( 'LET model = DOCUMENT(@m_id) '
-                'RETURN model.state' )
-        return execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
-    return 'error'
+def get_model_state(m_key):
+    m_id = "models/" + m_key
+    aql = ('LET model = DOCUMENT(@m_id) '
+           'RETURN model.state')
+    return execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
 
 
 def get_model_access(c_name, m_name, username):
