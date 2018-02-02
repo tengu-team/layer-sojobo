@@ -770,7 +770,6 @@ def add_credential(user, data):
         return get_controller_types()[data['type']].add_credential(user, data)
     except NotImplementedError as e:
         return 400, "This type of controller does not need credentials"
-    Popen(["python3", "{}/scripts/add_credential.py".format(settings.SOJOBO_API_DIR), user, str(credential), settings.SOJOBO_API_DIR])
 
 
 def update_cloud(controller, credential, username):
