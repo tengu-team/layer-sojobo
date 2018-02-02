@@ -263,6 +263,7 @@ def add_bundle(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authenticated!', controller, model)
         con, mod = juju.authorize( token, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authorized!', controller, model)
+        # Check if the model is 'ready' or else a bundle cannot be deployed.
         if not juju.check_model_state(mod.m_key, ['ready']):
             state = juju.get_model_state(mod.m_key)
             return juju.create_response(400, 'The bundle cannot be deployed because the model is in following state: ' + state)
