@@ -123,33 +123,6 @@ def update_ssh_keys(username, ssh_keys):
     execute_aql_query(aql, username=username, ssh=ssh_keys)
 
 
-def get_credentials(username):
-    u_id = "users/" + username
-    aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
-    return  execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
-
-
-def get_credential_keys(user):
-    return [c['name'] for c in get_credentials(user)]
-
-
-def add_credential(username, cred):
-    # TODO: Omvormen naar AQL.
-    user = get_user_doc(username)
-    if cred not in user['credentials']:
-        user['credentials'].append(cred)
-    user.save()
-
-
-def remove_credential(username, cred_name):
-    # TODO: Omvormen naar AQL.
-    user = get_user_doc(username)
-    for cred in user['credentials']:
-        if cred_name == cred['name']:
-            user['credentials'].remove(cred)
-    user.save()
-
-
 def delete_user(username):
     """Remove user from collection 'users' and from access collections."""
     remove_user_c_access(username)
@@ -180,6 +153,78 @@ def remove_user_m_access(username):
            'REMOVE edge in modelAccess')
     execute_aql_query(aql, u_id=u_id)
 
+
+################################################################################
+#                           CREDENTIAL FUNCTIONS                               #
+################################################################################
+def get_credentials(username):
+    u_id = "users/" + username
+    result = []
+    aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
+    output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    for out in output:
+        result.append(get_credential(username, out['name']))
+    return result
+
+def get_credential_keys(username):
+    u_id = "users/" + username
+    aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
+    output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    return [i['name'] for i in output]
+
+
+def get_credential(username, cred_name):
+    c_id = "credentials/{}".format(get_credential_id(username, cred_name))
+    aql ='LET u = DOCUMENT(@c_id) RETURN u'
+    return execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
+
+
+def get_credential_id(username, cred_name):
+    u_id = "users/" + username
+    aql =('LET u = DOCUMENT(@u_id) '
+          'FOR cred in u.credentials '
+          'FILTER cred.name == @cred_name '
+          'RETURN cred')
+    output = execute_aql_query(aql, rawResults=True, u_id=u_id, cred_name=cred_name)[0]
+    return output['key']
+
+
+def add_credential(username, cred):
+    cred['state'] = 'accepted'
+    aql = 'INSERT @credential INTO credentials LET newCredential = NEW RETURN newCredential '
+    output = execute_aql_query(aql, credential=cred)[0]
+    update_user_credential(username, {'name' :cred['name'], 'key': output['_key']})
+
+
+def update_user_credential(username, cred):
+    u_id = "users/" + username
+    aql = ('LET doc = DOCUMENT(@u_id) '
+           'UPDATE doc WITH {'
+           'credentials: PUSH(doc.credentials, @credential, true)'
+           '} IN users')
+    execute_aql_query(aql, u_id=u_id, credential=cred)
+
+
+def set_credential_ready(username, cred_name):
+    c_id = "credentials/{}".format(get_credential_id(username, cred_name))
+    print(c_id)
+    aql = ('LET u = DOCUMENT(@c_id) '
+           'UPDATE u WITH { '
+           'state: "ready"} in credentials')
+    execute_aql_query(aql, c_id=c_id)
+
+
+def remove_credential(username, cred_name):
+    c_id = get_credential_id(username, cred_name)
+    u_aql = 'REMOVE {_key: @c_id} IN credentials'
+    execute_aql_query(u_aql, username=username)
+    u_id = u_id = "users/" + username
+    credential = {'name': cred_name, 'key': c_id}
+    aql = ('LET u = DOCUMENT(@u_id) '
+           'UPDATE doc WITH { '
+           'credentials: REMOVE_VALUE(doc.credentials, @credential) '
+           '} IN users')
+    execute_aql_query(aql, u_id=u_id, credential=credential)
 
 ################################################################################
 #                           CONTROLLER FUNCTIONS                               #

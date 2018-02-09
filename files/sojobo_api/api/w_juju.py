@@ -757,15 +757,12 @@ def get_credentials(user):
 
 
 def get_credential(user, credential):
-    #TODO: AQL methode in w_datastore maken
-    for cred in get_credentials(user):
-        if cred['name'] == credential:
-            return cred
+    return datastore.get_credential(user, credential)
+
 
 
 def add_credential(user, data):
     try:
-        get_controller_types()[data['type']].check_valid_credentials(data['credential'])
         return get_controller_types()[data['type']].add_credential(user, data)
     except NotImplementedError as e:
         return 400, "This type of controller does not need credentials"
