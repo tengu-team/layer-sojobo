@@ -38,6 +38,8 @@ async def create_model(c_name, m_key, usr, pwd, cred_name):
         token = JuJu_Token(usr, pwd)
         controller = juju.Controller_Connection(token, c_name)
         m_name = datastore.get_model(m_key)["name"]
+        if not juju.get_credential(token.username, cred_name)['state'] == 'ready':
+            raise Exception('The Credential {} is not ready yet.'.format(cred_name))
         credential = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
 
         async with controller.connect(token) as con_juju:
