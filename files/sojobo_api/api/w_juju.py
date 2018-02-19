@@ -22,6 +22,7 @@ import os
 import re
 from subprocess import check_output, check_call, Popen
 import json
+import hashlib
 from asyncio_extras import async_contextmanager
 from async_generator import yield_
 from flask import abort, Response
