@@ -22,6 +22,7 @@ import os
 import re
 from subprocess import check_output, check_call, Popen
 import json
+import hashlib
 from asyncio_extras import async_contextmanager
 from async_generator import yield_
 from flask import abort, Response
@@ -64,7 +65,6 @@ class Controller_Connection(object):
         else:
             self.endpoint = None
             self.c_cacert = None
-        self.c_token = getattr(get_controller_types()[self.c_type], 'Token')(self.endpoint, token.username, token.password)
 
     async def set_controller(self, token, c_name):
         await self.c_connection.disconnect()
@@ -75,8 +75,6 @@ class Controller_Connection(object):
         self.c_type = con['type']
         self.endpoint = con['endpoints'][0]
         self.c_cacert = con['ca-cert']
-        self.c_token = getattr(get_controller_types()[self.c_type],
-                               'Token')(self.endpoint, token.username, token.password)
 
     @async_contextmanager
     async def connect(self, token):
@@ -248,7 +246,7 @@ def cloud_supports_series(controller_connection, series):
     if series is None:
         return True
     else:
-        return series in get_controller_types()[controller_connection.c_token.type].get_supported_series()
+        return series in get_controller_types()[controller_connection.c_type].get_supported_series()
 
 
 def check_c_type(c_type):
@@ -266,7 +264,7 @@ def create_controller(token, c_type, name, data):
     datastore.create_controller(name, c_type, data['region'], data['credential'])
     datastore.add_user_to_controller(name, 'admin', 'superuser')
     credential = get_credential(token.username, data['credential'])
-    return get_controller_types()[c_type].create_controller(name, region, data)
+    return get_controller_types()[c_type].create_controller(name, data)
 
 
 def delete_controller(con):
@@ -459,7 +457,8 @@ def check_model_state(m_key, required_states):
     a bundle requires that the model is 'ready' or else a deployment will fail.
     The call to delete a model requires that the model is in 'error' or 'ready' state."""
     state = datastore.get_model_state(m_key)
-    return if state in required_states
+    if state in required_states:
+        return state
 
 
 # TODO: Functie die bij iedere POST die iets verandert aan een model checkt
@@ -759,10 +758,8 @@ def get_credentials(user):
 
 
 def get_credential(user, credential):
-    #TODO: AQL methode in w_datastore maken
-    for cred in get_credentials(user):
-        if cred['name'] == credential:
-            return cred
+    return datastore.get_credential(user, credential)
+
 
 
 def add_credential(user, data):
@@ -772,12 +769,12 @@ def add_credential(user, data):
         return 400, "This type of controller does not need credentials"
 
 
-def update_cloud(controller, credential, username):
+async def update_cloud(controller, credential, username):
     credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
     cloud_facade = client.CloudFacade.from_connection(controller.connection)
-    credential = get_controller_types()[c_type](credential_name, credential)
+    cred = get_controller_types()[controller.c_type].generate_cred_file(credential_name, credential)
     cloud_cred = client.UpdateCloudCredential(
-        client.CloudCredential(credential['key'], credential['type']),
+        client.CloudCredential(cred['key'], cred['type']),
         tag.credential(c_type, username, credential_name)
     )
     await cloud_facade.UpdateCredentials([cloud_cred])
