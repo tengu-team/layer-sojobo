@@ -33,11 +33,13 @@ class JuJu_Token(object):  #pylint: disable=R0903
         self.is_admin = False
 
 
-async def create_model(c_name, m_key, usr, pwd, cred_name):
+async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
+    # TODO: Too many datastore calls, must wait until new Controller_Connection
+    # is ready. Then we can see which data can be retrieved from that.
     try:
         token = JuJu_Token(usr, pwd)
         controller = juju.Controller_Connection(token, c_name)
-        m_name = datastore.get_model(m_key)["name"]
+
         if not juju.get_credential(token.username, cred_name)['state'] == 'ready':
             raise Exception('The Credential {} is not ready yet.'.format(cred_name))
         credential = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
@@ -51,14 +53,17 @@ async def create_model(c_name, m_key, usr, pwd, cred_name):
                 owner=tag.user(usr)
             )
             logger.info('%s -> model deployed on juju', m_name)
+
             datastore.set_model_access(m_key, usr, 'admin')
             datastore.set_model_state(m_key, 'ready', cred_name, model.info.uuid)
+
             logger.info('%s -> Adding ssh-keys to model: %s', m_name, m_name)
             for key in datastore.get_ssh_keys(usr):
                 try:
                     await model.add_ssh_key(usr, key)
                 except (JujuAPIError, JujuError):
                     pass
+
             logger.info('%s -> retrieving users: %s', m_name, datastore.get_users_controller(c_name))
             for u in datastore.get_users_controller(c_name):
                 if u['access'] == 'superuser' and u['name'] != usr:
@@ -69,8 +74,10 @@ async def create_model(c_name, m_key, usr, pwd, cred_name):
                             await model.add_ssh_key(u['name'], key['key'])
                         except (JujuAPIError, JujuError):
                             pass
+
             await model.disconnect()
             logger.info('%s -> succesfully deployed model', m_name)
+
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -86,7 +93,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     logger = logging.getLogger('add-model')
     ws_logger = logging.getLogger('websockets.protocol')
-    hdlr = logging.FileHandler('{}/log/add_model.log'.format(sys.argv[3]))
+    hdlr = logging.FileHandler('{}/log/add_model.log'.format(sys.argv[4]))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)
@@ -96,7 +103,7 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
     try:
-        loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[4],
-                                             sys.argv[5], sys.argv[6]))
+        loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[3],
+                                             sys.argv[5], sys.argv[6], sys.argv[7]))
     finally:
         loop.close()

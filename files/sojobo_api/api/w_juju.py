@@ -20,6 +20,7 @@ from importlib import import_module
 from random import randint
 import os
 import re
+import base64
 from subprocess import check_output, check_call, Popen
 import json
 import hashlib
@@ -228,16 +229,17 @@ def authorize(token, c_name, m_name=None):
         if not c_access_exists(con.c_access):
             error = errors.does_not_exist('controller')
             abort(error[0], error[1])
-    if m_name and not model_exists(con, m_name):
-        error = errors.does_not_exist('model')
-        abort(error[0], error[1])
-    elif m_name:
-        mod = Model_Connection(token, c_name, m_name)
-        if not m_access_exists(mod.m_access):
-            error = errors.unauthorized()
+    if m_name:
+        m_key = construct_model_key(c_name, m_name)
+        if not datastore.model_exists(m_key):
+            error = errors.does_not_exist('model')
             abort(error[0], error[1])
-
-        return con, mod
+        else:
+            mod = Model_Connection(token, c_name, m_name)
+            if not m_access_exists(mod.m_access):
+                error = errors.unauthorized()
+                abort(error[0], error[1])
+            return con, mod
     return con
 ###############################################################################
 # CONTROLLER FUNCTIONS
@@ -302,16 +304,18 @@ def get_controller_info(token, controller):
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
+
+
+def construct_model_key(c_name, m_name):
+    key_string = c_name + "_" + m_name
+    # Must encode 'key_string' because base64 takes 8-bit binary byte data.
+    m_key = base64.b64encode(key_string.encode())
+    # To return a string you must decode the binary data.
+    return m_key.decode()
+
+
 def get_all_models(controller):
     return datastore.get_all_models(controller.c_name)
-
-
-def model_exists(controller, modelname):
-    all_models = get_all_models(controller)
-    for model in all_models:
-        if model['name'] == modelname:
-            return True
-    return False
 
 
 def get_model_uuid(controller, model):
@@ -429,19 +433,25 @@ async def get_gui_url(controller, model):
 
 def create_model(token, c_name, m_name, cred_name):
     """Creates model in database and then in JuJu (background script)."""
-    if not datastore.model_exists(m_name):
+    # Construct a key for the model using the controller name and model name.
+    key_string = c_name + "_" + m_name
+    m_key = construct_model_key(c_name, m_name)
+
+    if not datastore.model_exists(m_key):
         if cred_name in datastore.get_credential_keys(token.username):
             # Create the model in ArangoDB. Add model key to controller and
             # set the model access level of the user.
-            new_model = datastore.create_model(m_name, state='deploying')
-            new_model_key = new_model["_key"]
-            datastore.add_model_to_controller(c_name, new_model["_key"])
-            datastore.set_model_state(new_model["_key"], 'accepted')
-            datastore.set_model_access(new_model["_key"], token.username, 'admin')
+            new_model = datastore.create_model(m_key, m_name, state='deploying')
+            # TODO: Maybe put these 3 datastore methods in one so you do not have
+            # to create a connection with ArangoDB each time.
+            datastore.add_model_to_controller(c_name, m_key)
+            datastore.set_model_state(m_key, 'accepted')
+            datastore.set_model_access(m_key, token.username, 'admin')
 
             # Run the background script, this creates the model in JuJu.
-            Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), c_name,
-                   new_model_key, settings.SOJOBO_API_DIR, token.username, token.password, cred_name])
+            Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
+                    c_name, m_key, m_name, settings.SOJOBO_API_DIR,
+                    token.username,token.password, cred_name])
 
             code, response = 202, "Model is being deployed."
         else:
@@ -449,6 +459,7 @@ def create_model(token, c_name, m_name, cred_name):
     else:
         code, response = errors.already_exists('model')
     return code, response
+
 
 
 def check_model_state(m_key, required_states):
@@ -807,7 +818,8 @@ async def controller_revoke(token, controller, username):
 
 def set_models_access(token, controller, user, accesslist):
     for mod in accesslist:
-        if model_exists(controller, mod['name']):
+        m_key = construct_model_key(controller.c_name, mod['name'])
+        if datastore.model_exists(m_key):
             if not m_access_exists(mod['access']):
                 abort(400, 'Access Level {} is not supported. Change access for model {}'.format(mod['access'], mod['name']))
             else:

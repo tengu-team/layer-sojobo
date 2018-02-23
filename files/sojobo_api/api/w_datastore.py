@@ -433,9 +433,9 @@ def set_controller_access(c_name, username, access):
 ################################################################################
 
 
-def create_model(m_name, state, uuid=''):
-    # TODO: Check if model with that name already exists. In this layer?
+def create_model(m_key, m_name, state, uuid=''):
     model = {
+        "_key": m_key,
         "name": m_name,
         "state": state,
         "uuid": uuid}
@@ -443,10 +443,10 @@ def create_model(m_name, state, uuid=''):
     return execute_aql_query(aql, rawResults=True, model=model)[0]
 
 
-def model_exists(m_name):
-    aql = 'FOR m in models FILTER m.name == @m_name RETURN m'
+def model_exists(m_key):
+    aql = 'FOR m in models FILTER m._key == @m_key RETURN m'
     # Returns an empty list if no model is found.
-    model = execute_aql_query(aql, m_name=m_name)
+    model = execute_aql_query(aql, m_key=m_key)
     return bool(model)
 
 
