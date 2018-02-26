@@ -53,11 +53,12 @@ def create_user(username):
 
 
 def user_exists(username):
-    aql = 'FOR u in users FILTER u._key == @username RETURN u'
-    # Returns an empty list if no user is found.
-    user = execute_aql_query(aql, username=username)
-    return bool(user)
-
+    u_id = "users/" + username
+    aql = 'RETURN DOCUMENT("users", @u_id)'
+    user = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    if user is None:
+        return False
+    return True
 
 def get_user(username):
     """Returns the dict of a user."""
@@ -264,10 +265,12 @@ def create_manual_controller(name, c_type, url):
 
 
 def controller_exists(c_name):
-    aql = 'FOR c in controllers FILTER c._key == @c_name RETURN c'
-    # Returns an empty list if no controller is found.
-    controller = execute_aql_query(aql, c_name=c_name)
-    return bool(controller)
+    c_id = "controllers/" + c_name
+    aql = 'RETURN DOCUMENT("controllers", @c_id)'
+    controller = execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
+    if controller is None:
+        return False
+    return True
 
 
 def get_controller(c_name):
@@ -433,9 +436,8 @@ def set_controller_access(c_name, username, access):
 ################################################################################
 
 
-def create_model(m_key, m_name, state, uuid=''):
+def create_model(m_name, state, uuid=''):
     model = {
-        "_key": m_key,
         "name": m_name,
         "state": state,
         "uuid": uuid}
@@ -444,10 +446,12 @@ def create_model(m_key, m_name, state, uuid=''):
 
 
 def model_exists(m_key):
-    aql = 'FOR m in models FILTER m._key == @m_key RETURN m'
-    # Returns an empty list if no model is found.
-    model = execute_aql_query(aql, m_key=m_key)
-    return bool(model)
+    m_id = "models/" + m_key
+    aql = 'RETURN DOCUMENT("models", @m_id)'
+    model = execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
+    if model is None:
+        return False
+    return True
 
 
 def get_model(m_key):
