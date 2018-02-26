@@ -18,6 +18,7 @@ import asyncio
 import logging
 import sys
 import traceback
+from juju.controller import Controller
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
@@ -32,21 +33,21 @@ class JuJu_Token(object):  #pylint: disable=R0903
 ################################################################################
 # Async method
 ################################################################################
-async def create_user(username, password):
+async def add_user_to_controllers(username, password):
     try:
-        datastore.create_user(username)
-        logger.info('Succesfully created user %s', username)
-        controllers = datastore.get_keys_controllers()
+        logger.info('adding user %s to ready controllers', username)
+        controllers = datastore.datastore.get_all_ready_controllers()
         token = JuJu_Token()
         for con in controllers:
-            logger.info('Setting up Controllerconnection for %s', con)
-            controller = juju.Controller_Connection(token, con)
-            async with controller.connect(token) as con_juju:  #pylint: disable=E1701
-                await con_juju.add_user(username, password)
-                await con_juju.grant(username)
-                datastore.add_user_to_controller(con, username, 'login')
-                logger.info('Succesfully added user %s to controller %s', username, con)
-        datastore.set_user_state(username, 'ready')
+            if not get_controller_access(con['name'], username):
+                logger.info('Setting up Controllerconnection for %s', con['name'])
+                controller_connection = Controller()
+                await controller_connection.connect(con['endpoints'][0], token.username, token.password, con['ca_cert'])
+                await controller_connection.add_user(username, password)
+                await controller_connectcon_jujuion.grant(username)
+                await controller_connection.disconnect()
+                datastore.add_user_to_controller(con['name'], username, 'login')
+                logger.info('Succesfully added user %s to controller %s', username, con['name'])
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -56,9 +57,9 @@ async def create_user(username, password):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger('add-user')
+    logger = logging.getLogger('add_user_to_controllers')
     ws_logger = logging.getLogger('websockets.protocol')
-    hdlr = logging.FileHandler('{}/log/add_user.log'.format(settings.SOJOBO_API_DIR))
+    hdlr = logging.FileHandler('{}/log/add_user_to_controllers.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -67,5 +68,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
-    loop.run_until_complete(create_user(sys.argv[1], sys.argv[2]))
+    loop.run_until_complete(add_user_to_controllers(sys.argv[1], sys.argv[2], sys.argv[3]))
     loop.close()

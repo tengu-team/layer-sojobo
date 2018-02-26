@@ -555,3 +555,38 @@ def get_users_model(m_key):
     aql = ('FOR u, mEdge IN 1..1 OUTBOUND @m_id modelAccess '
                'RETURN {name: u.name, access: mEdge.access}')
     return execute_aql_query(aql, rawResults=True, m_id=m_id)
+
+################################################################################
+#                          CONNECTION FUNCTIONS                                #
+################################################################################
+
+
+def get_controller_connection_info(username, c_name):
+    u_id = "users/" + username
+    c_id = "controllers/" + c_name
+    aql = ("LET user = DOCUMENT(@u_id) "
+           "LET controller = DOCUMENT(@c_id) "
+           "LET c_access = "
+                "FIRST((FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess "
+                    "FILTER cEdge._from == @c_id "
+                    "RETURN cEdge.access)) "
+           "RETURN {user, controller, c_access}")
+    return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id)
+
+
+def get_model_connection_info(username, c_name, m_key):
+    u_id = "users/" + username
+    c_id = "controllers/" + c_name
+    m_id = "models/" + m_key
+    aql = ("LET user = DOCUMENT(@u_id) "
+           "LET controller = DOCUMENT(@c_id) "
+           "LET c_access = "
+                "FIRST((FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess "
+                    "FILTER cEdge._from == @c_id "
+                    "RETURN cEdge.access)) "
+           "LET m_access = "
+                "FIRST((FOR m, mEdge IN 1..1 INBOUND @u_id modelAccess "
+                    "FILTER mEdge._from == @m_id "
+                    "RETURN mEdge.access)) "
+           "RETURN {user, controller, c_access, m_access}")
+    return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id, m_id=m_id)

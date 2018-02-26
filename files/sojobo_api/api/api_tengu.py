@@ -51,14 +51,12 @@ def initialize():
 def get_all_controllers():
     try:
         LOGGER.info('/TENGU/controllers [GET] => receiving call')
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_user_info(request.authorization.username)
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
-        if token.is_admin:
-            code, response = 200, juju.get_keys_controllers()
+        if juju.authorize(auth_data):
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
-        else:
-            code, response = errors.no_permission()
-            LOGGER.error('/TENGU/controllers [GET] => No Permission to perform action!')
+            juju.create_response(200, juju.get_keys_controllers())
     except KeyError:
         code, response = errors.invalid_data()
         error_log()

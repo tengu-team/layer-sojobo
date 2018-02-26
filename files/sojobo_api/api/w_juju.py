@@ -14,7 +14,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302,e0611
-
 import asyncio
 from importlib import import_module
 from random import randint
@@ -23,8 +22,6 @@ import re
 from subprocess import check_output, check_call, Popen
 import json
 import hashlib
-from asyncio_extras import async_contextmanager
-from async_generator import yield_
 from flask import abort, Response
 from juju import tag
 from juju.client import client
@@ -38,88 +35,6 @@ from sojobo_api import settings
 ################################################################################
 # TENGU FUNCTIONS
 ################################################################################
-
-
-class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self, auth):
-        self.username = auth.username
-        self.password = auth.password
-        self.is_admin = self.set_admin()
-
-    def set_admin(self):
-        return self.username == settings.JUJU_ADMIN_USER and self.password == settings.JUJU_ADMIN_PASSWORD
-
-
-class Controller_Connection(object):
-    """Object to interact with controller in JuJu."""
-
-    def __init__(self, token, c_name):
-        self.c_name = c_name
-        self.c_access = datastore.get_controller_access(c_name, token.username)
-        self.c_connection = Controller()
-        con = datastore.get_controller(c_name)
-        self.c_type = con['type']
-        if len(con['endpoints']) > 0:
-            self.endpoint = con['endpoints'][0]
-            self.c_cacert = con['ca-cert']
-        else:
-            self.endpoint = None
-            self.c_cacert = None
-
-    async def set_controller(self, token, c_name):
-        await self.c_connection.disconnect()
-        self.c_name = c_name
-        self.c_access = datastore.get_controller_access(c_name, token.username)
-        self.c_connection = Controller()
-        con = datastore.get_controller(c_name)
-        self.c_type = con['type']
-        self.endpoint = con['endpoints'][0]
-        self.c_cacert = con['ca-cert']
-
-    @async_contextmanager
-    async def connect(self, token):
-        nested = False
-        if self.c_connection.connection is None or not self.c_connection.connection.is_open:
-            await self.c_connection.connect(self.endpoint, token.username, token.password, self.c_cacert)
-        else:
-            nested = True
-        await yield_(self.c_connection)   #pylint: disable=E1700
-        if not nested:
-            await self.c_connection.disconnect()
-
-
-class Model_Connection(object):
-    def __init__(self, token, controller, model):
-        con = datastore.get_controller(controller)
-        self.c_endpoint = con['endpoints'][0]
-        self.c_cacert = con['ca-cert']
-        self.m_name = model
-        self.m_key = datastore.get_model_key(controller, model)
-        self.m_access = datastore.get_model_access(controller, self.m_name, token.username)
-        self.m_uuid = datastore.get_model(self.m_key)['uuid']
-        self.m_connection = Model()
-
-    async def set_model(self, token, controller, modelname):
-        await self.m_connection.disconnect()
-        self.m_name = modelname
-        self.m_uuid = datastore.get_model(self.m_key)['uuid']
-        # TODO: Hier key ook setten?
-        self.m_connection = Model()
-        self.m_access = datastore.get_model_access(controller, self.m_name, token.username)
-
-    @async_contextmanager
-    async def connect(self, token):
-        nested = False
-        if self.m_connection.connection is None or not self.m_connection.connection.is_open:
-            await self.m_connection.connect(self.c_endpoint, self.m_uuid,
-                                            token.username, token.password, self.c_cacert)
-        else:
-            nested = True
-        await yield_(self.m_connection) #pylint: disable=E1700
-        if not nested:
-            await self.m_connection.disconnect()
-
-
 def get_controller_types():
     """Returns the types of the controllers (google, aws, etc.). This depends on
     which subordinates (f.e. controller_google) are connected to the sojobo-api charm.
@@ -180,65 +95,98 @@ def check_constraints(data):
             abort(error[0], error[1])
 
 
-
-async def authenticate(api_key, auth):
+async def authenticate(api_key, auth, data, controller=None, model=None):
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
-        if auth is None:
-            abort(error[0], error[1])
-        token = JuJu_Token(auth)
-        if not user_exists(token.username):
-            abort(error[0], error[1])
-        try:
-            controllers = get_all_controllers()
-            ready_cons = []
-            for con in controllers:
-                if con['state'] == 'ready':
-                    ready_cons.append(con)
-            user_state = datastore.get_user_state(token.username)
-            if user_state == 'ready':
-                if len(ready_cons) > 0:
-                    controller = Controller_Connection(token, controllers[randint(0, len(controllers) - 1)]["_key"])
-                    async with controller.connect(token):  #pylint: disable=E1701
-                        pass
-                    return token
-                else:
-                    if token.username == settings.JUJU_ADMIN_USER and token.password == settings.JUJU_ADMIN_PASSWORD:
-                        return token
-                    else:
-                        abort(error[0], error[1])
-            elif user_state == 'pending':
-                abort(403, "The user is not ready yet to perform this action. Please wait untill the user is created!")
+        if not controller and not model:
+            if token.username == settings.JUJU_ADMIN_USER and token.password == settings.JUJU_ADMIN_PASSWORD:
+                return data
             else:
-                abort(403, "The user is being removed and not able to perform this action anymore!")
+                await connect_to_random_controller(data)
+                return data
+        try:
+            check_controller_state(data)
+            check_user_state(data)
+            if data['c_access']:
+                if controller and not model:
+                    controller_connection = Controller()
+                    await controller_connection.connect(data['controller']['endpoints'][0], auth.username, auth.password, data['controller']['ca_cert'])
+                    return controller_connection
+                elif model:
+                    model_connection = Model()
+                    await model_connection.connect(data['controller']['endpoints'][0], data['model']['uuid'], auth.username, auth.password, data['controller']['ca_cert'])
+                    return model_connection
+            elif data['controller']['state'] == 'ready':
+                await connect_to_random_controller(data)
+                add_user_to_controllers(data, auth.username, auth.password)
+                abort(501, 'User {} is being added to the {} environment'.format(data['controller']['name'], data['user']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
     else:
         abort(error[0], error[1])
 
 
-def authorize(token, c_name, m_name=None):
-    """Checks if a user is authorized to access a given controller and optionally
-    given model. Returns appropriate error messages if a user is not allowed access."""
-    if not controller_exists(c_name):
-        error = errors.does_not_exist('controller')
+async def connect_to_random_controller(data):
+    error = errors.unauthorized()
+    try:
+        controllers = datastore.get_all_ready_controllers()
+        if len(controllers) = 0:
+            abort(400,'Please wait untill your first environment is set up!')
+        else:
+            con = controllers[randint(0, len(controllers) - 1)]
+            controller_connection = Controller()
+            await controller_connection.connect(con['endpoints'][0], auth.username, auth.password, con['ca_cert'])
+            await controller_connection.disconnect()
+    except JujuAPIError:
         abort(error[0], error[1])
-    else:
-        con = Controller_Connection(token, c_name)
-        if not c_access_exists(con.c_access):
-            error = errors.does_not_exist('controller')
-            abort(error[0], error[1])
-    if m_name and not model_exists(con, m_name):
-        error = errors.does_not_exist('model')
-        abort(error[0], error[1])
-    elif m_name:
-        mod = Model_Connection(token, c_name, m_name)
-        if not m_access_exists(mod.m_access):
-            error = errors.unauthorized()
-            abort(error[0], error[1])
 
-        return con, mod
-    return con
+
+def check_user_state(data):
+    if data['user']:
+        if data['user']['state'] == 'pending':
+            abort(403, "The user is not ready yet to perform this action. Please wait untill the user is created!")
+        elif data['user']['state'] != 'ready':
+            abort(403, "The user is being removed and not able to perform this action anymore!")
+
+
+def authorize(auth_data):
+    """Checks if a user is authorized to access a given controller and optionally
+    given model. Returns appropriate error messages if a user is not allowed access.
+    At the moment this method needs implementation to then check to model and controller
+    access of the user and check it if the user is authorized to perform the action"""
+    if auth_data['user']['name'] == settings.settings.JUJU_ADMIN_USER:
+        return True
+    else:
+        return False
+    # if not controller_exists(c_name):
+    #     error = errors.does_not_exist('controller')
+    #     abort(error[0], error[1])
+    # else:
+    #     con = Controller_Connection(token, c_name)
+    #     if not c_access_exists(con.c_access):
+    #         error = errors.does_not_exist('controller')
+    #         abort(error[0], error[1])
+    # if m_name and not model_exists(con, m_name):
+    #     error = errors.does_not_exist('model')
+    #     abort(error[0], error[1])
+    # elif m_name:
+    #     mod = Model_Connection(token, c_name, m_name)
+    #     if not m_access_exists(mod.m_access):
+    #         error = errors.unauthorized()
+    #         abort(error[0], error[1])
+    #     return con, mod
+    # return con
+
+def get_connection_info(username, c_name=None, m_name=None):
+    if c_name and m_name:
+        m_key = construct_model_key(c_name, m_name)
+        return datastore.get_model_connection_info(username, c_name, m_key)
+    elif c_name and not m_name:
+        return datastore.get_controller_connection_info(username, c_name)
+    else:
+        return datastore.get_user_info(username)
+
+
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
@@ -722,6 +670,9 @@ def create_user(username, password):
 
 def delete_user(username):
     Popen(["python3", "{}/scripts/delete_user.py".format(settings.SOJOBO_API_DIR), username])
+
+def add_user_to_controllers(data, username, password):
+    Popen(["python3", "{}/scripts/add_user_to_controllers.py".format(settings.SOJOBO_API_DIR),data, username, password])
 
 
 async def change_user_password(token, username, password):
