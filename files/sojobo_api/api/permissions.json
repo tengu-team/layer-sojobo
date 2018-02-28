@@ -1,0 +1,30 @@
+{
+	"get_users": {
+		"c_access": ["admin"],
+    "m_access:" []
+	},
+  "post_users": {
+    "c_access": ["admin"],
+    "m_access:" []
+  },
+  "get_users/user": {
+		"c_access": ["admin"],
+    "m_access:" []
+	},
+  "put_users/user": {
+		"c_access": ["admin"],
+    "m_access:" []
+	},
+  "del_users/user": {
+		"c_access": ["admin"],
+    "m_access:" []
+	},
+  "get_users/user/ssh-keys": {
+		"c_access": ["admin"],
+    "m_access:" []
+	},
+  "put_users/user/ssh-keys": {
+		"c_access": ["admin"],
+    "m_access:" []
+	},
+}
