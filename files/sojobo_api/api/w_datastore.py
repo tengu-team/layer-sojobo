@@ -56,9 +56,7 @@ def user_exists(username):
     u_id = "users/" + username
     aql = 'RETURN DOCUMENT("users", @u_id)'
     user = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
-    if user is None:
-        return False
-    return True
+    return user is not None
 
 def get_user(username):
     """Returns the dict of a user."""
@@ -436,8 +434,9 @@ def set_controller_access(c_name, username, access):
 ################################################################################
 
 
-def create_model(m_name, state, uuid=''):
+def create_model(m_key, m_name, state, uuid=''):
     model = {
+        "_key": m_key,
         "name": m_name,
         "state": state,
         "uuid": uuid}
