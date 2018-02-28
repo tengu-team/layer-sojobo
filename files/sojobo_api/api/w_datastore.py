@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from base64 import b64encode
 from sojobo_api import settings
 import pyArango.connection as pyArango
 
@@ -42,9 +43,10 @@ def execute_aql_query(aql, rawResults=False, **bindings):
 ################################################################################
 
 
-def create_user(username):
-    user = {"_key": username,
+def create_user(username, juju_username):
+    user = {"_key": b64encode(username.encode()).decode(),
             "name": username,
+            "juju_username": juju_username,
             "ssh_keys": [],
             "credentials": [],
             "state": "pending"}
@@ -53,16 +55,15 @@ def create_user(username):
 
 
 def user_exists(username):
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = 'RETURN DOCUMENT("users", @u_id)'
     user = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
-    if user is None:
-        return False
-    return True
+    return user is not None
+
 
 def get_user(username):
     """Returns the dict of a user."""
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = 'RETURN DOCUMENT(@u_id)'
     return execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
@@ -82,7 +83,7 @@ def get_user_doc(username):
 def get_user_info(username):
     """Returns info of the given user, including which controllers and models
     that the user has access to."""
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = ('LET u = DOCUMENT(@user) '
            'LET controllers = '
                 '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
@@ -103,25 +104,25 @@ def get_user_info(username):
 
 
 def get_user_state(username):
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.state'
     return  execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 
 def set_user_state(username, state):
     aql = 'UPDATE {_key: @username, state: @state} IN users'
-    execute_aql_query(aql, username=username, state=state)
+    execute_aql_query(aql, username=b64encode(username.encode()).decode(), state=state)
 
 
 def get_ssh_keys(username):
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.ssh_keys'
     return  execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 
 def update_ssh_keys(username, ssh_keys):
     aql = 'UPDATE {_key: @username, ssh_keys: @ssh} IN users'
-    execute_aql_query(aql, username=username, ssh=ssh_keys)
+    execute_aql_query(aql, username=b64encode(username.encode()).decode(), ssh=ssh_keys)
 
 
 def delete_user(username):
@@ -134,12 +135,12 @@ def delete_user(username):
 def remove_user_u_col(username):
     """Removes the user from the collection 'users'."""
     aql = 'REMOVE {_key: @username} IN users'
-    execute_aql_query(aql, username=username)
+    execute_aql_query(aql, username=b64encode(username.encode()).decode())
 
 
 def remove_user_c_access(username):
     """Removes every Edge from controllerAccess that contains given user."""
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = ('FOR edge in controllerAccess '
            'FILTER edge._to == @u_id '
            'REMOVE edge in controllerAccess')
@@ -148,7 +149,7 @@ def remove_user_c_access(username):
 
 def remove_user_m_access(username):
     """Removes every Edge from modelAccess that contains given user."""
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = ('FOR edge in modelAccess '
            'FILTER edge._to == @u_id '
            'REMOVE edge in modelAccess')
@@ -159,16 +160,14 @@ def remove_user_m_access(username):
 #                           CREDENTIAL FUNCTIONS                               #
 ################################################################################
 def get_credentials(username):
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     result = []
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
     output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
-    for out in output:
-        result.append(get_credential(username, out['name']))
-    return result
+    return output
 
 def get_credential_keys(username):
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
     output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
     return [i['name'] for i in output]
@@ -181,7 +180,7 @@ def get_credential(username, cred_name):
 
 
 def get_credential_id(username, cred_name):
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql =('LET u = DOCUMENT(@u_id) '
           'FOR cred in u.credentials '
           'FILTER cred.name == @cred_name '
@@ -198,7 +197,7 @@ def add_credential(username, cred):
 
 
 def update_user_credential(username, cred):
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = ('LET doc = DOCUMENT(@u_id) '
            'UPDATE doc WITH {'
            'credentials: PUSH(doc.credentials, @credential, true)'
@@ -218,8 +217,8 @@ def set_credential_ready(username, cred_name):
 def remove_credential(username, cred_name):
     c_id = get_credential_id(username, cred_name)
     u_aql = 'REMOVE {_key: @c_id} IN credentials'
-    execute_aql_query(u_aql, username=username)
-    u_id = u_id = "users/" + username
+    execute_aql_query(u_aql, username=b64encode(username.encode()).decode())
+    u_id = u_id = "users/" + b64encode(username.encode()).decode()
     credential = {'name': cred_name, 'key': c_id}
     aql = ('LET u = DOCUMENT(@u_id) '
            'UPDATE doc WITH { '
@@ -347,7 +346,7 @@ def get_controllers_access(username):
 def add_user_to_controller(c_name, username, access):
     """Creates or updates an Edge (relation) between a controller and a user."""
     c_id = "controllers/" + c_name
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = ("UPSERT { _from: @controller, _to: @user }"
            "INSERT { _from: @controller, _to: @user, access: @access}"
            "UPDATE { access : @access } in controllerAccess")
