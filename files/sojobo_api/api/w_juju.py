@@ -377,28 +377,24 @@ async def get_gui_url(controller, model):
     return 'https://{}/gui/{}'.format(controller.endpoint, model.m_uuid)
 
 
-def create_model(token, c_name, m_name, cred_name):
+async def create_model(connection, authentication, m_name, cred_name):
     """Creates model in database and then in JuJu (background script)."""
     if not datastore.model_exists(m_name):
-        if cred_name in datastore.get_credential_keys(token.username):
-            # Create the model in ArangoDB. Add model key to controller and
-            # set the model access level of the user.
-            new_model = datastore.create_model(m_name, state='deploying')
-            new_model_key = new_model["_key"]
-            datastore.add_model_to_controller(c_name, new_model["_key"])
-            datastore.set_model_state(new_model["_key"], 'accepted')
-            datastore.set_model_access(new_model["_key"], token.username, 'admin')
-
-            # Run the background script, this creates the model in JuJu.
-            Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), c_name,
-                   new_model_key, settings.SOJOBO_API_DIR, token.username, token.password, cred_name])
-
-            code, response = 202, "Model is being deployed."
-        else:
-            code, response = 404, "Credentials {} not found!".format(cred_name)
+        # Create the model in ArangoDB. Add model key to controller and
+        # set the model access level of the user.
+        new_model = datastore.create_model(m_name, state='deploying')
+        new_model_key = new_model["_key"]
+        datastore.add_model_to_controller(c_name, new_model["_key"])
+        datastore.set_model_state(new_model["_key"], 'accepted')
+        datastore.set_model_access(new_model["_key"], authentication.username, 'admin')
+        await connection.disconnect()
+        # Run the background script, this creates the model in JuJu.
+        Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), c_name, m_name,
+               new_model_key, authentication.username, authentication.password, cred_name])
+        return 202, "Model is being deployed."
     else:
-        code, response = errors.already_exists('model')
-    return code, response
+        return errors.already_exists('model')
+
 
 
 def check_model_state(m_key, required_states):
@@ -740,6 +736,8 @@ def remove_credential(user, cred_name):
 def credential_exists(user, credential):
     for cred in get_credentials(user):
         if cred['name'] == credential:
+            if not cred['state'] == 'ready':
+                raise Exception('The Credential {} is not ready yet.'.format(cred_name))
             return True
     return False
 

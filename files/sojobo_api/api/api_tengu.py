@@ -52,7 +52,7 @@ def get_all_controllers():
     try:
         LOGGER.info('/TENGU/controllers [GET] => receiving call')
         auth_data = juju.get_user_info(request.authorization.username)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
         if juju.authorize(auth_data):
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
@@ -173,34 +173,33 @@ def create_model(controller):
     try:
         LOGGER.info('/TENGU/controllers/%s/models [POST] => receiving call', controller)
         data = request.json
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_user_info(request.authorization.username, controller=controller)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
-        con = juju.authorize( token, controller)
-        LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
-        valid, model_name = juju.check_input(data['model'], "model")
-        if con.c_access == 'add-model' or con.c_access == 'superuser':
-            if juju.credential_exists(token.username, data['credential']):
+        if juju.authorize(auth_data):
+            LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
+            valid, model_name = juju.check_input(data['model'], "model")
+            if juju.credential_exists(auth_data['user']['name'], data['credential']):
                 credential_name = data['credential']
                 if valid:
                     LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
-                    code, response = juju.create_model(token, con.c_name, model_name, credential_name)
+                    return juju.create_response(juju.create_model(connection, request.authorization, model_name, credential_name))
                 else:
-                    code, response = 400, model_name
+                    return juju.create_response(400, model_name)
             else:
-                code, response = 400, 'Credential {} not found for user {}'.format(data['credential'], token.username)
+                return juju.create_response(400, 'Credential {} not found for user {}'.format(data['credential'], auth_data['user']['name']))
         else:
-            code, response = errors.no_permission()
             LOGGER.error('/TENGU/controllers/%s/models [POST] => No Permission to perform this action!', controller)
+            return juju.create_response(errors.no_permission())
     except KeyError:
-        code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(errors.invalid_data())
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
-        code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(errors.cmd_error(ers))
 
 
 @TENGU.route('/controllers/<controller>/models', methods=['GET'])
