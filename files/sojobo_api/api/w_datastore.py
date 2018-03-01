@@ -305,7 +305,7 @@ def get_keys_controllers():
 
 
 def get_cloud_controllers(c_type):
-    aql = 'FOR c IN controllers FILTER c.type == @cloud RETURN c._key'
+    aql = 'FOR c IN controllers FILTER c.type == @cloud RETURN c'
     return execute_aql_query(aql, rawResults=True, cloud=c_type)
 
 

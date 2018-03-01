@@ -99,7 +99,7 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
         if not controller and not model:
-            if token.username == settings.JUJU_ADMIN_USER and token.password == settings.JUJU_ADMIN_PASSWORD:
+            if auth.username == settings.JUJU_ADMIN_USER and auth.password == settings.JUJU_ADMIN_PASSWORD:
                 return data
             else:
                 await connect_to_random_controller(data)
@@ -130,7 +130,7 @@ async def connect_to_random_controller(data):
     error = errors.unauthorized()
     try:
         controllers = datastore.get_all_ready_controllers()
-        if len(controllers) = 0:
+        if len(controllers) == 0:
             abort(400,'Please wait untill your first environment is set up!')
         else:
             con = controllers[randint(0, len(controllers) - 1)]
@@ -154,7 +154,7 @@ def authorize(auth_data):
     given model. Returns appropriate error messages if a user is not allowed access.
     At the moment this method needs implementation to then check to model and controller
     access of the user and check it if the user is authorized to perform the action"""
-    if auth_data['user']['name'] == settings.settings.JUJU_ADMIN_USER:
+    if auth_data['user']['name'] == settings.JUJU_ADMIN_USER:
         return True
     else:
         return False
@@ -184,7 +184,7 @@ def get_connection_info(username, c_name=None, m_name=None):
     elif c_name and not m_name:
         return datastore.get_controller_connection_info(username, c_name)
     else:
-        return datastore.get_user_info(username)
+        return {'user': datastore.get_user_info(username)}
 
 
 ###############################################################################
@@ -209,9 +209,11 @@ def create_controller(token, c_type, name, data):
     for controller in get_all_controllers():
         if controller['state'] == 'accepted':
             return 503, 'An environment is already being created'
+    credential = get_credential(token.username, data['credential'])
+    if not credential['state'] == 'ready':
+        abort(503, 'The Credential {} is not ready yet.'.format(credential['name']))
     datastore.create_controller(name, c_type, data['region'], data['credential'])
     datastore.add_user_to_controller(name, 'admin', 'superuser')
-    credential = get_credential(token.username, data['credential'])
     return get_controller_types()[c_type].create_controller(name, data)
 
 
@@ -783,10 +785,11 @@ def get_all_users():
     return datastore.get_all_users()
 
 
-def get_users_info(token):
+def get_users_info(data):
+    print(data)
     """An admin user is allowed to access info of all other users. Users who
     have no admin rights have only access to info about themselves."""
-    if token.is_admin:
+    if data['name'] == settings.JUJU_ADMIN_USER:
         result = []
         for user in get_all_users():
             u_info = get_user_info(user["name"])

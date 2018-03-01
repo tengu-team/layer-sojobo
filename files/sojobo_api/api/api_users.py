@@ -72,7 +72,8 @@ def get_users_info():
     try:
         LOGGER.info('/USERS [GET] => receiving call')
         time1 = time.time()
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username)
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         time2 = time.time()
         print("===== TIMING =====")
         print ('%s function took %0.3f ms' % ("get_users_info", (time2-time1)*1000.0))
@@ -322,9 +323,10 @@ def add_credential(user):
     try:
         LOGGER.info('/USERS/%s/credentials [POST] => receiving call', user)
         data = request.json
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username)
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials [POST] => Authenticated!', user)
-        if token.is_admin or token.username == user:
+        if juju.authorize(auth_data):
             if juju.user_exists(user):
                 if not juju.credential_exists(user, data['name']):
                     juju.add_credential(user, data)

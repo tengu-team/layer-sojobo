@@ -78,9 +78,10 @@ def create_controller():
             data = request.json
         url = request.url_rule
         LOGGER.info('%s [POST] => receiving call', url)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username)
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('%s [POST] => Authenticated', url)
-        if token.is_admin:
+        if juju.authorize(auth_data):
             valid, controller = juju.check_input(data['controller'], 'controller')
             LOGGER.info('%s [POST] => Creating Controller %s', url, controller)
             if valid:
@@ -91,12 +92,12 @@ def create_controller():
                 else:
                     sup_clouds = juju.get_supported_regions(c_type)
                     if data['region'] in sup_clouds:
-                        if juju.credential_exists(token.username, data['credential']):
+                        if juju.credential_exists(token['user']['name'], data['credential']):
                             code, response = juju.create_controller(token, c_type,
                                                                     controller, data)
                             LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
                         else:
-                            code, response = 400, 'Credential {} not found for user {}'.format(data['credential'], token.username)
+                            code, response = 400, 'Credential {} not found for user {}'.format(data['credential'], auth_data['user']['name'])
                     else:
                         code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(c_type, sup_clouds)
                         LOGGER.error('%s [POST] => %s', url, response)

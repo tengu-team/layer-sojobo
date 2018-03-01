@@ -129,7 +129,7 @@ def connect_to_arango(arango):
 @when_not('admin.created')
 def create_admin():
     if leader_get().get('admin') != 'Created':
-        subprocess.check_call(["python3", "{}/scripts/add_user.py".format(API_DIR), 'admin', db.get('password')])
+        subprocess.check_call(["python3", "{}/scripts/create_user.py".format(API_DIR), 'admin', db.get('password')])
         leader_set({'admin': 'Created'})
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
         set_state('admin.created')
