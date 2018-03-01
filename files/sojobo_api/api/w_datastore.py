@@ -365,6 +365,7 @@ def set_controller_state(c_name, state, endpoints=None, uuid=None, ca_cert=None)
 
 def destroy_controller(c_name):
     remove_edges_controller_access(c_name)
+    remove_models_controller(c_name)
     remove_controller_c_col(c_name)
 
 
@@ -381,6 +382,18 @@ def remove_edges_controller_access(c_name):
     aql = ('FOR edge in controllerAccess '
            'FILTER edge._from == @controller '
            'REMOVE edge in controllerAccess')
+    execute_aql_query(aql, controller=c_id)
+
+
+def remove_models_controller(c_name):
+    """Remove all models that are from a given controller."""
+    c_id = "controllers/" + c_name
+    aql = ('LET c = DOCUMENT(@controller) '
+           'FOR m_key in c.models '
+                'FOR mEdge in modelAccess '
+                    'FILTER mEdge._from == CONCAT("models/", m_key) '
+                    'REMOVE mEdge in modelAccess '
+                'REMOVE {_key: m_key} IN models ')
     execute_aql_query(aql, controller=c_id)
 
 
