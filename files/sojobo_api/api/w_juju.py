@@ -19,6 +19,7 @@ from importlib import import_module
 from random import randint
 import os
 import re
+import base64
 from subprocess import check_output, check_call, Popen
 import json
 import hashlib
@@ -254,16 +255,18 @@ def get_controller_info(token, controller):
 ###############################################################################
 # MODEL FUNCTIONS
 ###############################################################################
+
+
+def construct_model_key(c_name, m_name):
+    key_string = c_name + "_" + m_name
+    # Must encode 'key_string' because base64 takes 8-bit binary byte data.
+    m_key = base64.b64encode(key_string.encode())
+    # To return a string you must decode the binary data.
+    return m_key.decode()
+
+
 def get_all_models(controller):
     return datastore.get_all_models(controller.c_name)
-
-
-def model_exists(controller, modelname):
-    all_models = get_all_models(controller)
-    for model in all_models:
-        if model['name'] == modelname:
-            return True
-    return False
 
 
 def get_model_uuid(controller, model):
@@ -381,21 +384,32 @@ async def get_gui_url(controller, model):
 
 async def create_model(connection, authentication, m_name, cred_name):
     """Creates model in database and then in JuJu (background script)."""
-    if not datastore.model_exists(m_name):
-        # Create the model in ArangoDB. Add model key to controller and
-        # set the model access level of the user.
-        new_model = datastore.create_model(m_name, state='deploying')
-        new_model_key = new_model["_key"]
-        datastore.add_model_to_controller(c_name, new_model["_key"])
-        datastore.set_model_state(new_model["_key"], 'accepted')
-        datastore.set_model_access(new_model["_key"], authentication.username, 'admin')
-        await connection.disconnect()
-        # Run the background script, this creates the model in JuJu.
-        Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR), c_name, m_name,
-               new_model_key, authentication.username, authentication.password, cred_name])
-        return 202, "Model is being deployed."
+    # Construct a key for the model using the controller name and model name.
+    key_string = c_name + "_" + m_name
+    m_key = construct_model_key(c_name, m_name)
+
+    if not datastore.model_exists(m_key):
+        if cred_name in datastore.get_credential_keys(token.username):
+            # Create the model in ArangoDB. Add model key to controller and
+            # set the model access level of the user.
+            new_model = datastore.create_model(m_key, m_name, state='deploying')
+            # TODO: Maybe put these 3 datastore methods in one so you do not have
+            # to create a connection with ArangoDB each time.
+            datastore.add_model_to_controller(c_name, m_key)
+            datastore.set_model_state(m_key, 'accepted')
+            datastore.set_model_access(m_key, token.username, 'admin')
+
+            # Run the background script, this creates the model in JuJu.
+            Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
+                    c_name, m_key, m_name, settings.SOJOBO_API_DIR,
+                    token.username,token.password, cred_name])
+
+            code, response = 202, "Model is being deployed."
+        else:
+            code, response = 404, "Credentials {} not found!".format(cred_name)
     else:
         return errors.already_exists('model')
+
 
 
 
@@ -720,13 +734,13 @@ def add_credential(user, data):
         return 400, "This type of controller does not need credentials"
 
 
-async def update_cloud(controller, credential, username):
+async def update_cloud(controller, cloud, credential, username):
     credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
     cloud_facade = client.CloudFacade.from_connection(controller.connection)
-    cred = get_controller_types()[controller.c_type].generate_cred_file(credential_name, credential)
+    cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential)
     cloud_cred = client.UpdateCloudCredential(
         client.CloudCredential(cred['key'], cred['type']),
-        tag.credential(c_type, username, credential_name)
+        tag.credential(cloud, username, credential_name)
     )
     await cloud_facade.UpdateCredentials([cloud_cred])
 
@@ -760,7 +774,8 @@ async def controller_revoke(token, controller, username):
 
 def set_models_access(token, controller, user, accesslist):
     for mod in accesslist:
-        if model_exists(controller, mod['name']):
+        m_key = construct_model_key(controller.c_name, mod['name'])
+        if datastore.model_exists(m_key):
             if not m_access_exists(mod['access']):
                 abort(400, 'Access Level {} is not supported. Change access for model {}'.format(mod['access'], mod['name']))
             else:

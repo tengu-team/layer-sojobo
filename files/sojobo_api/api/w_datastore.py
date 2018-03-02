@@ -53,11 +53,10 @@ def create_user(username):
 
 
 def user_exists(username):
-    aql = 'FOR u in users FILTER u._key == @username RETURN u'
-    # Returns an empty list if no user is found.
-    user = execute_aql_query(aql, username=username)
-    return bool(user)
-
+    u_id = "users/" + username
+    aql = 'RETURN DOCUMENT("users", @u_id)'
+    user = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    return user is not None
 
 def get_user(username):
     """Returns the dict of a user."""
@@ -264,10 +263,12 @@ def create_manual_controller(name, c_type, url):
 
 
 def controller_exists(c_name):
-    aql = 'FOR c in controllers FILTER c._key == @c_name RETURN c'
-    # Returns an empty list if no controller is found.
-    controller = execute_aql_query(aql, c_name=c_name)
-    return bool(controller)
+    c_id = "controllers/" + c_name
+    aql = 'RETURN DOCUMENT("controllers", @c_id)'
+    controller = execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
+    if controller is None:
+        return False
+    return True
 
 
 def get_controller(c_name):
@@ -305,6 +306,11 @@ def get_all_ready_controllers():
 
 def get_keys_controllers():
     aql = 'FOR c in controllers RETURN c._key'
+    return execute_aql_query(aql, rawResults=True)
+
+
+def get_ready_controllers():
+    aql = "FOR c in controllers FILTER c.state == 'ready' RETURN c"
     return execute_aql_query(aql, rawResults=True)
 
 
@@ -363,6 +369,7 @@ def set_controller_state(c_name, state, endpoints=None, uuid=None, ca_cert=None)
 
 def destroy_controller(c_name):
     remove_edges_controller_access(c_name)
+    remove_models_controller(c_name)
     remove_controller_c_col(c_name)
 
 
@@ -379,6 +386,18 @@ def remove_edges_controller_access(c_name):
     aql = ('FOR edge in controllerAccess '
            'FILTER edge._from == @controller '
            'REMOVE edge in controllerAccess')
+    execute_aql_query(aql, controller=c_id)
+
+
+def remove_models_controller(c_name):
+    """Remove all models that are from a given controller."""
+    c_id = "controllers/" + c_name
+    aql = ('LET c = DOCUMENT(@controller) '
+           'FOR m_key in c.models '
+                'FOR mEdge in modelAccess '
+                    'FILTER mEdge._from == CONCAT("models/", m_key) '
+                    'REMOVE mEdge in modelAccess '
+                'REMOVE {_key: m_key} IN models ')
     execute_aql_query(aql, controller=c_id)
 
 
@@ -432,9 +451,9 @@ def set_controller_access(c_name, username, access):
 ################################################################################
 
 
-def create_model(m_name, state, uuid=''):
-    # TODO: Check if model with that name already exists. In this layer?
+def create_model(m_key, m_name, state, uuid=''):
     model = {
+        "_key": m_key,
         "name": m_name,
         "state": state,
         "uuid": uuid}
@@ -442,11 +461,13 @@ def create_model(m_name, state, uuid=''):
     return execute_aql_query(aql, rawResults=True, model=model)[0]
 
 
-def model_exists(m_name):
-    aql = 'FOR m in models FILTER m.name == @m_name RETURN m'
-    # Returns an empty list if no model is found.
-    model = execute_aql_query(aql, m_name=m_name)
-    return bool(model)
+def model_exists(m_key):
+    m_id = "models/" + m_key
+    aql = 'RETURN DOCUMENT("models", @m_id)'
+    model = execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
+    if model is None:
+        return False
+    return True
 
 
 def get_model(m_key):

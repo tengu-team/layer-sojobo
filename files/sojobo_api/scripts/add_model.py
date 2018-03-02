@@ -29,7 +29,7 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: di
 
 
 
-async def create_model(c_name, m_name, m_key, usr, pwd, cred_name):
+async def create_model(c_name, m_key, m_name, usr, pwd, cred_name:
     try:
         # Get required information from database
         auth_data = datastore.get_controller_connection_info(usr, c_name)
