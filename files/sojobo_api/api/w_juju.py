@@ -382,14 +382,13 @@ async def get_gui_url(controller, model):
     return 'https://{}/gui/{}'.format(controller.endpoint, model.m_uuid)
 
 
-async def create_model(connection, authentication, m_name, cred_name):
+async def create_model(connection, authentication, m_name, cred_name, c_name):
     """Creates model in database and then in JuJu (background script)."""
     # Construct a key for the model using the controller name and model name.
     key_string = c_name + "_" + m_name
     m_key = construct_model_key(c_name, m_name)
-
     if not datastore.model_exists(m_key):
-        if cred_name in datastore.get_credential_keys(token.username):
+        if cred_name in datastore.get_credential_keys(authentication.username):
             # Create the model in ArangoDB. Add model key to controller and
             # set the model access level of the user.
             new_model = datastore.create_model(m_key, m_name, state='deploying')
@@ -397,18 +396,17 @@ async def create_model(connection, authentication, m_name, cred_name):
             # to create a connection with ArangoDB each time.
             datastore.add_model_to_controller(c_name, m_key)
             datastore.set_model_state(m_key, 'accepted')
-            datastore.set_model_access(m_key, token.username, 'admin')
+            datastore.set_model_access(m_key, authentication.username, 'admin')
 
             # Run the background script, this creates the model in JuJu.
             Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
-                    c_name, m_key, m_name, settings.SOJOBO_API_DIR,
-                    token.username,token.password, cred_name])
+                    c_name, m_key, m_name, authentication.username, authentication.password, cred_name])
 
-            code, response = 202, "Model is being deployed."
+            return 202, "Model is being deployed."
         else:
-            code, response = 404, "Credentials {} not found!".format(cred_name)
+            return 404, "Credentials {} not found!".format(cred_name)
     else:
-        return errors.already_exists('model')
+        return errors.already_exists('model')[0], errors.already_exists('model')[1]
 
 
 

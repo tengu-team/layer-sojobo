@@ -173,7 +173,7 @@ def create_model(controller):
     try:
         LOGGER.info('/TENGU/controllers/%s/models [POST] => receiving call', controller)
         data = request.json
-        auth_data = juju.get_user_info(request.authorization.username, controller=controller)
+        auth_data = juju.get_connection_info(request.authorization.username, c_name=controller)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
         if juju.authorize(auth_data):
@@ -183,7 +183,9 @@ def create_model(controller):
                 credential_name = data['credential']
                 if valid:
                     LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
-                    return juju.create_response(juju.create_model(connection, request.authorization, model_name, credential_name))
+                    code, response = execute_task(juju.create_model, connection, request.authorization, model_name, credential_name, controller)
+                    print(code, response)
+                    return juju.create_response(code, response)
                 else:
                     return juju.create_response(400, model_name)
             else:
@@ -193,13 +195,13 @@ def create_model(controller):
             return juju.create_response(errors.no_permission())
     except KeyError:
         error_log()
-        return juju.create_response(errors.invalid_data())
+        return juju.create_response(errors.invalid_data()[0], errors.invalid_data()[1])
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
-        return juju.create_response(errors.cmd_error(ers))
+        return juju.create_response(errors.cmd_error(ers)[0], errors.cmd_error(ers)[1])
 
 
 @TENGU.route('/controllers/<controller>/models', methods=['GET'])

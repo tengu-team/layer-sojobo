@@ -21,7 +21,7 @@ import hashlib
 from juju import tag
 from juju.client import client
 from juju.model import Model
-from juju.controller import controller
+from juju.controller import Controller
 from juju.errors import JujuAPIError, JujuError
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
@@ -29,11 +29,13 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: di
 
 
 
-async def create_model(c_name, m_key, m_name, usr, pwd, cred_name:
+async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
     try:
         # Get required information from database
         auth_data = datastore.get_controller_connection_info(usr, c_name)
+        print(usr, auth_data)
         credential_name = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
+        auth_data['user']['juju_user_name']=usr
 
         #Controller_Connection
         logger.info('Setting up Controllerconnection for %s', c_name)
@@ -41,6 +43,10 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name:
         await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_user_name'], pwd, auth_data['controller']['ca_cert'])
 
         #Generate Tag for Credential
+        credential_name = await controller_connection.add_credential(
+                name=credential_name,
+                cloud=auth_data['controller']['type'],
+                owner=auth_data['user']['juju_user_name'])
         credential = tag.credential(
                 auth_data['controller']['type'],
                 tag.untag('user-', auth_data['user']['juju_user_name']),
@@ -48,7 +54,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name:
             )
 
         #Create A Model
-        model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection())
+        model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
         model_info = await model_facade.CreateModel(
             tag.cloud(auth_data['controller']['type']),
             {},
@@ -60,7 +66,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name:
 
         #Connect to created Model
         model = Model(jujudata=controller_connection._connector.jujudata)
-        kwargs = controller_connection.connection().connect_params()
+        kwargs = controller_connection.connection.connect_params()
         kwargs['uuid'] = model_info.uuid
         await model._connect_direct(**kwargs)
         model = tag.model(model_uuid)
@@ -71,8 +77,8 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name:
         datastore.set_model_state(m_key, 'ready', cred_name, model.info.uuid)
 
         # Generate Facades for new model
-        key_facade = client.KeyManagerFacade.from_connection(model.connection())
-        model_facade = client.ModelManagerFacade.from_connection(model.connection())
+        key_facade = client.KeyManagerFacade.from_connection(model.connection)
+        model_facade = client.ModelManagerFacade.from_connection(model.connection)
 
         # Add SSH-keys for owner
         logger.info('%s -> Adding ssh-keys to model: %s', m_name, m_name)
@@ -114,9 +120,9 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name:
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger('add-model')
+    logger = logging.getLogger('add_model')
     ws_logger = logging.getLogger('websockets.protocol')
-    hdlr = logging.FileHandler('{}/log/add_model.log'.format(settings.SOJOBO_API_DIR)
+    hdlr = logging.FileHandler('{}/log/add_model.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr)

@@ -17,6 +17,7 @@
 from base64 import b64encode
 from hashlib import sha256
 import os
+import sys
 import shutil
 import requests
 import subprocess
@@ -129,10 +130,13 @@ def connect_to_arango(arango):
 @when_not('admin.created')
 def create_admin():
     if leader_get().get('admin') != 'Created':
-        subprocess.check_call(["python3", "{}/scripts/create_user.py".format(API_DIR), 'admin', db.get('password')])
+        sys.path.append('/opt')
+        from sojobo_api.api import w_datastore as datastore
+        datastore.create_user('admin')
         leader_set({'admin': 'Created'})
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
         set_state('admin.created')
+        datastore.set_user_state('admin', 'ready')
     else:
         leader_set({'admin': 'Created'})
 
@@ -191,7 +195,7 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 
 def install_api():
     for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments','gitpython',
-                'asyncio_extras', 'requests', 'juju==0.6.1', 'async_generator']:
+                'asyncio_extras', 'requests', 'juju==0.7.3', 'async_generator']:
         subprocess.check_call(['pip3', 'install', pkg])
     mergecopytree('files/sojobo_api', API_DIR)
     if not os.path.isdir('{}/files'.format(API_DIR)):
@@ -207,7 +211,6 @@ def install_api():
         os.mkdir('/home/{}'.format(USER))
     chownr('/home/{}'.format(USER), USER, USER, chowntopdir=True)
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
-    overwrite_juju_model_file()
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
@@ -247,9 +250,3 @@ def create_arangodb_collections(sojobo_db):
 
 def has_collection(sojobo_db, collection_name):
     return collection_name in sojobo_db.collections
-
-
-def overwrite_juju_model_file():
-    """We are waiting on a bugfix in libjuju. In order to circumvent the problem
-    we must manually edit the model.py file of the juju package."""
-    shutil.copy('files/model.py', '/usr/local/lib/python3.5/dist-packages/juju/model.py')

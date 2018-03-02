@@ -231,7 +231,6 @@ def remove_credential(username, cred_name):
 
 
 def create_controller(controller_name, c_type, region, cred_name):
-    # TODO: Check if controller with that name already exists. In this layer?
     controller = {
         "_key": controller_name,
         "name": controller_name,
@@ -240,7 +239,7 @@ def create_controller(controller_name, c_type, region, cred_name):
         "models": [],
         "endpoints": [],
         "uuid": "",
-        "ca-cert": "",
+        "ca_cert": "",
         "region": region,
         "default-credential": cred_name}
     aql = "INSERT @controller INTO controllers LET newController = NEW RETURN newController"
@@ -256,7 +255,7 @@ def create_manual_controller(name, c_type, url):
         "models": [],
         "endpoints": [],
         "uuid": "",
-        "ca-cert": "",
+        "ca_cert": "",
         "url": url}
     aql = "INSERT @controller INTO controllers LET newController = NEW RETURN newController"
     return execute_aql_query(aql, controller=controller)
@@ -596,7 +595,7 @@ def get_controller_connection_info(username, c_name):
                     "FILTER cEdge._from == @c_id "
                     "RETURN cEdge.access)) "
            "RETURN {user, controller, c_access}")
-    return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id)
+    return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id)[0]
 
 
 def get_model_connection_info(username, c_name, m_key):
@@ -614,4 +613,4 @@ def get_model_connection_info(username, c_name, m_key):
                     "FILTER mEdge._from == @m_id "
                     "RETURN mEdge.access)) "
            "RETURN {user, controller, c_access, m_access}")
-    return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id, m_id=m_id)
+    return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id, m_id=m_id)[0]
