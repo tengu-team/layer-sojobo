@@ -18,6 +18,7 @@ from base64 import b64encode
 from hashlib import sha256
 import os
 import shutil
+import sys
 import requests
 import subprocess
 from charmhelpers.core import unitdata
@@ -27,6 +28,7 @@ from charmhelpers.core.host import service_restart, chownr, adduser
 from charms.reactive import hook, when, when_not, set_state, remove_state
 import charms.leadership
 import pyArango.connection as pyArango
+
 
 
 API_DIR = '/opt/sojobo_api'
@@ -129,10 +131,13 @@ def connect_to_arango(arango):
 @when_not('admin.created')
 def create_admin():
     if leader_get().get('admin') != 'Created':
-        subprocess.check_call(["python3", "{}/scripts/add_user.py".format(API_DIR), 'admin', db.get('password')])
+        sys.path.append('/opt')
+        from sojobo_api.api import w_datastore as datastore
+        datastore.create_user('admin', 'admin')
         leader_set({'admin': 'Created'})
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
         set_state('admin.created')
+        datastore.set_user_state('admin', 'ready')
     else:
         leader_set({'admin': 'Created'})
 

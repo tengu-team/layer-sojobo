@@ -731,8 +731,11 @@ async def get_application_config(token, model, app_name):
 def create_user(username, password):
     juju_username = 'u{}{}'.format(base64.b64encode(username.encode()).decode(), give_timestamp())
     datastore.create_user(username, juju_username)
-    for controller in datastore.get_ready_controllers():
+    controllers = datastore.get_ready_controllers()
+    for controller in controllers:
         Popen(["python3", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR), username, password, controller['name'], juju_username])
+    if len(controllers) == 0:
+        datastore.set_user_state(username, 'ready')
 
 
 def delete_user(username):

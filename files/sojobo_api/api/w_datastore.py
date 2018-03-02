@@ -41,8 +41,6 @@ def execute_aql_query(aql, rawResults=False, **bindings):
 ################################################################################
 #                                USER FUNCTIONS                                #
 ################################################################################
-
-
 def create_user(username, juju_username):
     user = {"_key": b64encode(username.encode()).decode(),
             "name": username,
@@ -397,7 +395,7 @@ def add_model_to_controller(c_name, m_key):
 def get_controller_access(c_name, username):
     """Returns the access level that a user has to a controller."""
     c_id = "controllers/" + c_name
-    u_id = "users/" + username
+    u_id = "users/" + b64encode(username.encode()).decode()
     aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess  '
                'FILTER cEdge._from == @c_id '
                'RETURN cEdge.access ')

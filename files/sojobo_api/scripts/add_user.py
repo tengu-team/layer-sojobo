@@ -19,30 +19,47 @@ import logging
 import sys
 import base64
 import traceback
+from juju import tag, errors
+from juju.client import client
+from juju.controller import Controller
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
-
-class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = settings.JUJU_ADMIN_USER
-        self.password = settings.JUJU_ADMIN_PASSWORD
-        self.is_admin = True
-
 ################################################################################
 # Async method
 ################################################################################
-async def create_user(username, password, con, juju_username):
+async def add_user_to_controller(username, password, controller, juju_username):
     try:
-        token = JuJu_Token()
-        logger.info('Setting up Controllerconnection for %s', con)
-        controller = juju.Controller_Connection(token, con)
-        async with controller.connect(token) as con_juju:  #pylint: disable=E1701
-            await con_juju.add_user(juju_username, password)
-            await con_juju.grant(juju_username)
-            datastore.add_user_to_controller(con, username, 'login')
-            logger.info('Succesfully added user %s to controller %s', username, con)
+        logger.info('adding user %s to controller %s', username, controller)
+        # => get all controller info
+        con = datastore.get_controller(controller)
+        logger.info('Setting up Controllerconnection for %s', con['name'])
+        #1. Create controller connection as admin
+        # create connection
+        controller_connection = Controller()
+        await controller_connection.connect(con['endpoints'][0], settings.JUJU_ADMIN_USER, settings.JUJU_ADMIN_PASSWORD, con['ca_cert'])
+        # add user to controller
+        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection())
+        users = [client.AddUser(display_name=display_name,
+                                username=juju_username,
+                                password=password)]
+        await user_facade.AddUser(users)
+        # grant login access
+        controller_facade = client.ControllerFacade.from_connection(controller_connection.connection())
+        user = tag.user(juju_username)
+        changes = client.ModifyControllerAccess('login', 'grant', user)
+        try:
+            await controller_facade.ModifyControllerAccess([changes])
+            return True
+        except errors.JujuError as e:
+            if 'user already has' in str(e):
+                return False
+            else:
+                raise
+            # change user state
+        datastore.add_user_to_controller(con['name'], username, 'login')
+        logger.info('Succesfully added user %s to controller %s', username, con['name'])
         datastore.set_user_state(username, 'ready')
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -64,5 +81,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
-    loop.run_until_complete(create_user(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]))
+    loop.run_until_complete(add_user_to_controller(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]))
     loop.close()
