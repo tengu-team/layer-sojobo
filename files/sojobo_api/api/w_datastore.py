@@ -58,7 +58,6 @@ def user_exists(username):
     user = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
     return user is not None
 
-
 def get_user(username):
     """Returns the dict of a user."""
     u_id = "users/" + b64encode(username.encode()).decode()
@@ -364,6 +363,7 @@ def set_controller_state(c_name, state, endpoints=None, uuid=None, ca_cert=None)
 
 def destroy_controller(c_name):
     remove_edges_controller_access(c_name)
+    remove_models_controller(c_name)
     remove_controller_c_col(c_name)
 
 
@@ -380,6 +380,18 @@ def remove_edges_controller_access(c_name):
     aql = ('FOR edge in controllerAccess '
            'FILTER edge._from == @controller '
            'REMOVE edge in controllerAccess')
+    execute_aql_query(aql, controller=c_id)
+
+
+def remove_models_controller(c_name):
+    """Remove all models that are from a given controller."""
+    c_id = "controllers/" + c_name
+    aql = ('LET c = DOCUMENT(@controller) '
+           'FOR m_key in c.models '
+                'FOR mEdge in modelAccess '
+                    'FILTER mEdge._from == CONCAT("models/", m_key) '
+                    'REMOVE mEdge in modelAccess '
+                'REMOVE {_key: m_key} IN models ')
     execute_aql_query(aql, controller=c_id)
 
 
@@ -433,8 +445,9 @@ def set_controller_access(c_name, username, access):
 ################################################################################
 
 
-def create_model(m_name, state, uuid=''):
+def create_model(m_key, m_name, state, uuid=''):
     model = {
+        "_key": m_key,
         "name": m_name,
         "state": state,
         "uuid": uuid}

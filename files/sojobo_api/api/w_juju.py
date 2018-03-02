@@ -787,13 +787,13 @@ def add_credential(user, data):
         return 400, "This type of controller does not need credentials"
 
 
-async def update_cloud(controller, credential, username):
+async def update_cloud(controller, cloud, credential, username):
     credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
     cloud_facade = client.CloudFacade.from_connection(controller.connection)
-    cred = get_controller_types()[controller.c_type].generate_cred_file(credential_name, credential)
+    cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential)
     cloud_cred = client.UpdateCloudCredential(
         client.CloudCredential(cred['key'], cred['type']),
-        tag.credential(c_type, username, credential_name)
+        tag.credential(cloud, username, credential_name)
     )
     await cloud_facade.UpdateCredentials([cloud_cred])
 
