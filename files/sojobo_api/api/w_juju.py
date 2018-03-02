@@ -101,6 +101,8 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
         if not controller and not model:
             if auth.username == settings.JUJU_ADMIN_USER and auth.password == settings.JUJU_ADMIN_PASSWORD:
                 return data
+            elif len(datastore.get_all_controllers()) == 0:
+                abort(error[0], error[1])
             else:
                 await connect_to_random_controller(data)
                 return data
@@ -129,11 +131,11 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
 async def connect_to_random_controller(data):
     error = errors.unauthorized()
     try:
-        controllers = datastore.get_all_ready_controllers()
-        if len(controllers) == 0:
+        ready_controllers = datastore.get_all_ready_controllers()
+        if len(read_controllers) == 0:
             abort(400,'Please wait untill your first environment is set up!')
         else:
-            con = controllers[randint(0, len(controllers) - 1)]
+            con = read_controllers[randint(0, len(controllers) - 1)]
             controller_connection = Controller()
             await controller_connection.connect(con['endpoints'][0], auth.username, auth.password, con['ca_cert'])
             await controller_connection.disconnect()
@@ -209,11 +211,11 @@ def create_controller(token, c_type, name, data):
     for controller in get_all_controllers():
         if controller['state'] == 'accepted':
             return 503, 'An environment is already being created'
-    credential = get_credential(token.username, data['credential'])
+    credential = get_credential(token['user']['name'], data['credential'])
     if not credential['state'] == 'ready':
         abort(503, 'The Credential {} is not ready yet.'.format(credential['name']))
     datastore.create_controller(name, c_type, data['region'], data['credential'])
-    datastore.add_user_to_controller(name, 'admin', 'superuser')
+    datastore.add_user_to_controller(name, token['user']['name'], 'superuser')
     return get_controller_types()[c_type].create_controller(name, data)
 
 

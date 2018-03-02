@@ -298,6 +298,10 @@ def get_all_controllers():
     aql = 'FOR c in controllers RETURN c'
     return execute_aql_query(aql, rawResults=True)
 
+def get_all_ready_controllers():
+    aql = 'FOR c in controllers FILTER c.state == "ready" RETURN c'
+    return execute_aql_query(aql, rawResults=True)
+
 
 def get_keys_controllers():
     aql = 'FOR c in controllers RETURN c._key'
