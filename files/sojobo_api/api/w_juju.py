@@ -170,17 +170,14 @@ def authorize(connection_info, resource, method, self_user=None):
     by an admin OR the user himself. If this is the case then 'self_user' must
     be the user that is used in the call."""
     # Check if it is controller or model connection info.
-    try:
-        if self_user == connection_info["user"]["username"]:
-            return True
-        elif "m_access" in connection_info:
-            return w_permissions.m_authorize(connection_info, resource, method)
-        elif "c_access" in connection_info:
-            return w_permissions.c_authorize(connection_info, resource, method)
-        else:
-            return connection_info["user"]["username"] == "tengu_admin"
-    except KeyError, e:
-        print("A KeyError has occured: {}".format(e))
+    if self_user == connection_info["user"]["username"]:
+        return True
+    elif "m_access" in connection_info:
+        return w_permissions.m_authorize(connection_info, resource, method)
+    elif "c_access" in connection_info:
+        return w_permissions.c_authorize(connection_info, resource, method)
+    else:
+        return connection_info["user"]["username"] == "tengu_admin"
 
 
 def get_connection_info(username, c_name=None, m_name=None):

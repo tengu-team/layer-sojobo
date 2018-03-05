@@ -106,8 +106,8 @@ def c_authorize(controller_connection_info, resource, method):
     try:
         allowed_access_levels = permissions[resource][method]['c_access']
         return controller_access in allowed_access_levels
-    except KeyError, e:
-        print("A KeyError has occured: {}".format(e))
+    except KeyError:
+        print("A KeyError has occured.")
 
 
 def m_authorize(model_connection_info, resource, method):
@@ -115,5 +115,5 @@ def m_authorize(model_connection_info, resource, method):
     try:
         allowed_access_levels = permissions[resource][method]['m_access']
         return model_access in allowed_access_levels
-    except KeyError, e:
-        print("A KeyError has occured: {}".format(e))
+    except KeyError:
+        print("A KeyError has occured.")
