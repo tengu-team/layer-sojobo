@@ -155,34 +155,33 @@ def check_user_state(data):
         elif data['user']['state'] != 'ready':
             abort(403, "The user is being removed and not able to perform this action anymore!")
 
+def authorize(connection_info, resource, method, self_user=None):
+    """Checks if a user is authorized to perform a certain http method on
+    a certain resource. F.e. Is the user allowed to create a model?
 
-def authorize(auth_data):
-    """Checks if a user is authorized to access a given controller and optionally
-    given model. Returns appropriate error messages if a user is not allowed access.
-    At the moment this method needs implementation to then check to model and controller
-    access of the user and check it if the user is authorized to perform the action"""
-    if auth_data['user']['name'] == settings.JUJU_ADMIN_USER:
-        return True
-    else:
-        return False
-    # if not controller_exists(c_name):
-    #     error = errors.does_not_exist('controller')
-    #     abort(error[0], error[1])
-    # else:
-    #     con = Controller_Connection(token, c_name)
-    #     if not c_access_exists(con.c_access):
-    #         error = errors.does_not_exist('controller')
-    #         abort(error[0], error[1])
-    # if m_name and not model_exists(con, m_name):
-    #     error = errors.does_not_exist('model')
-    #     abort(error[0], error[1])
-    # elif m_name:
-    #     mod = Model_Connection(token, c_name, m_name)
-    #     if not m_access_exists(mod.m_access):
-    #         error = errors.unauthorized()
-    #         abort(error[0], error[1])
-    #     return con, mod
-    # return con
+    :param connection_info: Contains the controller and/or model access of the
+    user that is trying to authorize.
+
+    :param resource: The resource that the user tries to perform an action on.
+
+    :param method: The HTTP method (get, put, post, del)
+
+    :param self_user: Calls like changing the password of a user can be done
+    by an admin OR the user himself. If this is the case then 'self_user' must
+    be the user that is used in the call."""
+    # Check if it is controller or model connection info.
+    try:
+        if self_user == connection_info["user"]["username"]:
+            return True
+        elif "m_access" in connection_info:
+            return w_permissions.m_authorize(connection_info, resource, method)
+        elif "c_access" in connection_info:
+            return w_permissions.c_authorize(connection_info, resource, method)
+        else:
+            return connection_info["user"]["username"] == "tengu_admin"
+    except KeyError, e:
+        print("A KeyError has occured: {}".format(e))
+        
 
 def get_connection_info(username, c_name=None, m_name=None):
     if c_name and m_name:

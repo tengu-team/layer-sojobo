@@ -23,8 +23,7 @@ import logging
 import json
 from werkzeug.exceptions import HTTPException
 from flask import send_file, request, Blueprint
-from sojobo_api import settings
-from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
+from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore, w_permissions
 from sojobo_api.api.w_juju import execute_task
 import time
 from flask import abort
@@ -940,3 +939,13 @@ def error_log():
     for l in lines:
         LOGGER.error(l)
     return lines
+
+
+@TENGU.route('/testauthorize', methods=['GET'])
+def test_new_authorize():
+    c_info = {"c_access": "superuser"}
+    if w_permissions.c_authorize(c_info, "/controllers/controller", "get"):
+        code, response = 200, 'Authorization was succesful!'
+    else:
+        code, response = 200, 'Authorization failed!'
+    return juju.create_response(code, response)
