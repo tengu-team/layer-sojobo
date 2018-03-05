@@ -75,7 +75,7 @@ def get_users_info():
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS [GET] => Authenticated!')
         if juju.check_if_admin(request.authorization):
-            code, response = 200, juju.get_users_info(token)
+            code, response = 200, juju.get_users_info(token['user'])
             LOGGER.info('/USERS [GET] => Succesfully retieved all users!')
         else:
             code, response = errors.no_permission()
