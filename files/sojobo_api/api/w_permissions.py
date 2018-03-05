@@ -12,7 +12,7 @@ permissions = {
 			"c_access": ["tengu_admin", "company_admin", "superuser"]
 		},
 		"del": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["tengu_admin", "company_admin"] #TODO: Update wiki
 		}
 	},
 	"/controllers/controller/models": {

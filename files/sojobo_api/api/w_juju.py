@@ -218,29 +218,58 @@ async def authenticate(api_key, auth):
         abort(error[0], error[1])
 
 
-def authorize(token, c_name, m_name=None):
-    """Checks if a user is authorized to access a given controller and optionally
-    given model. Returns appropriate error messages if a user is not allowed access."""
-    if not controller_exists(c_name):
-        error = errors.does_not_exist('controller')
-        abort(error[0], error[1])
-    else:
-        con = Controller_Connection(token, c_name)
-        if not c_access_exists(con.c_access):
-            error = errors.does_not_exist('controller')
-            abort(error[0], error[1])
-    if m_name:
-        m_key = construct_model_key(c_name, m_name)
-        if not datastore.model_exists(m_key):
-            error = errors.does_not_exist('model')
-            abort(error[0], error[1])
+# def authorize(token, c_name, m_name=None):
+#     """Checks if a user is authorized to access a given controller and optionally
+#     given model. Returns appropriate error messages if a user is not allowed access."""
+#     if not controller_exists(c_name):
+#         error = errors.does_not_exist('controller')
+#         abort(error[0], error[1])
+#     else:
+#         con = Controller_Connection(token, c_name)
+#         if not c_access_exists(con.c_access):
+#             error = errors.does_not_exist('controller')
+#             abort(error[0], error[1])
+#     if m_name:
+#         m_key = construct_model_key(c_name, m_name)
+#         if not datastore.model_exists(m_key):
+#             error = errors.does_not_exist('model')
+#             abort(error[0], error[1])
+#         else:
+#             mod = Model_Connection(token, c_name, m_name)
+#             if not m_access_exists(mod.m_access):
+#                 error = errors.unauthorized()
+#                 abort(error[0], error[1])
+#             return con, mod
+#     return con
+
+def authorize(connection_info, resource, method, self_user=None):
+    """Checks if a user is authorized to perform a certain http method on
+    a certain resource. F.e. Is the user allowed to create a model?
+
+    :param connection_info: Contains the controller and/or model access of the
+    user that is trying to authorize.
+
+    :param resource: The resource that the user tries to perform an action on.
+
+    :param method: The HTTP method (get, put, post, del)
+
+    :param self_user: Calls like changing the password of a user can be done
+    by an admin OR the user himself. If this is the case then 'self_user' must
+    be the user that is used in the call."""
+    # Check if it is controller or model connection info.
+    try:
+        if self_user == connection_info["user"]["username"]:
+            return True
+        elif "m_access" in connection_info:
+            return w_permissions.m_authorize(connection_info, resource, method)
+        elif "c_access" in connection_info:
+            return w_permissions.c_authorize(connection_info, resource, method)
         else:
-            mod = Model_Connection(token, c_name, m_name)
-            if not m_access_exists(mod.m_access):
-                error = errors.unauthorized()
-                abort(error[0], error[1])
-            return con, mod
-    return con
+            return connection_info["user"]["username"] == "tengu_admin"
+    except KeyError, e:
+        print("A KeyError has occured: {}".format(e))
+
+
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
