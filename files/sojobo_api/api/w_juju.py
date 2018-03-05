@@ -113,11 +113,11 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
             if data['c_access']:
                 if controller and not model:
                     controller_connection = Controller()
-                    await controller_connection.connect(data['controller']['endpoints'][0], auth.username, auth.password, data['controller']['ca_cert'])
+                    await controller_connection.connect(endpoint=data['controller']['endpoints'][0], username=auth.username, password=auth.password, cacert=data['controller']['ca_cert'])
                     return controller_connection
                 elif model:
                     model_connection = Model()
-                    await model_connection.connect(data['controller']['endpoints'][0], data['model']['uuid'], auth.username, auth.password, data['controller']['ca_cert'])
+                    await model_connection.connect(endpoint=data['controller']['endpoints'][0], uuid=data['model']['uuid'], username=auth.username, password=auth.password, cacert=data['controller']['ca_cert'])
                     return model_connection
             elif data['controller']['state'] == 'ready':
                 await connect_to_random_controller(data)
