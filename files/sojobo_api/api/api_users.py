@@ -99,16 +99,17 @@ def create_user():
     try:
         LOGGER.info('/USERS [POST] => receiving call')
         data = request.json
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS [POST] => Authenticated!')
         valid, user = juju.check_input(data['username'], "username")
-        if token.is_admin:
+        if juju.check_if_admin(request.authorization):
             if valid:
                 if juju.user_exists(user):
                     code, response = errors.already_exists('user')
                     LOGGER.error('/USERS [POST] => Username %s already exists!', user)
                 elif data['password']:
-                    LOGGER.info('/USERS [POST] => Creating user %s, check add_user.log for more information!', user)
+                    LOGGER.info('/USERS [POST] => Creating user %s, check create_user.log for more information!', user)
                     juju.create_user(user, data['password'])
                     code, response = 202, 'User {} is being created'.format(user)
                 else:
@@ -120,25 +121,30 @@ def create_user():
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS [POST] => No Permission to perform this action!')
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>', methods=['GET'])
 def get_user_info(user):
     try:
         LOGGER.info('/USERS/%s [GET] => receiving call', user)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        controllers_user = [a,b]
+        controllers_authenticator = [a]
+        auth_data = juju.get_connection_info(request.authorization.username)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [GET] => Authenticated!', user)
-        if user == token.username or token.is_admin:
+        if juju.authorize(auth_data, '/users/user', 'get', user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_user_info(user)
                 LOGGER.info('/USERS/%s [GET] => Succesfully retrieved user information!', user)

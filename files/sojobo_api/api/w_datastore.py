@@ -445,6 +445,11 @@ def set_controller_access(c_name, username, access):
     execute_aql_query(aql, c_id=c_id, u_id=u_id, access=access)
 
 
+def get_matching_controllers(superuser, resource_user):
+    su_id = "users/" + superuser
+    ru_id = "users/" + resource_user
+
+
 ################################################################################
 #                               MODEL FUNCTIONS                                #
 ################################################################################

@@ -155,7 +155,8 @@ def check_user_state(data):
         elif data['user']['state'] != 'ready':
             abort(403, "The user is being removed and not able to perform this action anymore!")
 
-def authorize(connection_info, resource, method, self_user=None):
+
+def authorize(connection_info, resource, method, self_user=None, resource_user=None):
     """Checks if a user is authorized to perform a certain http method on
     a certain resource. F.e. Is the user allowed to create a model?
 
@@ -168,19 +169,23 @@ def authorize(connection_info, resource, method, self_user=None):
 
     :param self_user: Calls like changing the password of a user can be done
     by an admin OR the user himself. If this is the case then 'self_user' must
-    be the user that is used in the call."""
-    # Check if it is controller or model connection info.
-    try:
-        if self_user == connection_info["user"]["username"]:
-            return True
-        elif "m_access" in connection_info:
-            return w_permissions.m_authorize(connection_info, resource, method)
-        elif "c_access" in connection_info:
-            return w_permissions.c_authorize(connection_info, resource, method)
-        else:
-            return connection_info["user"]["username"] == "tengu_admin"
-    except KeyError:
-        print("A KeyError has occured.")
+    be the user that is used in the call.
+
+    :param resource_user: A superuser is allowed to access and update info of
+    other users if they are on the same controller. When 'resource_user' is
+    provided and if the authenticated user is a superuser there needs to be
+    checked if they are together on at least one controller."""
+
+    if return connection_info["user"]["username"] == "tengu_admin":
+        return True
+    elif self_user == connection_info["user"]["username"]:
+        return True
+    elif resource_user:
+        return w_permissions.superuser_authorize(connection_info, resource, method, resource_user)
+    elif "m_access" in connection_info:
+        return w_permissions.m_authorize(connection_info, resource, method)
+    else "c_access" in connection_info:
+        return w_permissions.c_authorize(connection_info, resource, method)
 
 
 def get_connection_info(username, c_name=None, m_name=None):
@@ -683,7 +688,7 @@ async def get_application_config(token, model, app_name):
 # USER FUNCTIONS
 ###############################################################################
 def create_user(username, password):
-    Popen(["python3", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR), username, password])
+    Popen(["python3", "{}/scripts/create_user.py".format(settings.SOJOBO_API_DIR), username, password])
 
 
 def delete_user(username):
