@@ -181,7 +181,7 @@ def authorize(connection_info, resource, method, self_user=None):
             return connection_info["user"]["username"] == "tengu_admin"
     except KeyError, e:
         print("A KeyError has occured: {}".format(e))
-        
+
 
 def get_connection_info(username, c_name=None, m_name=None):
     if c_name and m_name:
@@ -211,7 +211,14 @@ def check_c_type(c_type):
         abort(error[0], error[1])
 
 
-def create_controller(token, c_type, name, data):
+def create_controller(token, data):
+    c_type = check_c_type(data['type'])
+    valid, name = check_input(data['controller'], 'controller')
+    if not valid:
+        abort(400, error)
+    if controller_exists(name):
+        ers = errors.already_exists('controller')
+        abort(ers[0], ers[1])
     for controller in get_all_controllers():
         if controller['state'] == 'accepted':
             return 503, 'An environment is already being created'
@@ -237,7 +244,7 @@ def get_all_controllers():
     return datastore.get_all_controllers()
 
 def get_keys_controllers():
-    return [key for key in datastore.get_keys_controllers()]
+    return datastore.get_keys_controllers()
 
 
 def controller_exists(c_name):
