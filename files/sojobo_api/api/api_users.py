@@ -71,25 +71,28 @@ def login():
 def get_users_info():
     try:
         LOGGER.info('/USERS [GET] => receiving call')
-        time1 = time.time()
         auth_data = juju.get_connection_info(request.authorization.username)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
-        time2 = time.time()
-        print("===== TIMING =====")
-        print ('%s function took %0.3f ms' % ("get_users_info", (time2-time1)*1000.0))
         LOGGER.info('/USERS [GET] => Authenticated!')
-        code, response = 200, juju.get_users_info(token)
-        LOGGER.info('/USERS [GET] => Succesfully retieved all users!')
+        if juju.check_if_admin(request.authorization):
+            code, response = 200, juju.get_users_info(token)
+            LOGGER.info('/USERS [GET] => Succesfully retieved all users!')
+        else:
+            code, response = errors.no_permission()
+            LOGGER.error('/USERS [GET] => No Permission to perform this action!')
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+
 
 @USERS.route('/', methods=['POST'])
 def create_user():

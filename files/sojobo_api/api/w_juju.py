@@ -179,9 +179,9 @@ def authorize(connection_info, resource, method, self_user=None):
             return w_permissions.c_authorize(connection_info, resource, method)
         else:
             return connection_info["user"]["username"] == "tengu_admin"
-    except KeyError, e:
-        print("A KeyError has occured: {}".format(e))
-        
+    except KeyError:
+        print("A KeyError has occured.")
+
 
 def get_connection_info(username, c_name=None, m_name=None):
     if c_name and m_name:
