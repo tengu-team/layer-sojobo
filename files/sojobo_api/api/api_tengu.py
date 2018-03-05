@@ -23,6 +23,7 @@ import logging
 import json
 from werkzeug.exceptions import HTTPException
 from flask import send_file, request, Blueprint
+from sojobo_api import settings
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task
 import time
@@ -54,7 +55,7 @@ def get_all_controllers():
         auth_data = juju.get_user_info(request.authorization.username)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
-        if juju.authorize(auth_data):
+        if juju.check_if_admin(request.authorization):
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
             juju.create_response(200, juju.get_keys_controllers())
     except KeyError:
@@ -81,7 +82,7 @@ def create_controller():
         auth_data = juju.get_connection_info(request.authorization.username)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('%s [POST] => Authenticated', url)
-        if juju.authorize(auth_data):
+        if juju.check_if_admin(request.authorization):
             valid, controller = juju.check_input(data['controller'], 'controller')
             LOGGER.info('%s [POST] => Creating Controller %s', url, controller)
             if valid:
@@ -176,7 +177,7 @@ def create_model(controller):
         auth_data = juju.get_connection_info(request.authorization.username, c_name=controller)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
-        if juju.authorize(auth_data):
+        if juju.authorize(auth_data, '/controllers/controller/models', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
             valid, model_name = juju.check_input(data['model'], "model")
             if juju.credential_exists(auth_data['user']['name'], data['credential']):

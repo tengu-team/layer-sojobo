@@ -100,7 +100,7 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
         if not controller and not model:
-            if auth.username == settings.JUJU_ADMIN_USER and auth.password == settings.JUJU_ADMIN_PASSWORD:
+            if check_if_admin(auth):
                 return data
             elif len(datastore.get_all_controllers()) == 0:
                 abort(error[0], error[1])
@@ -127,6 +127,10 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
             abort(error[0], error[1])
     else:
         abort(error[0], error[1])
+
+
+def check_if_admin(auth):
+    return auth.username == settings.JUJU_ADMIN_USER and auth.password == settings.JUJU_ADMIN_PASSWORD
 
 
 async def connect_to_random_controller(data):
@@ -216,7 +220,10 @@ def create_controller(token, c_type, name, data):
     if not credential['state'] == 'ready':
         abort(503, 'The Credential {} is not ready yet.'.format(credential['name']))
     datastore.create_controller(name, c_type, data['region'], data['credential'])
-    datastore.add_user_to_controller(name, token['user']['name'], 'superuser')
+    if token['user']['name'] == settings.JUJU_ADMIN_USER:
+        datastore.add_user_to_controller(name, token['user']['name'], 'tengu_admin')
+    else:
+        datastore.add_user_to_controller(name, token['user']['name'], 'company_admin')
     return get_controller_types()[c_type].create_controller(name, data)
 
 
@@ -799,7 +806,6 @@ def get_all_users():
 
 
 def get_users_info(data):
-    print(data)
     """An admin user is allowed to access info of all other users. Users who
     have no admin rights have only access to info about themselves."""
     if data['name'] == settings.JUJU_ADMIN_USER:

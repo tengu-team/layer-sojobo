@@ -104,7 +104,7 @@ def connect_to_arango(arango):
     password = db.get('password')
     render('settings.py', '{}/settings.py'.format(API_DIR), {
         'API_KEY': api_key,
-        'JUJU_ADMIN_USER': 'admin',
+        'JUJU_ADMIN_USER': 'tengu_admin',
         'JUJU_ADMIN_PASSWORD': password,
         'SOJOBO_API_DIR': API_DIR,
         'LOCAL_CHARM_DIR': config()['charm-dir'],
@@ -129,23 +129,23 @@ def connect_to_arango(arango):
 @when('leadership.is_leader', 'api.running')
 @when_not('admin.created')
 def create_admin():
-    if leader_get().get('admin') != 'Created':
+    if leader_get().get('tengu_admin') != 'Created':
         sys.path.append('/opt')
         from sojobo_api.api import w_datastore as datastore
-        datastore.create_user('admin')
-        leader_set({'admin': 'Created'})
+        datastore.create_user('tengu_admin')
+        leader_set({'tengu_admin': 'Created'})
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
         set_state('admin.created')
-        datastore.set_user_state('admin', 'ready')
+        datastore.set_user_state('tengu_admin', 'ready')
     else:
-        leader_set({'admin': 'Created'})
+        leader_set({'tengu_admin': 'Created'})
 
 
 @when('api.running')
 @when_not('leadership.is_leader')
 def status_update_not_leader():
-    if leader_get().get('admin') != 'Created':
-        status_set('blocked', 'error creating admin user')
+    if leader_get().get('tengu_admin') != 'Created':
+        status_set('blocked', 'error creating Tengu admin user')
     else:
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
 

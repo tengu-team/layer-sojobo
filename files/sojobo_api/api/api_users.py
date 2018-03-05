@@ -199,13 +199,13 @@ def delete_user(user):
         LOGGER.info('/USERS/%s [DELETE] => Authenticated!', user)
         if token.is_admin:
             if juju.user_exists(user):
-                if user != 'admin':
+                if user != 'tengu_admin':
                     juju.delete_user(user)
                     code, response = 202, 'User {} is being removed'.format(user)
                     LOGGER.info('/USERS/%s [DELETE] => User %s is being removed!', user, user)
                 else:
-                    code, response = 403, 'This would remove the admin from the system!'
-                    LOGGER.error('/USERS/%s [DELETE] => This would remove the admin from the system!', user)
+                    code, response = 403, 'This would remove the Tengu admin from the system!'
+                    LOGGER.error('/USERS/%s [DELETE] => This would remove the  Tengu admin from the system!', user)
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s [DELETE] => User %s does not exist!', user, user)
@@ -485,7 +485,7 @@ def grant_to_controller(user, controller):
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authenticated!', user, controller)
         con = juju.authorize(token, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authorized!', user, controller)
-        if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
+        if (token.is_admin or con.c_access == 'superuser') and user != 'tengu_admin':
             if juju.user_exists(user):
                 if request.json['access'] and juju.c_access_exists(request.json['access'].lower()):
                     juju.grant_user_to_controller(token, con, user, request.json['access'].lower())
@@ -554,7 +554,7 @@ def grant_to_model(user, controller):
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authenticated!', user, controller)
         con = juju.authorize(token, controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authorized!', user, controller)
-        if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
+        if (token.is_admin or con.c_access == 'superuser') and user != 'tengu_admin':
             if juju.user_exists(user):
                 print("=====DEBUGGING=====")
                 print("USER EXISTS according to juju.user_exists(user)")
