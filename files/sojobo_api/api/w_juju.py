@@ -881,7 +881,7 @@ def m_access_exists(access):
 def has_superuser_access_over_user(superuser, resource_user):
     """Checks if there is at least one controller where the given user has superuser
     access over the resource_user."""
-    matching_controllers = get_superuser_matching_controllers(superuser, resource_user)
+    matching_controllers = datastore.get_superuser_matching_controllers(superuser, resource_user)
     return bool(matching_controllers)
 
 

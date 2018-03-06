@@ -463,13 +463,13 @@ def get_controllers_access(user):
 def get_ucontroller_access(user, controller):
     try:
         LOGGER.info('/USERS/%s/controllers/%s [GET] => receiving call', user, controller)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
         LOGGER.info('/USERS/%s/controllers/%s [GET] => Authenticated!', user, controller)
-        con = juju.authorize(token, controller)
-        if token.is_admin or token.username == user or con.access == 'superuser':
+        if juju.authorize(auth_data, '/users/user/controllers/controller', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 LOGGER.info('/USERS/%s/controllers/%s [GET] => Authorized!', user, controller)
-                code, response = 200, juju.get_ucontroller_access(con.c_name, user)
+                code, response = 200, juju.get_ucontroller_access(controller, user)
                 LOGGER.info('/USERS/%s/controllers/%s [GET] => Succesfully retrieved controller access!', user, controller)
             else:
                 code, response = errors.does_not_exist('user')
@@ -494,11 +494,10 @@ def grant_to_controller(user, controller):
     try:
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => receiving call', user, controller)
         auth_data = juju.get_connection_info(request.authorization.username)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authenticated!', user, controller)
-        con = juju.authorize(token, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authorized!', user, controller)
-        if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
+        if juju.authorize(auth_data, '/users/user/controllers/controller', 'get', resource_user=user):
             if juju.user_exists(user):
                 if request.json['access'] and juju.c_access_exists(request.json['access'].lower()):
                     juju.grant_user_to_controller(token, con, user, request.json['access'].lower())
