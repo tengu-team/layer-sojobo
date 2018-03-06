@@ -693,7 +693,7 @@ async def get_application_config(token, model, app_name):
 # USER FUNCTIONS
 ###############################################################################
 def create_user(username, password):
-    juju_username = 'u{}{}'.format(base64.b64encode(username.encode()).decode(), give_timestamp())
+    juju_username = 'u{}{}'.format(hashlib.md5(username.encode('utf')).hexdigest(), give_timestamp())
     datastore.create_user(username, juju_username)
     controllers = datastore.get_ready_controllers()
     for controller in controllers:
