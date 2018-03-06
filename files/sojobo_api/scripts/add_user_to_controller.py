@@ -41,18 +41,6 @@ async def add_user_to_controller(username, password, controller, juju_username):
                                 username=juju_username,
                                 password=password)]
         await user_facade.AddUser(users)
-        # grant login access
-        # controller_facade = client.ControllerFacade.from_connection(controller_connection.connection)
-        # user = tag.user(juju_username)
-        # changes = client.ModifyControllerAccess('login', 'grant', user)
-        # try:
-        #     await controller_facade.ModifyControllerAccess([changes])
-        #     return True
-        # except errors.JujuError as e:
-        #     if 'user already has' in str(e):
-        #         return False
-        #     else:
-        #         raise
         datastore.add_user_to_controller(con['name'], username, 'login')
         logger.info('Succesfully added user %s to controller %s', username, con['name'])
         datastore.set_user_state(username, 'ready')
@@ -61,11 +49,13 @@ async def add_user_to_controller(username, password, controller, juju_username):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+    finally:
+        await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger('create_user')
+    logger = logging.getLogger('add_user_to_controller')
     ws_logger = logging.getLogger('websockets.protocol')
     hdlr = logging.FileHandler('{}/log/add_user_to_controller.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')

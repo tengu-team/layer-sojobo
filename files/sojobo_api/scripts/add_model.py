@@ -69,7 +69,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         kwargs = controller_connection.connection.connect_params()
         kwargs['uuid'] = model_info.uuid
         await model._connect_direct(**kwargs)
-        model = tag.model(model_uuid)
+        model = tag.model(model_info.uuid)
         logger.info('%s -> model deployed on juju', m_name)
 
         # Set Datastore information for creator
@@ -84,7 +84,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         logger.info('%s -> Adding ssh-keys to model: %s', m_name, m_name)
         for key in auth_data['user']['ssh-keys']:
             try:
-                key_facade.AddKeys([key], user)
+                key_facade.AddKeys([key], auth_data['user'])
             except (JujuAPIError, JujuError):
                 pass
 
