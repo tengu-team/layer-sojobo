@@ -20,49 +20,41 @@ import sys
 import traceback
 sys.path.append('/opt')
 from juju import tag
+from juju.client import client
+from juju.controller import Controller
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
-from juju.client import client
 
-
-class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = settings.JUJU_ADMIN_USER
-        self.password = settings.JUJU_ADMIN_PASSWORD
-        self.is_admin = True
 
 ################################################################################
 # Async method
 ################################################################################
-async def delete_user(username):
+async def remove_user_from_controller(username, c_name):
     try:
-        token = JuJu_Token()
-        #TO DO => libjuju implementation
-        controllers = datastore.get_keys_controllers()
-        datastore.set_user_state(username, 'deleting')
-        for con in controllers:
-            logger.info('Setting up Controllerconnection for %s', con)
-            controller = juju.Controller_Connection(token, con)
-            async with controller.connect(token) as con_juju:
-                user_facade = client.UserManagerFacade.from_connection(con_juju.connection)
-                entity = client.Entity(tag.user(username))
-                logger.info('Removing user from %s', con)
-                await user_facade.RemoveUser([entity])
-                # if wrapper ready =>
-                # await con_juju.remove(username)
-            logger.info('Removed user %s from Controller %s', username ,con)
+        data = datastore.get_controller_connection_info(username, c_name)
+        logger.info('Setting up Controllerconnection for %s', c_name)
+        controller_connection = Controller()
+        await controller_connection.connect(endpoint=data['controller']['endpoints'][0], username=settings.JUJU_ADMIN_USER, password=settings.JUJU_ADMIN_PASSWORD, cacert=data['controller']['ca_cert'])
+        logger.info('Controller connection as admin was successful')
+        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection())
+        entity = client.Entity(tag.user(data['user']['juju_username']))
+        logger.info('Removing user from %s', c_name)
+        await user_facade.RemoveUser([entity])
+        logger.info('Removed user %s from Controller %s', username ,c_name)
         datastore.delete_user(username)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+    finally:
+        await juju.disconnect(controller_connection)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger('delete-user')
+    logger = logging.getLogger('remove_user_from_controller')
     ws_logger = logging.getLogger('websockets.protocol')
-    hdlr = logging.FileHandler('{}/log/delete_user.log'.format(settings.SOJOBO_API_DIR))
+    hdlr = logging.FileHandler('{}/log/remove_user_from_controller.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -71,5 +63,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
-    loop.run_until_complete(delete_user(sys.argv[1]))
+    loop.run_until_complete(remove_user_from_controller(sys.argv[1], sys.argv[2]))
     loop.close()

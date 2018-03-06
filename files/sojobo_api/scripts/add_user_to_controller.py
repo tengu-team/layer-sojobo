@@ -18,7 +18,6 @@ import asyncio
 import logging
 import sys
 import traceback
-from juju import tag, errors
 from juju.client import client
 from juju.controller import Controller
 sys.path.append('/opt')
