@@ -17,7 +17,6 @@
 import asyncio
 import logging
 import sys
-import base64
 import traceback
 from juju import tag, errors
 from juju.client import client
@@ -32,32 +31,28 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: di
 async def add_user_to_controller(username, password, controller, juju_username):
     try:
         logger.info('adding user %s to controller %s', username, controller)
-        # => get all controller info
         con = datastore.get_controller(controller)
         logger.info('Setting up Controllerconnection for %s', con['name'])
-        #1. Create controller connection as admin
-        # create connection
         controller_connection = Controller()
-        await controller_connection.connect(con['endpoints'][0], settings.JUJU_ADMIN_USER, settings.JUJU_ADMIN_PASSWORD, con['ca_cert'])
-        # add user to controller
-        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection())
-        users = [client.AddUser(display_name=display_name,
+        await controller_connection.connect(endpoint=con['endpoints'][0], username=settings.JUJU_ADMIN_USER, password=settings.JUJU_ADMIN_PASSWORD, cacert=con['ca_cert'])
+        logger.info('Controller connection as admin was successful')
+        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection)
+        users = [client.AddUser(display_name=juju_username,
                                 username=juju_username,
                                 password=password)]
         await user_facade.AddUser(users)
         # grant login access
-        controller_facade = client.ControllerFacade.from_connection(controller_connection.connection())
-        user = tag.user(juju_username)
-        changes = client.ModifyControllerAccess('login', 'grant', user)
-        try:
-            await controller_facade.ModifyControllerAccess([changes])
-            return True
-        except errors.JujuError as e:
-            if 'user already has' in str(e):
-                return False
-            else:
-                raise
-            # change user state
+        # controller_facade = client.ControllerFacade.from_connection(controller_connection.connection)
+        # user = tag.user(juju_username)
+        # changes = client.ModifyControllerAccess('login', 'grant', user)
+        # try:
+        #     await controller_facade.ModifyControllerAccess([changes])
+        #     return True
+        # except errors.JujuError as e:
+        #     if 'user already has' in str(e):
+        #         return False
+        #     else:
+        #         raise
         datastore.add_user_to_controller(con['name'], username, 'login')
         logger.info('Succesfully added user %s to controller %s', username, con['name'])
         datastore.set_user_state(username, 'ready')
