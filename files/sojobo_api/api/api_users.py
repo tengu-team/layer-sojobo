@@ -72,6 +72,8 @@ def get_users_info():
     try:
         LOGGER.info('/USERS [GET] => receiving call')
         auth_data = juju.get_connection_info(request.authorization.username)
+        print("auuuutth data")
+        print(auth_data)
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS [GET] => Authenticated!')
         if juju.check_if_admin(request.authorization):
@@ -491,7 +493,8 @@ def get_ucontroller_access(user, controller):
 def grant_to_controller(user, controller):
     try:
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => receiving call', user, controller)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authenticated!', user, controller)
         con = juju.authorize(token, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authorized!', user, controller)

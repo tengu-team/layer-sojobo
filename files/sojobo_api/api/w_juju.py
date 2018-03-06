@@ -826,7 +826,7 @@ def get_users_info(data):
     if data['name'] == settings.JUJU_ADMIN_USER:
         return datastore.get_users_info()
     else:
-        return datastore.get_user_info(token.username)
+        return datastore.get_user_info(token['name'])
 
 
 def get_user_info(username):

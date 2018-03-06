@@ -107,6 +107,8 @@ def get_user_info(username):
     """Returns info of the given user, including which controllers and models
     that the user has access to."""
     u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    print("datastore debug==================")
+    print(u_id)
     aql = ('LET u = DOCUMENT(@user) '
            'LET controllers = '
                 '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
