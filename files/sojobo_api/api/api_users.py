@@ -110,7 +110,7 @@ def create_user():
                     code, response = errors.already_exists('user')
                     LOGGER.error('/USERS [POST] => Username %s already exists!', user)
                 elif data['password']:
-                    LOGGER.info('/USERS [POST] => Creating user %s, check create_user.log for more information!', user)
+                    LOGGER.info('/USERS [POST] => Creating user %s, check add_user_to_controller.log for more information!', user)
                     juju.create_user(user, data['password'])
                     code, response = 202, 'User {} is being created'.format(user)
                 else:
@@ -209,7 +209,7 @@ def delete_user(user):
         LOGGER.info('/USERS/%s [DELETE] => Authenticated!', user)
         if token.is_admin:
             if juju.user_exists(user):
-                if user != 'tengu_admin':
+                if user != 'admin':
                     juju.delete_user(user)
                     code, response = 202, 'User {} is being removed'.format(user)
                     LOGGER.info('/USERS/%s [DELETE] => User %s is being removed!', user, user)
@@ -495,7 +495,7 @@ def grant_to_controller(user, controller):
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authenticated!', user, controller)
         con = juju.authorize(token, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authorized!', user, controller)
-        if (token.is_admin or con.c_access == 'superuser') and user != 'tengu_admin':
+        if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
             if juju.user_exists(user):
                 if request.json['access'] and juju.c_access_exists(request.json['access'].lower()):
                     juju.grant_user_to_controller(token, con, user, request.json['access'].lower())
@@ -564,7 +564,7 @@ def grant_to_model(user, controller):
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authenticated!', user, controller)
         con = juju.authorize(token, controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authorized!', user, controller)
-        if (token.is_admin or con.c_access == 'superuser') and user != 'tengu_admin':
+        if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
             if juju.user_exists(user):
                 print("=====DEBUGGING=====")
                 print("USER EXISTS according to juju.user_exists(user)")

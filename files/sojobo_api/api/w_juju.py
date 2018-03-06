@@ -178,8 +178,8 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
     superuser on a controller where resource_user resides. 'resource_user' is
     only needed for User API calls."""
 
-    # tengu_admin has authorization in every situation.
-    if connection_info["user"]["name"] == "tengu_admin":
+    # admin has authorization in every situation.
+    if connection_info["user"]["name"] == "admin":
         return True
     elif self_user == connection_info["user"]["username"]:
         return True
@@ -230,7 +230,7 @@ def create_controller(token, c_type, name, data):
         abort(503, 'The Credential {} is not ready yet.'.format(credential['name']))
     datastore.create_controller(name, c_type, data['region'], data['credential'])
     if token['user']['name'] == settings.JUJU_ADMIN_USER:
-        datastore.add_user_to_controller(name, token['user']['name'], 'tengu_admin')
+        datastore.add_user_to_controller(name, token['user']['name'], 'admin')
     else:
         datastore.add_user_to_controller(name, token['user']['name'], 'company_admin')
     return get_controller_types()[c_type].create_controller(name, data)
@@ -770,12 +770,12 @@ def remove_credential(user, cred_name):
 
 
 def credential_exists(user, credential):
-    for cred in get_credentials(user):
-        if cred['name'] == credential:
-            if not cred['state'] == 'ready':
-                raise Exception('The Credential {} is not ready yet.'.format(cred_name))
-            return True
-    return False
+   for cred in get_credentials(user):
+       print(cred)
+       if cred:
+           if cred['name'] == credential:
+               return True
+   return False
 
 def grant_user_to_controller(token, controller, user, access):
     Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),

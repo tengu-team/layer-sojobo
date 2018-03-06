@@ -11,15 +11,15 @@ It is used to check if a user has the rights to perform certain actions.
 permissions = {
 	"/controllers/controller": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		},
 		"del": {
-			"c_access": ["tengu_admin", "company_admin"] #TODO: Update wiki
+			"c_access": ["admin", "company_admin"] #TODO: Update wiki
 		}
 	},
 	"/controllers/controller/models": {
 		"post": {
-			"c_access": ["tengu_admin", "company_admin", "superuser", "add-model"]
+			"c_access": ["admin", "company_admin", "superuser", "add-model"]
 		}
 	},
 	"/controllers/controller/models/model": {
@@ -80,28 +80,28 @@ permissions = {
 	},
 	"/users/user": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		}
 	},
     "/users/user/controllers/controller": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		},
         "put": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		}
 	},
     "/users/user/controllers/controller/models": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		},
         "put": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		}
 	},
     "/users/user/controllers/controller/models/model": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"],
+			"c_access": ["admin", "company_admin", "superuser"],
             "m_access": ["admin"]
 		}
 	}
