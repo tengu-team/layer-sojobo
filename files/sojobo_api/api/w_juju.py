@@ -20,6 +20,7 @@ from random import randint
 import os
 import re
 import base64
+import datetime
 from subprocess import check_output, check_call, Popen
 import json
 import hashlib
@@ -177,7 +178,8 @@ def check_model_state(data):
         return {'name': data['model']['name'], 'state': state, 'users' : {"user" : data['user']['name'], "access" : "admin"}}
 
 
-def authorize(connection_info, resource, method, self_user=None):
+
+def authorize(connection_info, resource, method, self_user=None, resource_user=None):
     """Checks if a user is authorized to perform a certain http method on
     a certain resource. F.e. Is the user allowed to create a model?
 
@@ -189,17 +191,30 @@ def authorize(connection_info, resource, method, self_user=None):
     :param method: The HTTP method (get, put, post, del)
 
     :param self_user: Calls like changing the password of a user can be done
-    by an admin OR the user himself. If this is the case then 'self_user' must
-    be the user that is used in the call."""
-    # Check if it is controller or model connection info.
-    if self_user == connection_info["user"]["name"]:
+
+    by an admin OR the user himself. In the latter case 'self_user' must
+    be the user that is provided in the API call.
+
+    :param resource_user: A superuser is allowed to access and update info of
+    other users if they are on the same controller. When 'resource_user' is
+    provided there needs to be checked if the authenticated user is at least
+    superuser on a controller where resource_user resides. 'resource_user' is
+    only needed for User API calls."""
+
+    # admin has authorization in every situation.
+    if connection_info["user"]["name"] == settings.JUJU_ADMIN_USER:
+        return True
+    elif self_user == connection_info["user"]["username"]:
         return True
     elif "m_access" in connection_info:
         return permissions.m_authorize(connection_info, resource, method)
     elif "c_access" in connection_info:
         return permissions.c_authorize(connection_info, resource, method)
-    else:
-        return connection_info["user"]["name"] == settings.JUJU_ADMIN_USER
+    # If no 'm_access' or 'c_access' is found in the connection info then there will
+    # only be user info.
+    elif "user" in connection_info and resource_user:
+        return permissions.superuser_authorize(connection_info["user"], resource_user)
+
 
 
 def get_connection_info(username, c_name=None, m_name=None):
@@ -249,7 +264,7 @@ def create_controller(token, data):
         abort(503, 'The Credential {} is not ready yet.'.format(credential['name']))
     datastore.create_controller(name, c_type, data['region'], data['credential'])
     if token['user']['name'] == settings.JUJU_ADMIN_USER:
-        datastore.add_user_to_controller(name, token['user']['name'], 'tengu_admin')
+        datastore.add_user_to_controller(name, token['user']['name'], 'admin')
     else:
         datastore.add_user_to_controller(name, token['user']['name'], 'company_admin')
     return get_controller_types()[c_type].create_controller(name, data)
@@ -686,7 +701,13 @@ async def get_application_config(token, model, app_name):
 # USER FUNCTIONS
 ###############################################################################
 def create_user(username, password):
-    Popen(["python3", "{}/scripts/add_user.py".format(settings.SOJOBO_API_DIR), username, password])
+    juju_username = 'u{}{}'.format(hashlib.md5(username.encode('utf')).hexdigest(), give_timestamp())
+    datastore.create_user(username, juju_username)
+    controllers = datastore.get_ready_controllers()
+    for controller in controllers:
+        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR), username, password, controller['name'], juju_username])
+    if len(controllers) == 0:
+        datastore.set_user_state(username, 'ready')
 
 
 def delete_user(username):
@@ -755,12 +776,13 @@ def remove_credential(user, cred_name):
 
 
 def credential_exists(user, credential):
-    for cred in get_credentials(user):
-        if cred['name'] == credential:
-            if not cred['state'] == 'ready':
-                raise Exception('The Credential {} is not ready yet.'.format(cred['name']))
-            return True
-    return False
+   for cred in get_credentials(user):
+       print(cred)
+       if cred:
+           if cred['name'] == credential:
+               return True
+   return False
+
 
 def grant_user_to_controller(token, controller, user, access):
     Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
@@ -808,14 +830,10 @@ def get_all_users():
 def get_users_info(data):
     """An admin user is allowed to access info of all other users. Users who
     have no admin rights have only access to info about themselves."""
-    if data['user']['name'] == settings.JUJU_ADMIN_USER:
-        result = []
-        for user in get_all_users():
-            u_info = get_user_info(user["name"])
-            result.append(u_info)
-        return result
+    if data['name'] == settings.JUJU_ADMIN_USER:
+        return datastore.get_users_info()
     else:
-        return datastore.get_user_info(data['user']['name'])
+        return datastore.get_user_info(data['name'])
 
 
 def get_user_info(username):
@@ -867,6 +885,13 @@ def m_access_exists(access):
     return access in ['read', 'write', 'admin']
 
 
+def has_superuser_access_over_user(superuser, resource_user):
+    """Checks if there is at least one controller where the given user has superuser
+    access over the resource_user."""
+    matching_controllers = datastore.get_superuser_matching_controllers(superuser, resource_user)
+    return bool(matching_controllers)
+
+
 # def check_access(access):
 #     acc = access.lower()
 #     if c_access_exists(acc) or m_access_exists(acc):
@@ -874,3 +899,14 @@ def m_access_exists(access):
 #     else:
 #         error = errors.invalid_access('access')
 #         abort(error[0], error[1])
+
+########################################################################
+# AUXILIARY FUNCTIONS
+########################################################################
+def give_timestamp():
+    dt = datetime.datetime.now()
+    dt_values = [dt.month, dt.day, dt.hour, dt.minute, dt.second]
+    timestamp = str(dt.year)
+    for value in dt_values:
+        timestamp += '-' + str(value)
+    return(timestamp)

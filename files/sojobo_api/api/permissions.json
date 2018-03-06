@@ -1,15 +1,15 @@
 {
 	"/controllers/controller": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		},
 		"del": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		}
 	},
 	"/controllers/controller/models": {
 		"post": {
-			"c_access": ["tengu_admin", "company_admin", "superuser", "add-model"]
+			"c_access": ["admin", "company_admin", "superuser", "add-model"]
 		}
 	},
 	"/controllers/controller/models/model": {

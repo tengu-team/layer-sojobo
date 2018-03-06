@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from sojobo_api.api import w_juju
+
 """
 This module has a static dictionary with each call and its required access levels.
 It is used to check if a user has the rights to perform certain actions.
@@ -9,15 +11,15 @@ It is used to check if a user has the rights to perform certain actions.
 permissions = {
 	"/controllers/controller": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		},
 		"del": {
-			"c_access": ["tengu_admin", "company_admin"] #TODO: Update wiki
+			"c_access": ["admin", "company_admin"] #TODO: Update wiki
 		}
 	},
 	"/controllers/controller/models": {
 		"post": {
-			"c_access": ["tengu_admin", "company_admin", "superuser", "add-model"]
+			"c_access": ["admin", "company_admin", "superuser", "add-model"]
 		}
 	},
 	"/controllers/controller/models/model": {
@@ -76,25 +78,30 @@ permissions = {
 			"m_access": ["admin", "write"]
 		}
 	},
+	"/users/user": {
+		"get": {
+			"c_access": ["admin", "company_admin", "superuser"]
+		}
+	},
     "/users/user/controllers/controller": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		},
         "put": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		}
 	},
     "/users/user/controllers/controller/models": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		},
         "put": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin", "superuser"]
 		}
 	},
     "/users/user/controllers/controller/models/model": {
 		"get": {
-			"c_access": ["tengu_admin", "company_admin", "superuser"],
+			"c_access": ["admin", "company_admin", "superuser"],
             "m_access": ["admin"]
 		}
 	}
@@ -103,17 +110,15 @@ permissions = {
 
 def c_authorize(controller_connection_info, resource, method):
     controller_access = controller_connection_info['c_access']
-    try:
-        allowed_access_levels = permissions[resource][method]['c_access']
-        return controller_access in allowed_access_levels
-    except KeyError:
-        print("A KeyError has occured.")
+    allowed_access_levels = permissions[resource][method]['c_access']
+    return controller_access in allowed_access_levels
 
 
 def m_authorize(model_connection_info, resource, method):
     model_access = model_connection_info['m_access']
-    try:
-        allowed_access_levels = permissions[resource][method]['m_access']
-        return model_access in allowed_access_levels
-    except KeyError:
-        print("A KeyError has occured.")
+    allowed_access_levels = permissions[resource][method]['m_access']
+    return model_access in allowed_access_levels
+
+
+def superuser_authorize(user_info, resource_user):
+	return w_juju.has_superuser_access_over_user(user_info['name'], resource_user)
