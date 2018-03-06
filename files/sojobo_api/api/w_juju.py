@@ -20,6 +20,7 @@ from random import randint
 import os
 import re
 import base64
+import datetime
 from subprocess import check_output, check_call, Popen
 import json
 import hashlib
@@ -692,7 +693,13 @@ async def get_application_config(token, model, app_name):
 # USER FUNCTIONS
 ###############################################################################
 def create_user(username, password):
-    Popen(["python3", "{}/scripts/create_user.py".format(settings.SOJOBO_API_DIR), username, password])
+    juju_username = 'u{}{}'.format(base64.b64encode(username.encode()).decode(), give_timestamp())
+    datastore.create_user(username, juju_username)
+    controllers = datastore.get_ready_controllers()
+    for controller in controllers:
+        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR), username, password, controller['name'], juju_username])
+    if len(controllers) == 0:
+        datastore.set_user_state(username, 'ready')
 
 
 def delete_user(username):
@@ -885,3 +892,14 @@ def has_superuser_access_over_user(superuser, resource_user):
 #     else:
 #         error = errors.invalid_access('access')
 #         abort(error[0], error[1])
+
+########################################################################
+# AUXILIARY FUNCTIONS
+########################################################################
+def give_timestamp():
+    dt = datetime.datetime.now()
+    dt_values = [dt.month, dt.day, dt.hour, dt.minute, dt.second]
+    timestamp = str(dt.year)
+    for value in dt_values:
+        timestamp += '-' + str(value)
+    return(timestamp)
