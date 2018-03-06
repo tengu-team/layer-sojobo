@@ -29,7 +29,7 @@ from juju.client import client
 from juju.controller import Controller
 from juju.errors import JujuAPIError, JujuError
 from juju.model import Model
-from sojobo_api.api import w_errors as errors, w_datastore as datastore
+from sojobo_api.api import w_errors as errors, w_datastore as datastore, w_permissions as permissions
 from sojobo_api import settings
 
 
@@ -105,11 +105,12 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
             elif len(datastore.get_all_controllers()) == 0:
                 abort(error[0], error[1])
             else:
-                await connect_to_random_controller(data)
+                await connect_to_random_controller(auth)
                 return data
         try:
             check_controller_state(data)
             check_user_state(data)
+            check_model_state(data)
             if data['c_access']:
                 if controller and not model:
                     controller_connection = Controller()
@@ -120,7 +121,7 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
                     await model_connection.connect(endpoint=data['controller']['endpoints'][0], uuid=data['model']['uuid'], username=auth.username, password=auth.password, cacert=data['controller']['ca_cert'])
                     return model_connection
             elif data['controller']['state'] == 'ready':
-                await connect_to_random_controller(data)
+                await connect_to_random_controller(auth)
                 add_user_to_controllers(data, auth.username, auth.password)
                 abort(501, 'User {} is being added to the {} environment'.format(data['controller']['name'], data['user']['name']))
         except JujuAPIError:
@@ -133,16 +134,17 @@ def check_if_admin(auth):
     return auth.username == settings.JUJU_ADMIN_USER and auth.password == settings.JUJU_ADMIN_PASSWORD
 
 
-async def connect_to_random_controller(data):
+async def connect_to_random_controller(authorization):
     error = errors.unauthorized()
     try:
         ready_controllers = datastore.get_all_ready_controllers()
-        if len(read_controllers) == 0:
+        if len(ready_controllers) == 0:
             abort(400,'Please wait untill your first environment is set up!')
         else:
-            con = read_controllers[randint(0, len(controllers) - 1)]
+            con = ready_controllers[randint(0, len(ready_controllers) - 1)]
             controller_connection = Controller()
-            await controller_connection.connect(con['endpoints'][0], auth.username, auth.password, con['ca_cert'])
+            await controller_connection.connect(endpoint=con['endpoints'][0], username=authorization.username,
+                                                password=authorization.password, cacert=con['ca_cert'])
             await controller_connection.disconnect()
     except JujuAPIError:
         abort(error[0], error[1])
@@ -154,6 +156,17 @@ def check_user_state(data):
             abort(403, "The user is not ready yet to perform this action. Please wait untill the user is created!")
         elif data['user']['state'] != 'ready':
             abort(403, "The user is being removed and not able to perform this action anymore!")
+
+
+def check_controller_state(data):
+    if data['controller']:
+        if data['controller']['state'] != 'ready':
+            abort(403, "The Workspace is not ready yet. Please wait untill the workspace is created!")
+
+def check_model_state(data):
+    state = data['model']['state']
+    if data['model']:
+        return {'name': data['model']['name'], 'state': state, 'users' : {"user" : data['user']['name'], "access" : "admin"}}
 
 def authorize(connection_info, resource, method, self_user=None):
     """Checks if a user is authorized to perform a certain http method on
@@ -170,14 +183,14 @@ def authorize(connection_info, resource, method, self_user=None):
     by an admin OR the user himself. If this is the case then 'self_user' must
     be the user that is used in the call."""
     # Check if it is controller or model connection info.
-    if self_user == connection_info["user"]["username"]:
+    if self_user == connection_info["user"]["name"]:
         return True
     elif "m_access" in connection_info:
-        return w_permissions.m_authorize(connection_info, resource, method)
+        return permissions.m_authorize(connection_info, resource, method)
     elif "c_access" in connection_info:
-        return w_permissions.c_authorize(connection_info, resource, method)
+        return permissions.c_authorize(connection_info, resource, method)
     else:
-        return connection_info["user"]["username"] == "tengu_admin"
+        return connection_info["user"]["name"] == "tengu_admin"
 
 
 def get_connection_info(username, c_name=None, m_name=None):
@@ -190,6 +203,9 @@ def get_connection_info(username, c_name=None, m_name=None):
         return {'user': datastore.get_user_info(username)}
 
 
+async def disconnect(connection):
+    if connection.connection.is_open():
+        connection.disconnect()
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
@@ -212,7 +228,7 @@ def create_controller(token, data):
     c_type = check_c_type(data['type'])
     valid, name = check_input(data['controller'], 'controller')
     if not valid:
-        abort(400, error)
+        abort(400, name)
     if controller_exists(name):
         ers = errors.already_exists('controller')
         abort(ers[0], ers[1])
@@ -230,9 +246,9 @@ def create_controller(token, data):
     return get_controller_types()[c_type].create_controller(name, data)
 
 
-def delete_controller(con):
+def delete_controller(data):
     Popen(["python3", "{}/scripts/remove_controller.py".format(settings.SOJOBO_API_DIR),
-           con.c_name, con.c_type])
+           data['controller']['name'], data['controller']['type']])
 
 def get_supported_regions(c_type):
     return get_controller_types()[c_type].get_supported_regions()
@@ -252,13 +268,10 @@ def get_controller_access(con, username):
     return datastore.get_controller_access(con.c_name, username)
 
 
-def get_controller_info(token, controller):
-    if controller.c_access is not None:
-        con_info = datastore.get_controller_info(controller.c_name)
-        if con_info['state'] == 'ready':
-            con_info['models'] = get_models_info(token, controller)
-    else:
-        con_info = None
+def get_controller_info(data):
+    con_info = data['controller']
+    if con_info['state'] == 'ready':
+        con_info['models'] = [u['name'] for u in get_models_access(data)]
     return con_info
 
 
@@ -294,32 +307,16 @@ def get_model_access(model, controller, username):
     return datastore.get_model_access(controller, model, username) if not None else "None"
 
 
-def get_models_info(token, controller):
-    result = []
-    models = get_all_models(controller)
-    for mod in models:
-        print(mod, datastore.get_model_access(controller.c_name, mod, token.username))
-        if datastore.get_model_access(controller.c_name, mod['name'], token.username) in ['read', 'write', 'admin']:
-            result.append(mod)
-    return result
-
-
-async def get_model_info(token, controller, model):
-    state = datastore.get_model_state(model.m_key)
-    if state == 'ready':
-        async with model.connect(token):
-            users = get_users_model(token, controller, model)
-            applications = await get_applications_info(token, model)
-            machines = await get_machines_info(token, model)
-            gui = await get_gui_url(controller, model)
-            credentials = {'cloud': controller.c_type, 'credential-name': get_model_credential(controller, model)}
-        return {'name': model.m_name, 'users': users,
-                'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
-                'state': datastore.get_model_state(model.m_key), 'credentials' : credentials}
-    elif state == 'accepted' or state == 'error':
-        return {'name': model.m_name, 'state': state, 'users' : {"user" : token.username, "access" : "admin"}}
-    else:
-        return {}
+async def get_model_info(connection, data):
+    state = data['model']['state']
+    users = get_users_model(data)
+    applications = get_applications_info(connection)
+    machines = get_machines_info(connection)
+    gui = get_gui_url(data)
+    credentials = {'cloud': data['controller']['type'], 'credential-name': ['model']['credential']}
+    return {'name': data['model']['name'], 'users': users,
+            'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
+            'state': state, 'credentials' : credentials}
 
 
 async def get_ssh_keys(token, model):
@@ -336,29 +333,27 @@ def get_ssh_keys_user(username):
     return datastore.get_ssh_keys(username)
 
 
-async def get_applications_info(token, model):
+def get_applications_info(connection):
     result = []
-    async with model.connect(token) as juju:
-        for data in juju.state.state.get('application', {}).values():
-            res = {'name': data[0]['name'], 'relations': [], 'charm': data[0]['charm-url'], 'exposed': data[0]['exposed'],
-                   'state': data[0]['status']}
-            for rels in juju.state.state['relation'].values():
-                keys = rels[0]['key'].split(" ")
-                if len(keys) == 1 and data[0]['name'] == keys[0].split(":")[0]:
-                    res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
-                elif len(keys) == 2 and data[0]['name'] == keys[0].split(":")[0]:
-                    res['relations'].extend([{'interface': keys[1].split(":")[1], 'with': keys[1].split(":")[0]}])
-                elif len(keys) == 2 and data[0]['name'] == keys[1].split(":")[0]:
-                    res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
-            res['units'] = await get_units_info(token, model, data[0]['name'])
-            result.append(res)
+    for data in connection.state.state.get('application', {}).values():
+        res = {'name': data[0]['name'], 'relations': [], 'charm': data[0]['charm-url'], 'exposed': data[0]['exposed'],
+               'state': data[0]['status']}
+        for rels in connection.state.state['relation'].values():
+            keys = rels[0]['key'].split(" ")
+            if len(keys) == 1 and data[0]['name'] == keys[0].split(":")[0]:
+                res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
+            elif len(keys) == 2 and data[0]['name'] == keys[0].split(":")[0]:
+                res['relations'].extend([{'interface': keys[1].split(":")[1], 'with': keys[1].split(":")[0]}])
+            elif len(keys) == 2 and data[0]['name'] == keys[1].split(":")[0]:
+                res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
+        res['units'] = get_units_info(connection, data[0]['name'])
+        result.append(res)
     return result
 
 
-async def get_units_info(token, model, application):
+def get_units_info(connection, application):
     try:
-        async with model.connect(token) as juju:
-            data = juju.state.state['unit']
+        data = connection.state.state['unit']
         units = []
         result = []
         for unit in data.keys():
@@ -386,19 +381,17 @@ async def get_public_ip_controller(token, controller):
                 return server['value']
 
 
-
-#libjuju geen manier om gui te verkrijgen of juju gui methode
-async def get_gui_url(controller, model):
-    return 'https://{}/gui/{}'.format(controller.endpoint, model.m_uuid)
+def get_gui_url(data):
+    return 'https://{}/gui/{}'.format(data['controller']['endpoint'], data['model']['uuid'])
 
 
-async def create_model(connection, authentication, m_name, cred_name, c_name):
+async def create_model(authorization, m_name, cred_name, c_name):
     """Creates model in database and then in JuJu (background script)."""
     # Construct a key for the model using the controller name and model name.
     key_string = c_name + "_" + m_name
     m_key = construct_model_key(c_name, m_name)
     if not datastore.model_exists(m_key):
-        if cred_name in datastore.get_credential_keys(authentication.username):
+        if cred_name in datastore.get_credential_keys(authorization.username):
             # Create the model in ArangoDB. Add model key to controller and
             # set the model access level of the user.
             new_model = datastore.create_model(m_key, m_name, state='deploying')
@@ -406,12 +399,10 @@ async def create_model(connection, authentication, m_name, cred_name, c_name):
             # to create a connection with ArangoDB each time.
             datastore.add_model_to_controller(c_name, m_key)
             datastore.set_model_state(m_key, 'accepted')
-            datastore.set_model_access(m_key, authentication.username, 'admin')
-
+            datastore.set_model_access(m_key, authorization.username, 'admin')
             # Run the background script, this creates the model in JuJu.
             Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
-                    c_name, m_key, m_name, authentication.username, authentication.password, cred_name])
-
+                    c_name, m_key, m_name, authorization.username, authorization.password, cred_name])
             return 202, "Model is being deployed."
         else:
             return 404, "Credentials {} not found!".format(cred_name)
@@ -446,33 +437,32 @@ async def delete_model(token, controller, model):
 #####################################################################################
 # Machines FUNCTIONS
 #####################################################################################
-async def get_machines_info(token, model):
+async def get_machines_info(connection):
     result = {}
-    async with model.connect(token) as juju:
-        for machine, data in juju.state.state.get('machine', {}).items():
-            try:
-                if data[0]['agent-status']['current'] == 'error' and data[0]['addresses'] is None:
-                    result[machine] = {'name': machine, 'Error': data[0]['agent-status']['message']}
-                if data[0] is None:
-                    result[machine] = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown',
-                                       'series': 'Unknown', 'containers': 'Unknown',
-                                       'hardware-characteristics' : 'Unknown'}
-                if 'lxd' in machine:
-                    result[machine.split('/')[0]].get('containers', []).append({
-                        'name': machine, 'instance-id': data[0]['instance-id'],
-                        'ip': get_machine_ip(data[0]), 'series': data[0]['series']
-                    })
-                else:
-                    result[machine] = {
-                        'name': machine,
-                        'instance-id': data[0]['instance-id'],
-                        'ip': get_machine_ip(data[0]),
-                        'series': data[0]['series'],
-                        'hardware-characteristics': data[0]['hardware-characteristics']
-                    }
-            except KeyError:
-                result[machine] = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown',
-                                   'containers': 'Unknown', 'hardware-characteristics' : 'Unknown'}
+    for machine, data in connection.state.state.get('machine', {}).items():
+        try:
+            if data[0]['agent-status']['current'] == 'error' and data[0]['addresses'] is None:
+                result[machine] = {'name': machine, 'Error': data[0]['agent-status']['message']}
+            if data[0] is None:
+                result[machine] = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown',
+                                   'series': 'Unknown', 'containers': 'Unknown',
+                                   'hardware-characteristics' : 'Unknown'}
+            if 'lxd' in machine:
+                result[machine.split('/')[0]].get('containers', []).append({
+                    'name': machine, 'instance-id': data[0]['instance-id'],
+                    'ip': get_machine_ip(data[0]), 'series': data[0]['series']
+                })
+            else:
+                result[machine] = {
+                    'name': machine,
+                    'instance-id': data[0]['instance-id'],
+                    'ip': get_machine_ip(data[0]),
+                    'series': data[0]['series'],
+                    'hardware-characteristics': data[0]['hardware-characteristics']
+                }
+        except KeyError:
+            result[machine] = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown',
+                               'containers': 'Unknown', 'hardware-characteristics' : 'Unknown'}
     return [info for info in result.values()]
 
 
@@ -715,15 +705,13 @@ def get_users_controller(controller):
     return datastore.get_users_controller(controller)
 
 
-def get_users_model(token, controller, model):
-    if model.m_access == 'admin' or model.m_access == 'write':
-        aql_data = datastore.get_users_model(model.m_key)
-        users = [user for user in aql_data]
-    elif model.m_access == 'read':
-        users = [{'name': token.username, 'access': model.m_access}]
+def get_users_model(data):
+    if data['m_access'] in ['admin', 'write']:
+        return datastore.get_users_model(data['model']['_key'])
+    elif data['m_access'] == 'read':
+        return [{'name': data['user']['name'], 'access': data['m_access']}]
     else:
-        users = None
-    return users
+        return None
 
 
 def get_credentials(user):
@@ -811,14 +799,14 @@ def get_all_users():
 def get_users_info(data):
     """An admin user is allowed to access info of all other users. Users who
     have no admin rights have only access to info about themselves."""
-    if data['name'] == settings.JUJU_ADMIN_USER:
+    if data['user']['name'] == settings.JUJU_ADMIN_USER:
         result = []
         for user in get_all_users():
             u_info = get_user_info(user["name"])
             result.append(u_info)
         return result
     else:
-        return datastore.get_user_info(token.username)
+        return datastore.get_user_info(data['user']['name'])
 
 
 def get_user_info(username):
@@ -844,8 +832,8 @@ def get_ucontroller_access(controller, username):
     return datastore.get_controller_and_access(controller, username)
 
 
-def get_models_access(controller, name):
-    return datastore.get_models_access(controller.c_name, name)
+async def get_models_access(data):
+    return datastore.get_models_access(data['controller']['name'], data['user']['name'])
 
 
 def check_models_access(token, controller, user):
