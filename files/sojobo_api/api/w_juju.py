@@ -158,7 +158,7 @@ def check_user_state(data):
         elif data['user']['state'] != 'ready':
             abort(403, "The user is being removed and not able to perform this action anymore!")
     else:
-        abort(errors.unauthorized[0], errors.unauthorized[1])
+        abort(errors.unauthorized)
 
 
 def check_controller_state(data, auth):
@@ -168,7 +168,7 @@ def check_controller_state(data, auth):
     elif check_if_admin(auth):
         abort(404, 'The controller does not exist')
     else:
-        abort(errors.unauthorized[0], errors.unauthorized[1])
+        abort(errors.unauthorized)
 
 
 def check_model_state(data):
@@ -217,19 +217,22 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
 
 
 
-def get_connection_info(username, c_name=None, m_name=None):
-    if c_name and m_name:
-        m_key = construct_model_key(c_name, m_name)
-        return datastore.get_model_connection_info(username, c_name, m_key)
-    elif c_name and not m_name:
-        return datastore.get_controller_connection_info(username, c_name)
+def get_connection_info(authorization, c_name=None, m_name=None):
+    if authorization:
+        if c_name and m_name:
+            m_key = construct_model_key(c_name, m_name)
+            return datastore.get_model_connection_info(authorization.username, c_name, m_key)
+        elif c_name and not m_name:
+            return datastore.get_controller_connection_info(authorization.username, c_name)
+        else:
+            return {'user': datastore.get_user_info(authorization.username)}
     else:
-        return {'user': datastore.get_user_info(username)}
+        abort(errors.unauthorized)
 
 
 async def disconnect(connection):
-    if connection.connection.is_open():
-        connection.disconnect()
+    if connection.connection().is_open:
+        await connection.disconnect()
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
@@ -409,10 +412,9 @@ def get_gui_url(data):
     return 'https://{}/gui/{}'.format(data['controller']['endpoint'], data['model']['uuid'])
 
 
-async def create_model(authorization, m_name, cred_name, c_name):
+def create_model(authorization, m_name, cred_name, c_name):
     """Creates model in database and then in JuJu (background script)."""
     # Construct a key for the model using the controller name and model name.
-    key_string = c_name + "_" + m_name
     m_key = construct_model_key(c_name, m_name)
     if not datastore.model_exists(m_key):
         if cred_name in datastore.get_credential_keys(authorization.username):
@@ -431,9 +433,7 @@ async def create_model(authorization, m_name, cred_name, c_name):
         else:
             return 404, "Credentials {} not found!".format(cred_name)
     else:
-        return errors.already_exists('model')[0], errors.already_exists('model')[1]
-
-
+        return errors.already_exists('model')
 
 
 def check_model_state(m_key, required_states):
@@ -453,11 +453,10 @@ def check_model_state(m_key, required_states):
 # model nog niet"
 
 
-async def delete_model(token, controller, model):
-    async with controller.connect(token) as juju:
-        await juju.destroy_models(model.m_uuid)
-    datastore.delete_model(controller.c_name, model.m_key)
-    return "Model {} is being deleted".format(model.m_name)
+async def delete_model(authorization, data):
+    datastore.set_model_state(data['model']['_key'], 'deleting model')
+    Popen(["python3", "{}/scripts/delete_model.py".format(settings.SOJOBO_API_DIR),
+           data['controller']['name'], data['model']['name'], data['model']['_key'], authorization.username, authorization.password])
 #####################################################################################
 # Machines FUNCTIONS
 #####################################################################################
@@ -562,10 +561,9 @@ async def app_exists(token, controller, model, app_name):
     return False
 
 
-def add_bundle(token, controller, model, bundle):
+def add_bundle(authentication, data, bundle):
     Popen(["python3", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR),
-           token.username, token.password, settings.SOJOBO_API_DIR, controller, model,
-           str(bundle)])
+           authentication.username, authentication.password, data['controller']['name'], data['model']['name'], str(bundle)])
 
 
 async def deploy_app(token, con, model, app_name, data):
@@ -714,7 +712,7 @@ def delete_user(username):
     datastore.set_user_state(username, 'deleting')
     controllers = datastore.get_ready_controllers()
     for controller in controllers:
-        Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR), username, controller])
+        Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR), username, controller['name']])
 
 def add_user_to_controllers(data, username, password):
     Popen(["python3", "{}/scripts/add_user_to_controllers.py".format(settings.SOJOBO_API_DIR),data, username, password])
@@ -765,7 +763,7 @@ def add_credential(user, data):
 
 async def update_cloud(controller, cloud, credential, username):
     credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
-    cloud_facade = client.CloudFacade.from_connection(controller.connection)
+    cloud_facade = client.CloudFacade.from_connection(controller.connection())
     cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential)
     cloud_cred = client.UpdateCloudCredential(
         client.CloudCredential(cred['key'], cred['type']),
@@ -911,5 +909,5 @@ def give_timestamp():
     dt_values = [dt.month, dt.day, dt.hour, dt.minute, dt.second]
     timestamp = str(dt.year)
     for value in dt_values:
-        timestamp += '-' + str(value)
+        timestamp += str(value)
     return(timestamp)
