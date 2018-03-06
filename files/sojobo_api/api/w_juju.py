@@ -739,7 +739,10 @@ def create_user(username, password):
 
 
 def delete_user(username):
-    Popen(["python3", "{}/scripts/delete_user.py".format(settings.SOJOBO_API_DIR), username])
+    datastore.set_user_state(username, 'deleting')
+    controllers = datastore.get_ready_controllers()
+    for controller in controllers:
+        Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR), username, controller])
 
 
 async def change_user_password(token, username, password):

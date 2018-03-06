@@ -18,7 +18,6 @@ import asyncio
 import logging
 import sys
 import traceback
-from juju import tag, errors
 from juju.client import client
 from juju.controller import Controller
 sys.path.append('/opt')
@@ -36,23 +35,11 @@ async def add_user_to_controller(username, password, controller, juju_username):
         controller_connection = Controller()
         await controller_connection.connect(endpoint=con['endpoints'][0], username=settings.JUJU_ADMIN_USER, password=settings.JUJU_ADMIN_PASSWORD, cacert=con['ca_cert'])
         logger.info('Controller connection as admin was successful')
-        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection)
+        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection())
         users = [client.AddUser(display_name=juju_username,
                                 username=juju_username,
                                 password=password)]
         await user_facade.AddUser(users)
-        # grant login access
-        # controller_facade = client.ControllerFacade.from_connection(controller_connection.connection)
-        # user = tag.user(juju_username)
-        # changes = client.ModifyControllerAccess('login', 'grant', user)
-        # try:
-        #     await controller_facade.ModifyControllerAccess([changes])
-        #     return True
-        # except errors.JujuError as e:
-        #     if 'user already has' in str(e):
-        #         return False
-        #     else:
-        #         raise
         datastore.add_user_to_controller(con['name'], username, 'login')
         logger.info('Succesfully added user %s to controller %s', username, con['name'])
         datastore.set_user_state(username, 'ready')
