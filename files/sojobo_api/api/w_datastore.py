@@ -603,7 +603,6 @@ def get_models_access(c_name, username):
             'RETURN models')
     return execute_aql_query(aql, rawResults=True, controller=c_id, user=u_id)[0]
 
-
 def set_model_access(m_key, username, access):
     m_id = "models/" + m_key
     u_id = "users/" + username

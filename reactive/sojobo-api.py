@@ -17,10 +17,8 @@
 from base64 import b64encode
 from hashlib import sha256
 import os
-import sys
 import shutil
 import sys
-import requests
 import subprocess
 from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render

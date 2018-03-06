@@ -341,28 +341,32 @@ def add_credential(user):
         if juju.authorize(auth_data, '/users/credentials', 'post', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 if not juju.credential_exists(user, data['name']):
-                    juju.add_credential(user, data)
                     LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
-                    code, response = 202, 'Credentials are being added'
+                    code, response = juju.add_credential(user, data)
+                    return juju.create_response(code, response)
                 else:
                     code, response = errors.already_exists('credential')
                     LOGGER.error('/USERS/%s/credentials [POST] => Credential for User %s already exists!', user, user)
+                    return juju.create_response(code, response)
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/credentials [POST] => User %s does not exist!', user, user)
+                return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials [POST] => No Permission to perform this action!', user)
+            return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials/<credential>', methods=['GET'])

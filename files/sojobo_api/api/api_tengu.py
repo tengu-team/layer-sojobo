@@ -56,116 +56,114 @@ def get_all_controllers():
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
         if juju.check_if_admin(request.authorization):
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
-            juju.create_response(200, juju.get_keys_controllers())
+            return juju.create_response(200, juju.get_keys_controllers())
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
-        ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+
 
 
 @TENGU.route('/controllers', methods=['POST'])
 def create_controller():
     try:
-        if request.json is None:
-            data = request.form
-        else:
-            data = request.json
+        data = request.json
         url = request.url_rule
         LOGGER.info('%s [POST] => receiving call', url)
         auth_data = juju.get_connection_info(request.authorization.username)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('%s [POST] => Authenticated', url)
         if juju.check_if_admin(request.authorization):
-            valid, controller = juju.check_input(data['controller'], 'controller')
-            LOGGER.info('%s [POST] => Creating Controller %s', url, controller)
-            if valid:
-                c_type = juju.check_c_type(data['type'])
-                if juju.controller_exists(controller):
-                    code, response = errors.already_exists('controller')
-                    LOGGER.error('%s [POST] => Controller %s already exists', url, controller)
-                else:
-                    sup_clouds = juju.get_supported_regions(c_type)
-                    if data['region'] in sup_clouds:
-                        if juju.credential_exists(token['user']['name'], data['credential']):
-                            code, response = juju.create_controller(token, c_type,
-                                                                    controller, data)
-                            LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, controller)
-                        else:
-                            code, response = 400, 'Credential {} not found for user {}'.format(data['credential'], auth_data['user']['name'])
-                    else:
-                        code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(c_type, sup_clouds)
-                        LOGGER.error('%s [POST] => %s', url, response)
+            if juju.credential_exists(connection['user']['name'], data['credential']):
+                code, response = juju.create_controller(connection, data)
+                LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, data['controller'])
+                return juju.create_response(code, response)
             else:
-                code, response = 400, controller
+                code, response = 400, 'Credential {} not found for user {}'.format(data['credential'], auth_data['user']['name'])
+                return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
             LOGGER.error('%s [POST] => No Permission to perform action!', url)
+            return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
-        ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+
 
 
 @TENGU.route('/controllers/<controller>', methods=['GET'])
 def get_controller_info(controller):
     try:
         LOGGER.info('/TENGU/controllers/%s [GET] => receiving call', controller)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username, c_name=controller)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller)
         LOGGER.info('/TENGU/controllers/%s [GET] => Authenticated!', controller)
-        con = juju.authorize(token, controller)
-        LOGGER.info('/TENGU/controllers/%s [GET] => Authorized!', controller)
-        code, response = 200, juju.get_controller_info(token, con)
-        LOGGER.info('/TENGU/controllers/%s [GET] => Succesfully retrieved controller information!', controller)
+        if juju.authorize(auth_data, '/controllers/controller', 'get'):
+            LOGGER.info('/TENGU/controllers/%s [GET] => Authorized!', controller)
+            code, response = 200, juju.get_controller_info(auth_data)
+            LOGGER.info('/TENGU/controllers/%s [GET] => Succesfully retrieved controller information!', controller)
+            return juju.create_response(code, response)
+        else:
+            code, response = errors.no_permission()
+            return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
-        ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+    finally:
+        execute_task(juju.disconnect, connection)
+
 
 
 @TENGU.route('/controllers/<controller>', methods=['DELETE'])
 def delete_controller(controller):
     try:
         LOGGER.info('/TENGU/controllers/%s [DELETE] => receiving call', controller)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username, c_name=controller)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller)
         LOGGER.info('/TENGU/controllers/%s [DELETE] => Authenticated!', controller)
-        con = juju.authorize(token, controller)
-        LOGGER.info('/TENGU/controllers/%s [DELETE] => Authorized!', controller)
-        if token.is_admin:
+        if juju.check_if_admin(request.authorization):
+            LOGGER.info('/TENGU/controllers/%s [DELETE] => Authorized!', controller)
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Deleting Controller!', controller)
-            juju.delete_controller(con)
+            execute_task(juju.delete_controller, auth_data)
             code, response = 202, 'Controller {} is being deleted'.format(controller)
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Succesfully deleted controller!', controller)
+            return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/TENGU/controllers/%s [DELETE] => No Permission to perform this action!', controller)
+            return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
-        ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+    finally:
+        execute_task(juju.disconnect, connection)
 
 
 @TENGU.route('/controllers/<controller>/models', methods=['POST'])
@@ -183,8 +181,7 @@ def create_model(controller):
                 credential_name = data['credential']
                 if valid:
                     LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
-                    code, response = execute_task(juju.create_model, connection, request.authorization, model_name, credential_name, controller)
-                    print(code, response)
+                    code, response = juju.create_model(request.authorization, model_name, credential_name, controller)
                     return juju.create_response(code, response)
                 else:
                     return juju.create_response(400, model_name)
@@ -197,55 +194,62 @@ def create_model(controller):
         error_log()
         return juju.create_response(errors.invalid_data()[0], errors.invalid_data()[1])
     except HTTPException:
-        ers = error_log()
         raise
     except Exception:
         ers = error_log()
         return juju.create_response(errors.cmd_error(ers)[0], errors.cmd_error(ers)[1])
-
+    finally:
+        execute_task(juju.disconnect, connection)
 
 @TENGU.route('/controllers/<controller>/models', methods=['GET'])
 def get_models_info(controller):
     try:
         LOGGER.info('/TENGU/controllers/%s/models [GET] => receiving call', controller)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username, c_name=controller)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller)
         LOGGER.info('/TENGU/controllers/%s/models [GET] => Authenticated!', controller)
-        con = juju.authorize( token, controller)
-        LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
-        code, response = 200, juju.get_models_info(token, con)
-        LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
+        if juju.authorize(auth_data, '/controllers/controller/models', 'get'):
+            LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
+            code, response = 200, [u['name'] for u in juju.get_models_access(auth_data)]
+            LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
+            return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
-        ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
-
+        return juju.create_response(code, response)
+    finally:
+        execute_task(juju.disconnect, connection)
 
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_info(controller, model):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => receiving call', controller, model)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username, c_name=controller, m_name=model)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => Authenticated!', controller, model)
-        con, mod = juju.authorize(token, controller, model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => Authorized!', controller, model)
-        code, response = 200, execute_task(juju.get_model_info, token, con, mod)
-        LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => model information retrieved!', controller, model)
+        if juju.authorize(auth_data, '/controllers/controller/models/model', 'get'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => Authorized!', controller, model)
+            code, response = 200, execute_task(juju.get_model_info, connection, auth_data)
+            LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => model information retrieved!', controller, model)
+            return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
-        ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+    finally:
+        execute_task(juju.disconnect, connection)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['POST'])
@@ -939,13 +943,3 @@ def error_log():
     for l in lines:
         LOGGER.error(l)
     return lines
-
-
-@TENGU.route('/testauthorize', methods=['GET'])
-def test_new_authorize():
-    c_info = {"c_access": "superuser"}
-    if w_permissions.c_authorize(c_info, "/controllers/controller", "get"):
-        code, response = 200, 'Authorization was succesful!'
-    else:
-        code, response = 200, 'Authorization failed!'
-    return juju.create_response(code, response)
