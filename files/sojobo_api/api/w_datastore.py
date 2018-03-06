@@ -77,6 +77,32 @@ def get_user_doc(username):
     return  execute_aql_query(aql, username=username)[0]
 
 
+def get_users_info():
+    """Returns info of all the users, including which controllers and models
+    that the users have access to."""
+    aql = ('FOR u in users '
+               'LET controllers = '
+                    '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
+                        'LET models = '
+                            '(FOR model, mEdge in 1..1 INBOUND u._id modelAccess '
+                                'FILTER model._key in controller.models '
+                                'RETURN {name: model.name, '
+                                        'access: mEdge.access}) '
+                        'RETURN {name: controller.name, '
+                                'type: controller.type, '
+                                'access: cEdge.access, '
+                                'models: models}) '
+                'RETURN {name: u.name, '
+                        'credentials: u.credentials, '
+                        'ssh_keys: u.ssh_keys, '
+                        'controllers: controllers} ')
+    users = execute_aql_query(aql, rawResults=True)
+    results = []
+    for u in users:
+        results.append(u)
+    return results
+
+
 def get_user_info(username):
     """Returns info of the given user, including which controllers and models
     that the user has access to."""
@@ -445,9 +471,17 @@ def set_controller_access(c_name, username, access):
     execute_aql_query(aql, c_id=c_id, u_id=u_id, access=access)
 
 
-def get_matching_controllers(superuser, resource_user):
-    su_id = "users/" + superuser
+def get_superuser_matching_controllers(user, resource_user):
+    """Get controllers where the given user has superuser access and where
+    the resource_user resides."""
+    u_id = "users/" + user
     ru_id = "users/" + resource_user
+    aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess '
+                'FILTER cEdge.access == "superuser" '
+                'FOR c, E IN 1..1 INBOUND @ru_id controllerAccess '
+                    'FILTER c == controller '
+                    'RETURN c')
+    return execute_aql_query(aql, rawResults=True, u_id=u_id, ru_id=ru_id)
 
 
 ################################################################################

@@ -120,11 +120,5 @@ def m_authorize(model_connection_info, resource, method):
     return model_access in allowed_access_levels
 
 
-def superuser_authorize(user_info, resource, method, resource_user):
-	controllers_superuser = set()
-	controllers_resource_user = set()
-	for c in user_info['controllers']:
-		controllers_superuser.add(c.name)
-	for c in w_juju.get_user_info(resource_user)['controllers']:
-		controllers_resource_user.add(c.name)
-	matching_controllers = controllers_superuser.intersection(controllers_resource_user)
+def superuser_authorize(user_info, resource_user):
+	return w_juju.has_superuser_access_over_user(user_info['name'], resource_user)

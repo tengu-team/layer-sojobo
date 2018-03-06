@@ -75,6 +75,7 @@ def get_users_info():
         token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS [GET] => Authenticated!')
         if juju.check_if_admin(request.authorization):
+            print(token)
             code, response = 200, juju.get_users_info(token['user'])
             LOGGER.info('/USERS [GET] => Succesfully retieved all users!')
         else:
@@ -137,14 +138,13 @@ def create_user():
 
 @USERS.route('/<user>', methods=['GET'])
 def get_user_info(user):
+    # TODO: TEST! With superuser!
     try:
         LOGGER.info('/USERS/%s [GET] => receiving call', user)
-        controllers_user = [a,b]
-        controllers_authenticator = [a]
         auth_data = juju.get_connection_info(request.authorization.username)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [GET] => Authenticated!', user)
-        if juju.authorize(auth_data, '/users/user', 'get', user):
+        if juju.authorize(auth_data, '/users/user', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_user_info(user)
                 LOGGER.info('/USERS/%s [GET] => Succesfully retrieved user information!', user)
@@ -170,9 +170,10 @@ def get_user_info(user):
 def change_user_password(user):
     try:
         LOGGER.info('/USERS/%s [PUT] => receiving call', user)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization.username)
+        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [PUT] => Authenticated!', user)
-        if user == token.username or token.is_admin:
+        if juju.authorize(auth_data, '/users/user', 'put', self_user=user):
             if juju.user_exists(user):
                 pwd = request.json['password']
                 if pwd:
@@ -333,9 +334,9 @@ def add_credential(user):
         LOGGER.info('/USERS/%s/credentials [POST] => receiving call', user)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization.username)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials [POST] => Authenticated!', user)
-        if juju.authorize(auth_data):
+        if juju.authorize(auth_data, '/users/credentials', 'post', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 if not juju.credential_exists(user, data['name']):
                     juju.add_credential(user, data)

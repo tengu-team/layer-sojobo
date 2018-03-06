@@ -168,24 +168,28 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
     :param method: The HTTP method (get, put, post, del)
 
     :param self_user: Calls like changing the password of a user can be done
-    by an admin OR the user himself. If this is the case then 'self_user' must
-    be the user that is used in the call.
+    by an admin OR the user himself. In the latter case 'self_user' must
+    be the user that is provided in the API call.
 
     :param resource_user: A superuser is allowed to access and update info of
     other users if they are on the same controller. When 'resource_user' is
-    provided and if the authenticated user is a superuser there needs to be
-    checked if they are together on at least one controller."""
+    provided there needs to be checked if the authenticated user is at least
+    superuser on a controller where resource_user resides. 'resource_user' is
+    only needed for User API calls."""
 
-    if return connection_info["user"]["username"] == "tengu_admin":
+    # tengu_admin has authorization in every situation.
+    if connection_info["user"]["name"] == "tengu_admin":
         return True
     elif self_user == connection_info["user"]["username"]:
         return True
-    elif resource_user:
-        return w_permissions.superuser_authorize(connection_info, resource, method, resource_user)
     elif "m_access" in connection_info:
         return w_permissions.m_authorize(connection_info, resource, method)
-    else "c_access" in connection_info:
+    elif "c_access" in connection_info:
         return w_permissions.c_authorize(connection_info, resource, method)
+    # If no 'm_access' or 'c_access' is found in the connection info then there will
+    # only be user info.
+    elif "user" in connection_info and resource_user:
+        return w_permissions.superuser_authorize(connection_info["user"], resource_user)
 
 
 def get_connection_info(username, c_name=None, m_name=None):
@@ -813,11 +817,7 @@ def get_users_info(data):
     """An admin user is allowed to access info of all other users. Users who
     have no admin rights have only access to info about themselves."""
     if data['name'] == settings.JUJU_ADMIN_USER:
-        result = []
-        for user in get_all_users():
-            u_info = get_user_info(user["name"])
-            result.append(u_info)
-        return result
+        return datastore.get_users_info()
     else:
         return datastore.get_user_info(token.username)
 
@@ -869,6 +869,13 @@ def c_access_exists(access):
 
 def m_access_exists(access):
     return access in ['read', 'write', 'admin']
+
+
+def has_superuser_access_over_user(superuser, resource_user):
+    """Checks if there is at least one controller where the given user has superuser
+    access over the resource_user."""
+    matching_controllers = get_superuser_matching_controllers(superuser, resource_user)
+    return bool(matching_controllers)
 
 
 # def check_access(access):
