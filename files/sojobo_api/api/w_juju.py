@@ -108,15 +108,15 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
                 await connect_to_random_controller(auth)
                 return data
         try:
-            check_controller_state(data)
+            check_controller_state(data, auth)
             check_user_state(data)
-            check_model_state(data)
             if data['c_access']:
                 if controller and not model:
                     controller_connection = Controller()
                     await controller_connection.connect(endpoint=data['controller']['endpoints'][0], username=auth.username, password=auth.password, cacert=data['controller']['ca_cert'])
                     return controller_connection
                 elif model:
+                    check_model_state(data)
                     model_connection = Model()
                     await model_connection.connect(endpoint=data['controller']['endpoints'][0], uuid=data['model']['uuid'], username=auth.username, password=auth.password, cacert=data['controller']['ca_cert'])
                     return model_connection
@@ -156,17 +156,26 @@ def check_user_state(data):
             abort(403, "The user is not ready yet to perform this action. Please wait untill the user is created!")
         elif data['user']['state'] != 'ready':
             abort(403, "The user is being removed and not able to perform this action anymore!")
+    else:
+        abort(errors.unauthorized[0], errors.unauthorized[1])
 
 
-def check_controller_state(data):
+def check_controller_state(data, auth):
     if data['controller']:
         if data['controller']['state'] != 'ready':
             abort(403, "The Workspace is not ready yet. Please wait untill the workspace is created!")
+    elif check_if_admin(auth):
+        abort(404, 'The controller does not exist')
+    else:
+        abort(errors.unauthorized[0], errors.unauthorized[1])
+
 
 def check_model_state(data):
     state = data['model']['state']
     if data['model']:
+
         return {'name': data['model']['name'], 'state': state, 'users' : {"user" : data['user']['name'], "access" : "admin"}}
+
 
 def authorize(connection_info, resource, method, self_user=None):
     """Checks if a user is authorized to perform a certain http method on
@@ -190,7 +199,7 @@ def authorize(connection_info, resource, method, self_user=None):
     elif "c_access" in connection_info:
         return permissions.c_authorize(connection_info, resource, method)
     else:
-        return connection_info["user"]["name"] == "tengu_admin"
+        return connection_info["user"]["name"] == settings.JUJU_ADMIN_USER
 
 
 def get_connection_info(username, c_name=None, m_name=None):
@@ -749,7 +758,7 @@ def credential_exists(user, credential):
     for cred in get_credentials(user):
         if cred['name'] == credential:
             if not cred['state'] == 'ready':
-                raise Exception('The Credential {} is not ready yet.'.format(cred_name))
+                raise Exception('The Credential {} is not ready yet.'.format(cred['name']))
             return True
     return False
 
