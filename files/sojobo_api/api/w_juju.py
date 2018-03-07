@@ -231,7 +231,7 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 
 async def disconnect(connection):
-    if connection.connection().is_open:
+    if connection.connection.is_open:
         await connection.disconnect()
 ###############################################################################
 # CONTROLLER FUNCTIONS
@@ -265,6 +265,10 @@ def create_controller(token, data):
     credential = get_credential(token['user']['name'], data['credential'])
     if not credential['state'] == 'ready':
         abort(503, 'The Credential {} is not ready yet.'.format(credential['name']))
+    regions= get_controller_types()[c_type].get_supported_regions()
+    if not data['region'] in regions:
+        code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(data['type'], regions)
+        abort(code, response)
     datastore.create_controller(name, c_type, data['region'], data['credential'])
     if token['user']['name'] == settings.JUJU_ADMIN_USER:
         datastore.add_user_to_controller(name, token['user']['name'], 'admin')
