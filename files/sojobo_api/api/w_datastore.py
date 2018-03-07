@@ -120,6 +120,7 @@ def get_user_info(username):
                             'access: cEdge.access, '
                             'models: models}) '
             'RETURN {name: u.name, '
+                    'juju_username: u.juju_username, '
                     'credentials: u.credentials, '
                     'ssh_keys: u.ssh_keys, '
                     'controllers: controllers} ')

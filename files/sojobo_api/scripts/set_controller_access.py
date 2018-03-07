@@ -39,7 +39,7 @@ async def set_controller_acc(c_name, username, acl):
         logger.info('Controller connection as admin was successful.')
 
         logger.info('Initializing facade...')
-        controller_facade = client.ControllerFacade.from_connection(controller_connection.connection())
+        controller_facade = client.ControllerFacade.from_connection(controller_connection.connection)
         juju_user = tag.user(user_ds["juju_username"])
 
         # Note that if the user already has higher permissions than the

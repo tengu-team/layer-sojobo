@@ -231,7 +231,7 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 
 async def disconnect(connection):
-    if connection.connection().is_open:
+    if connection.connection.is_open:
         await connection.disconnect()
 ###############################################################################
 # CONTROLLER FUNCTIONS
@@ -718,11 +718,14 @@ def add_user_to_controllers(data, username, password):
     Popen(["python3", "{}/scripts/add_user_to_controllers.py".format(settings.SOJOBO_API_DIR),data, username, password])
 
 
-async def change_user_password(token, username, password):
-    for con in get_keys_controllers():
-        controller = Controller_Connection(token, con)
-        async with controller.connect(token) as juju:  #pylint: disable=E1701
-            await juju.change_user_password(username, password)
+async def change_user_password(auth_data, password):
+    for controller in auth_data["user"]["controllers"]:
+        Popen(["python3", "{}/scripts/change_password.py".format(settings.SOJOBO_API_DIR), controller["name"], auth_data["juju_username"], password])
+
+    # for con in get_keys_controllers():
+    #     controller = Controller_Connection(token, con)
+    #     async with controller.connect(token) as juju:  #pylint: disable=E1701
+    #         await juju.change_user_password(username, password)
 
 
 def update_ssh_keys_user(user, ssh_keys):
@@ -763,7 +766,7 @@ def add_credential(user, data):
 
 async def update_cloud(controller, cloud, credential, username):
     credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
-    cloud_facade = client.CloudFacade.from_connection(controller.connection())
+    cloud_facade = client.CloudFacade.from_connection(controller.connection)
     cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential)
     cloud_cred = client.UpdateCloudCredential(
         client.CloudCredential(cred['key'], cred['type']),
@@ -890,6 +893,8 @@ def has_superuser_access_over_user(superuser, resource_user):
     """Checks if there is at least one controller where the given user has superuser
     access over the resource_user."""
     matching_controllers = datastore.get_superuser_matching_controllers(superuser, resource_user)
+    print("Matching controllers: ")
+    print(matching_controllers)
     return bool(matching_controllers)
 
 

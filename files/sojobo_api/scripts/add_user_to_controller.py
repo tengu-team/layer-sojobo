@@ -35,7 +35,7 @@ async def add_user_to_controller(username, password, controller, juju_username):
         controller_connection = Controller()
         await controller_connection.connect(endpoint=con['endpoints'][0], username=settings.JUJU_ADMIN_USER, password=settings.JUJU_ADMIN_PASSWORD, cacert=con['ca_cert'])
         logger.info('Controller connection as admin was successful')
-        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection())
+        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection)
         users = [client.AddUser(display_name=juju_username,
                                 username=juju_username,
                                 password=password)]
