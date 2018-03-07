@@ -40,7 +40,7 @@ async def delete_model(c_name, m_name, m_key, usr, pwd):
         await controller_connection.connect(endpoint=auth_data['controller']['endpoints'][0], username=usr, password=pwd, cacert=auth_data['controller']['ca_cert'])
 
         # Remove A Model
-        model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection())
+        model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
         await model_facade.DestroyModels([client.Entity(tag.model(m_name))])
 
         # Destroy modle from datastore

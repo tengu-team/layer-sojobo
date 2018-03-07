@@ -40,8 +40,9 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         controller_connection = Controller()
         await controller_connection.connect(endpoint=auth_data['controller']['endpoints'][0], username=auth_data['user']['juju_username'], password=pwd, cacert=auth_data['controller']['ca_cert'])
 
-        owner = controller_connection.connection().info['user-info']['identity']
         cloud_name = await controller_connection.get_cloud()
+        owner = tag.user(usr)
+        logger.info(owner, cloud_name)
         #Generate Tag for Credential
         credential_name = await controller_connection.add_credential(
             name=credential_name,
@@ -49,27 +50,21 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
             owner=owner)
         credential = tag.credential(
             cloud_name,
-            tag.untag('user-', owner),
+            usr,
             credential_name
         )
-        model_info = await controller_connection.add_model(
-            m_name,
-            cloud_name=cloud_name,
-            credential_name=credential_name
-        )
-        # config = {}
-        # config['authorized-keys'] = await utils.read_ssh_key(loop=controller_connection._connector.loop)
-        # #Create A Model
-        # model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection())
-        # model_info = await model_facade.CreateModel(
-        #     tag.cloud(cloud_name),
-        #     config,
-        #     credential,
-        #     m_name,
-        #     owner
-        # )
+        logger.info(credential_name, credential)
+        #model_info = await controller_connection.add_model(m_name)
+        config = {}
+        config['authorized-keys'] = await utils.read_ssh_key(loop=controller_connection._connector.loop)
+        logger.info(config)
+
+        #Create A Model
+        model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
+        model_info = await model_facade.CreateModel(tag.cloud(cloud_name),config,credential, m_name, owner,auth_data['controller']['region'])
         logger.info('%s -> Connected to model', m_name)
         #Connect to created Model
+
         model = Model(jujudata=controller_connection._connector.jujudata)
         kwargs = controller_connection.connection.connect_params()
         kwargs['uuid'] = model_info.uuid
@@ -82,8 +77,8 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         datastore.set_model_state(m_key, 'ready', cred_name, model.info.uuid)
 
         # Generate Facades for new model
-        key_facade = client.KeyManagerFacade.from_connection(model.connection())
-        model_facade = client.ModelManagerFacade.from_connection(model.connection())
+        key_facade = client.KeyManagerFacade.from_connection(model.connection)
+        model_facade = client.ModelManagerFacade.from_connection(model.connection)
 
         # Add SSH-keys for owner
         logger.info('%s -> Adding ssh-keys to model: %s', m_name, m_name)
@@ -115,8 +110,10 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
             logger.error(l)
         datastore.set_model_state(m_key, 'error: {}'.format(lines))
     finally:
-        await juju.disconnect(controller_connection)
-        await juju.disconnect(model)
+        if controller_connection in locals():
+            await juju.disconnect(controller_connection)
+            if model in locals():
+                await juju.disconnect(model)
 
 
 if __name__ == '__main__':
