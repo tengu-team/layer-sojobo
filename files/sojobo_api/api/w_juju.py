@@ -124,7 +124,7 @@ async def authenticate(api_key, auth, data, controller=None, model=None):
             elif data['controller']['state'] == 'ready':
                 await connect_to_random_controller(auth)
                 add_user_to_controllers(data, auth.username, auth.password)
-                abort(501, 'User {} is being added to the {} environment'.format(data['controller']['name'], data['user']['name']))
+                abort(409, 'User {} is being added to the {} environment'.format(data['controller']['name'], data['user']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
     else:
@@ -767,7 +767,7 @@ def add_credential(user, data):
 
 async def update_cloud(controller, cloud, credential, username):
     credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
-    cloud_facade = client.CloudFacade.from_connection(controller.connection())
+    cloud_facade = client.CloudFacade.from_connection(controller.connection)
     cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential)
     cloud_cred = client.UpdateCloudCredential(
         client.CloudCredential(cred['key'], cred['type']),
