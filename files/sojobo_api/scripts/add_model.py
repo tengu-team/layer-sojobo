@@ -18,7 +18,7 @@ import sys
 import traceback
 import logging
 import hashlib
-from juju import tag
+from juju import tag, utils, errors
 from juju.client import client
 from juju.model import Model
 from juju.controller import Controller
@@ -33,43 +33,48 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
     try:
         # Get required information from database
         auth_data = datastore.get_controller_connection_info(usr, c_name)
-        print(usr, auth_data)
         credential_name = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
-        auth_data['user']['juju_user_name']=usr
 
         #Controller_Connection
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller_connection = Controller()
-        await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_user_name'], pwd, auth_data['controller']['ca_cert'])
+        await controller_connection.connect(endpoint=auth_data['controller']['endpoints'][0], username=auth_data['user']['juju_username'], password=pwd, cacert=auth_data['controller']['ca_cert'])
 
+        owner = controller_connection.connection().info['user-info']['identity']
+        cloud_name = await controller_connection.get_cloud()
         #Generate Tag for Credential
         credential_name = await controller_connection.add_credential(
-                name=credential_name,
-                cloud=auth_data['controller']['type'],
-                owner=auth_data['user']['juju_user_name'])
+            name=credential_name,
+            cloud=cloud_name,
+            owner=owner)
         credential = tag.credential(
-                auth_data['controller']['type'],
-                tag.untag('user-', auth_data['user']['juju_user_name']),
-                credential_name
-            )
-
-        #Create A Model
-        model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
-        model_info = await model_facade.CreateModel(
-            tag.cloud(auth_data['controller']['type']),
-            {},
-            credential,
-            m_name,
-            auth_data['user']['juju_user_name'],
-            auth_data['controller']['region']
+            cloud_name,
+            tag.untag('user-', owner),
+            credential_name
         )
-
+        model_info = await controller_connection.add_model(
+            m_name,
+            cloud_name=cloud_name,
+            credential_name=credential_name
+        )
+        # config = {}
+        # config['authorized-keys'] = await utils.read_ssh_key(loop=controller_connection._connector.loop)
+        # #Create A Model
+        # model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection())
+        # model_info = await model_facade.CreateModel(
+        #     tag.cloud(cloud_name),
+        #     config,
+        #     credential,
+        #     m_name,
+        #     owner
+        # )
+        logger.info('%s -> Connected to model', m_name)
         #Connect to created Model
         model = Model(jujudata=controller_connection._connector.jujudata)
         kwargs = controller_connection.connection.connect_params()
         kwargs['uuid'] = model_info.uuid
         await model._connect_direct(**kwargs)
-        model = tag.model(model_uuid)
+        model = tag.model(model_info.uuid)
         logger.info('%s -> model deployed on juju', m_name)
 
         # Set Datastore information for creator
@@ -77,14 +82,14 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         datastore.set_model_state(m_key, 'ready', cred_name, model.info.uuid)
 
         # Generate Facades for new model
-        key_facade = client.KeyManagerFacade.from_connection(model.connection)
-        model_facade = client.ModelManagerFacade.from_connection(model.connection)
+        key_facade = client.KeyManagerFacade.from_connection(model.connection())
+        model_facade = client.ModelManagerFacade.from_connection(model.connection())
 
         # Add SSH-keys for owner
         logger.info('%s -> Adding ssh-keys to model: %s', m_name, m_name)
         for key in auth_data['user']['ssh-keys']:
             try:
-                key_facade.AddKeys([key], user)
+                key_facade.AddKeys([key], auth_data['user'])
             except (JujuAPIError, JujuError):
                 pass
 
@@ -102,20 +107,16 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
                         key_facade.AddKeys([key], u['name'])
                     except (JujuAPIError, JujuError):
                         pass
-
-        # Disconnect with any open connection to JUJU
-        await model.disconnect()
-        await controller_connection.disconnect()
         logger.info('%s -> succesfully deployed model', m_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
-        if 'model' in locals():
-            datastore.set_model_state(m_key, 'ready', cred_name, model.info.uuid)
-        else:
-            datastore.set_model_state(m_key, 'error: {}'.format(lines))
+        datastore.set_model_state(m_key, 'error: {}'.format(lines))
+    finally:
+        await juju.disconnect(controller_connection)
+        await juju.disconnect(model)
 
 
 if __name__ == '__main__':
@@ -131,8 +132,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    try:
-        loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[3],
-                                             sys.argv[4], sys.argv[5], sys.argv[6]))
-    finally:
-        loop.close()
+    loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[3],sys.argv[4], sys.argv[5], sys.argv[6]))
+    loop.close()

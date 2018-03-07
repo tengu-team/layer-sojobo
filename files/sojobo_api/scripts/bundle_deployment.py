@@ -26,6 +26,7 @@ import yaml
 import json
 from juju.model import Model
 sys.path.append('/opt')
+from sojobo_api import settings
 from sojobo_api.api import w_datastore as datastore
 ################################################################################
 # Helper Functions
@@ -35,7 +36,7 @@ def quoted_presenter(dumper, data):
 ################################################################################
 # Async Functions
 ################################################################################
-async def deploy_bundle(username, password, controller_name, m_key, bundle):
+async def deploy_bundle(username, password, c_name, m_name, bundle):
     try:
         logger.info('Authenticated and starting bundle deployment!')
         dirpath = tempfile.mkdtemp()
@@ -71,7 +72,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('bundle_deployment')
-    hdlr = logging.FileHandler('{}/log/bundle_deployment.log'.format(sys.argv[3]))
+    hdlr = logging.FileHandler('{}/log/bundle_deployment.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -80,6 +81,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(deploy_bundle(sys.argv[1], sys.argv[2], sys.argv[4],
-                                          sys.argv[5], sys.argv[6]))
+    loop.run_until_complete(deploy_bundle(sys.argv[1], sys.argv[2], sys.argv[3],
+                                          sys.argv[4], sys.argv[5]))
     loop.close()

@@ -13,57 +13,63 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
-import logging
 import sys
 import traceback
+import logging
+import hashlib
+from juju import tag
 from juju.client import client
+from juju.model import Model
 from juju.controller import Controller
+from juju.errors import JujuAPIError, JujuError
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
-################################################################################
-# Async method
-################################################################################
-async def add_user_to_controller(username, password, controller, juju_username):
+
+
+async def delete_model(c_name, m_name, m_key, usr, pwd):
     try:
-        logger.info('adding user %s to controller %s', username, controller)
-        con = datastore.get_controller(controller)
-        logger.info('Setting up Controllerconnection for %s', con['name'])
+        # Get required information from database
+        auth_data = datastore.get_controller_connection_info(usr, c_name)
+
+        # Controller_Connection
+        logger.info('Setting up Controllerconnection for %s', c_name)
         controller_connection = Controller()
-        await controller_connection.connect(endpoint=con['endpoints'][0], username=settings.JUJU_ADMIN_USER, password=settings.JUJU_ADMIN_PASSWORD, cacert=con['ca_cert'])
-        logger.info('Controller connection as admin was successful')
-        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection())
-        users = [client.AddUser(display_name=juju_username,
-                                username=juju_username,
-                                password=password)]
-        await user_facade.AddUser(users)
-        datastore.add_user_to_controller(con['name'], username, 'login')
-        logger.info('Succesfully added user %s to controller %s', username, con['name'])
-        datastore.set_user_state(username, 'ready')
+        await controller_connection.connect(endpoint=auth_data['controller']['endpoints'][0], username=usr, password=pwd, cacert=auth_data['controller']['ca_cert'])
+
+        # Remove A Model
+        model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection())
+        await model_facade.DestroyModels([client.Entity(tag.model(m_name))])
+
+        # Destroy modle from datastore
+        datastore.delete_model(c_name, m_key)
+
+        logger.info('%s -> succesfully Destroyed model', m_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+        datastore.set_model_state(m_key, 'error: {}'.format(lines))
     finally:
         await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger('add_user_to_controller')
+    logger = logging.getLogger('delete_model')
     ws_logger = logging.getLogger('websockets.protocol')
-    hdlr = logging.FileHandler('{}/log/add_user_to_controller.log'.format(settings.SOJOBO_API_DIR))
+    hdlr = logging.FileHandler('{}/log/delete_model.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
+    logger.addHandler(hdlr)
     ws_logger.addHandler(hdlr)
     ws_logger.setLevel(logging.DEBUG)
-    logger.addHandler(hdlr)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     loop = asyncio.get_event_loop()
-    loop.set_debug(False)
-    loop.run_until_complete(add_user_to_controller(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]))
+    loop.set_debug(True)
+    loop.run_until_complete(delete_model(sys.argv[1], sys.argv[2], sys.argv[3],
+                                             sys.argv[4], sys.argv[5]))
     loop.close()

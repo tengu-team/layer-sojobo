@@ -42,7 +42,7 @@ def execute_aql_query(aql, rawResults=False, **bindings):
 #                                USER FUNCTIONS                                #
 ################################################################################
 def create_user(username, juju_username):
-    user = {"_key": hashlib.md5(username.encode('utf')).hexdigest(),
+    user = {"_key": hash_username(username),
             "name": username,
             "juju_username": juju_username,
             "ssh_keys": [],
@@ -53,14 +53,14 @@ def create_user(username, juju_username):
 
 
 def user_exists(username):
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = 'RETURN DOCUMENT("users", @u_id)'
     user = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
     return user is not None
 
 def get_user(username):
     """Returns the dict of a user."""
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = 'RETURN DOCUMENT(@u_id)'
     return execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
@@ -74,7 +74,7 @@ def get_user_doc(username):
     # TODO: If credential methods work with AQL then this function becomes obsolete.
     """Returns the Document of a user."""
     aql = 'FOR u IN users FILTER u._key == @username RETURN u'
-    return  execute_aql_query(aql, username=username)[0]
+    return  execute_aql_query(aql, username=hash_username(username))[0]
 
 
 def get_users_info():
@@ -106,9 +106,7 @@ def get_users_info():
 def get_user_info(username):
     """Returns info of the given user, including which controllers and models
     that the user has access to."""
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
-    print("datastore debug==================")
-    print(u_id)
+    u_id = get_user_id(username)
     aql = ('LET u = DOCUMENT(@user) '
            'LET controllers = '
                 '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
@@ -129,25 +127,25 @@ def get_user_info(username):
 
 
 def get_user_state(username):
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.state'
     return  execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 
 def set_user_state(username, state):
     aql = 'UPDATE {_key: @username, state: @state} IN users'
-    execute_aql_query(aql, username=hashlib.md5(username.encode('utf')).hexdigest(), state=state)
+    execute_aql_query(aql, username=hash_username(username), state=state)
 
 
 def get_ssh_keys(username):
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.ssh_keys'
     return  execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 
 def update_ssh_keys(username, ssh_keys):
     aql = 'UPDATE {_key: @username, ssh_keys: @ssh} IN users'
-    execute_aql_query(aql, username=hashlib.md5(username.encode('utf')).hexdigest(), ssh=ssh_keys)
+    execute_aql_query(aql, username=hash_username(username), ssh=ssh_keys)
 
 
 def delete_user(username):
@@ -160,12 +158,12 @@ def delete_user(username):
 def remove_user_u_col(username):
     """Removes the user from the collection 'users'."""
     aql = 'REMOVE {_key: @username} IN users'
-    execute_aql_query(aql, username=hashlib.md5(username.encode('utf')).hexdigest())
+    execute_aql_query(aql, username=hash_username(username))
 
 
 def remove_user_c_access(username):
     """Removes every Edge from controllerAccess that contains given user."""
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = ('FOR edge in controllerAccess '
            'FILTER edge._to == @u_id '
            'REMOVE edge in controllerAccess')
@@ -174,7 +172,7 @@ def remove_user_c_access(username):
 
 def remove_user_m_access(username):
     """Removes every Edge from modelAccess that contains given user."""
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = ('FOR edge in modelAccess '
            'FILTER edge._to == @u_id '
            'REMOVE edge in modelAccess')
@@ -185,14 +183,14 @@ def remove_user_m_access(username):
 #                           CREDENTIAL FUNCTIONS                               #
 ################################################################################
 def get_credentials(username):
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     result = []
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
     output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
     return output
 
 def get_credential_keys(username):
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
     output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
     return [i['name'] for i in output]
@@ -205,7 +203,7 @@ def get_credential(username, cred_name):
 
 
 def get_credential_id(username, cred_name):
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql =('LET u = DOCUMENT(@u_id) '
           'FOR cred in u.credentials '
           'FILTER cred.name == @cred_name '
@@ -222,7 +220,7 @@ def add_credential(username, cred):
 
 
 def update_user_credential(username, cred):
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = ('LET doc = DOCUMENT(@u_id) '
            'UPDATE doc WITH {'
            'credentials: PUSH(doc.credentials, @credential, true)'
@@ -232,7 +230,6 @@ def update_user_credential(username, cred):
 
 def set_credential_ready(username, cred_name):
     c_id = "credentials/{}".format(get_credential_id(username, cred_name))
-    print(c_id)
     aql = ('LET u = DOCUMENT(@c_id) '
            'UPDATE u WITH { '
            'state: "ready"} in credentials')
@@ -241,9 +238,9 @@ def set_credential_ready(username, cred_name):
 
 def remove_credential(username, cred_name):
     c_id = get_credential_id(username, cred_name)
+    u_id = get_user_id(username)
     u_aql = 'REMOVE {_key: @c_id} IN credentials'
-    execute_aql_query(u_aql, username=hashlib.md5(username.encode('utf')).hexdigest())
-    u_id = u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    execute_aql_query(u_aql, c_id=c_id)
     credential = {'name': cred_name, 'key': c_id}
     aql = ('LET u = DOCUMENT(@u_id) '
            'UPDATE doc WITH { '
@@ -300,7 +297,6 @@ def get_controller(c_name):
     """Returns the dict of a controller."""
     c_id = "controllers/" + c_name
     aql = 'RETURN DOCUMENT(@c_id)'
-    # TODO: Is [0] nodig?
     return execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
 
 
@@ -353,7 +349,7 @@ def get_users_controller(c_name):
 
 
 def get_controllers_access(username):
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = ('FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
              'LET models = '
                '(FOR model, mEdge in 1..1 INBOUND @u_id modelAccess '
@@ -374,7 +370,7 @@ def get_controllers_access(username):
 def add_user_to_controller(c_name, username, access):
     """Creates or updates an Edge (relation) between a controller and a user."""
     c_id = "controllers/" + c_name
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = ("UPSERT { _from: @controller, _to: @user }"
            "INSERT { _from: @controller, _to: @user, access: @access}"
            "UPDATE { access : @access } in controllerAccess")
@@ -438,7 +434,7 @@ def add_model_to_controller(c_name, m_key):
 def get_controller_access(c_name, username):
     """Returns the access level that a user has to a controller."""
     c_id = "controllers/" + c_name
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess  '
                'FILTER cEdge._from == @c_id '
                'RETURN cEdge.access ')
@@ -449,7 +445,7 @@ def get_controller_and_access(c_name, username):
     """Returns info about the controller AND the access level of the given user
     in one dictionary."""
     c_id = "controllers/" + c_name
-    u_id = "users/" + hashlib.md5(username.encode('utf')).hexdigest()
+    u_id = get_user_id(username)
     aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess  '
                'FILTER cEdge._from == @c_id '
                'LET models = '
@@ -464,7 +460,7 @@ def get_controller_and_access(c_name, username):
 
 def set_controller_access(c_name, username, access):
     c_id = "controllers/" + c_name
-    u_id = "users/" + username
+    u_id = get_user_id(username)
     aql = ("UPSERT { _from: @c_id, _to: @u_id }"
            "INSERT { _from: @c_id, _to: @u_id, access: @access}"
            "UPDATE { access : @access } in controllerAccess")
@@ -474,7 +470,7 @@ def set_controller_access(c_name, username, access):
 def get_superuser_matching_controllers(user, resource_user):
     """Get controllers where the given user has superuser access and where
     the resource_user resides."""
-    u_id = "users/" + user
+    u_id = get_user_id(user)
     ru_id = "users/" + resource_user
     aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess '
                 'FILTER cEdge.access == "superuser" '
@@ -581,7 +577,7 @@ def get_model_state(m_key):
 
 def get_model_access(c_name, m_name, username):
     c_id = "controllers/" + c_name
-    u_id = "users/" + username
+    u_id = get_user_id(username)
     aql = ('LET c = DOCUMENT(@controller) '
            'FOR model, mEdge in 1..1 INBOUND @user modelAccess '
                 'FILTER model._key in c.models '
@@ -593,7 +589,7 @@ def get_model_access(c_name, m_name, username):
 
 
 def get_models_access(c_name, username):
-    u_id = "users/" + username
+    u_id = get_user_id(username)
     c_id = "controllers/" + c_name
     aql = ('LET c = DOCUMENT(@controller) '
            'LET models = '
@@ -605,7 +601,7 @@ def get_models_access(c_name, username):
 
 def set_model_access(m_key, username, access):
     m_id = "models/" + m_key
-    u_id = "users/" + username
+    u_id = get_user_id(username)
     aql = ("UPSERT { _from: @model, _to: @user }"
            "INSERT { _from: @model, _to: @user, access: @access}"
            "UPDATE { access : @access } in modelAccess")
@@ -624,7 +620,7 @@ def get_users_model(m_key):
 
 
 def get_controller_connection_info(username, c_name):
-    u_id = "users/" + username
+    u_id = get_user_id(username)
     c_id = "controllers/" + c_name
     aql = ("LET user = DOCUMENT(@u_id) "
            "LET controller = DOCUMENT(@c_id) "
@@ -637,7 +633,7 @@ def get_controller_connection_info(username, c_name):
 
 
 def get_model_connection_info(username, c_name, m_key):
-    u_id = "users/" + username
+    u_id = get_user_id(username)
     c_id = "controllers/" + c_name
     m_id = "models/" + m_key
     aql = ("LET user = DOCUMENT(@u_id) "
@@ -652,3 +648,9 @@ def get_model_connection_info(username, c_name, m_key):
                     "RETURN mEdge.access)) "
            "RETURN {user, controller, c_access, m_access}")
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id, m_id=m_id)[0]
+
+def hash_username(username):
+    return hashlib.md5(username.encode('utf')).hexdigest()
+
+def get_user_id(username):
+    return "users/" + hash_username(username)
