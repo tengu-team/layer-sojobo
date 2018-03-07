@@ -72,11 +72,11 @@ def get_users_info():
     try:
         LOGGER.info('/USERS [GET] => receiving call')
         auth_data = juju.get_connection_info(request.authorization)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS [GET] => Authenticated!')
         if juju.check_if_admin(request.authorization):
-            print(token)
-            code, response = 200, juju.get_users_info(token['user'])
+            print(connection)
+            code, response = 200, juju.get_users_info(connection['user'])
             LOGGER.info('/USERS [GET] => Succesfully retieved all users!')
         else:
             code, response = errors.no_permission()
@@ -137,7 +137,7 @@ def create_user():
 
 @USERS.route('/<user>', methods=['GET'])
 def get_user_info(user):
-    # TODO: TEST! With superuser!
+    # TODO: TEST! With superuser! First controller-access change must be possible.
     try:
         LOGGER.info('/USERS/%s [GET] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
@@ -167,6 +167,7 @@ def get_user_info(user):
 
 @USERS.route('/<user>', methods=['PUT'])
 def change_user_password(user):
+    # TODO: Test. (low priority)
     try:
         LOGGER.info('/USERS/%s [PUT] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
@@ -495,14 +496,14 @@ def get_ucontroller_access(user, controller):
 def grant_to_controller(user, controller):
     try:
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => receiving call', user, controller)
-        auth_data = juju.get_connection_info(request.authorization.username)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = juju.get_connection_info(request.authorization, controller)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authenticated!', user, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authorized!', user, controller)
-        if juju.authorize(auth_data, '/users/user/controllers/controller', 'get', resource_user=user):
+        if juju.authorize(auth_data, '/users/user/controllers/controller', 'put'):
             if juju.user_exists(user):
                 if request.json['access'] and juju.c_access_exists(request.json['access'].lower()):
-                    juju.grant_user_to_controller(token, con, user, request.json['access'].lower())
+                    juju.grant_user_to_controller(controller, user, request.json['access'].lower())
                     LOGGER.info('/USERS/%s/controllers/%s [PUT] => Changing user access, check set_controller_access.log for more information!', user, controller)
                     code, response = 202, 'The user\'s access is being changed'
                 else:
@@ -514,16 +515,20 @@ def grant_to_controller(user, controller):
         else:
             LOGGER.error('/USERS/%s/controllers/%s [PUT] => No Permission to perform this action', user, controller)
             code, response = errors.no_permission()
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+    finally:
+        execute_task(juju.disconnect, connection)
 
 
 @USERS.route('/<user>/controllers/<controller>/models', methods=['GET'])

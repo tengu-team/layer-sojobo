@@ -201,7 +201,7 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
     superuser on a controller where resource_user resides. 'resource_user' is
     only needed for User API calls."""
 
-    # admin has authorization in every situation.
+    # Admin has authorization in every situation.
     if connection_info["user"]["name"] == settings.JUJU_ADMIN_USER:
         return True
     elif self_user == connection_info["user"]["username"]:
@@ -785,9 +785,9 @@ def credential_exists(user, credential):
    return False
 
 
-def grant_user_to_controller(token, controller, user, access):
+def grant_user_to_controller(c_name, username, access):
     Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
-           controller.c_name, access, settings.SOJOBO_API_DIR, user])
+           c_name, username, access, settings.SOJOBO_API_DIR])
 
 
 async def controller_grant(token, controller, username, access):
