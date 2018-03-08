@@ -129,8 +129,6 @@ def create_user():
         ers = error_log()
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
-    finally:
-        execute_task(juju.disconnect, connection)
 
 
 @USERS.route('/<user>', methods=['GET'])
@@ -163,25 +161,20 @@ def get_user_info(user):
         ers = error_log()
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
-    finally:
-        execute_task(juju.disconnect, connection)
 
 
 @USERS.route('/<user>', methods=['PUT'])
 def change_user_password(user):
-    # TODO: Test. (low priority)
     try:
         LOGGER.info('/USERS/%s [PUT] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
-        print("AUTH DATA")
-        print(auth_data)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [PUT] => Authenticated!', user)
         if juju.authorize(auth_data, '/users/user', 'put', self_user=user):
             if juju.user_exists(user):
                 pwd = request.json['password']
                 if pwd:
-                    execute_task(juju.change_user_password, auth_data, pwd)
+                    juju.change_user_password(auth_data["user"]["controllers"], user, pwd)
                     code, response = 200, 'Succesfully changed password for user {}'.format(user)
                     LOGGER.info('/USERS/%s [PUT] => Succesfully changed password for user %s!', user, user)
                 else:
@@ -205,8 +198,6 @@ def change_user_password(user):
         ers = error_log()
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
-    finally:
-        execute_task(juju.disconnect, connection)
 
 
 @USERS.route('/<user>', methods=['DELETE'])

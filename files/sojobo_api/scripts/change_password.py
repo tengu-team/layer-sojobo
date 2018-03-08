@@ -25,17 +25,15 @@ sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
-async def change_password(c_name, juju_username, password):
-    try:
-        controller_ds = datastore.get_controller(c_name)
-        #user_ds = datastore.get_user(username)
 
-        logger.info('Setting up Controller connection for %s.', controller_ds['name'])
+async def change_password(c_name, endpoint, ca_cert, juju_username, password):
+    try:
+        logger.info('Setting up Controller connection for %s.', c_name)
         controller_connection = Controller()
-        await controller_connection.connect(endpoint=controller_ds['endpoints'][0],
+        await controller_connection.connect(endpoint=endpoint,
                                             username=settings.JUJU_ADMIN_USER,
                                             password=settings.JUJU_ADMIN_PASSWORD,
-                                            cacert=controller_ds['ca_cert'])
+                                            cacert=ca_cert)
         logger.info('Controller connection as admin was successful.')
 
         logger.info('Initializing user manager facade...')
@@ -68,6 +66,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    result = loop.run_until_complete(set_controller_acc(sys.argv[1], sys.argv[2],
-                                                        sys.argv[3]))
+    result = loop.run_until_complete(change_password(sys.argv[1], sys.argv[2],
+                                                     sys.argv[3], sys.argv[4],
+                                                     sys.argv[5]))
     loop.close()

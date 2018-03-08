@@ -31,6 +31,9 @@ async def add_user_to_controller(username, password, controller, juju_username):
     try:
         logger.info('adding user %s to controller %s', username, controller)
         con = datastore.get_controller(controller)
+        print("DEGBUUGGING")
+        print(controller)
+        print(con)
         logger.info('Setting up Controllerconnection for %s', con['name'])
         controller_connection = Controller()
         await controller_connection.connect(endpoint=con['endpoints'][0], username=settings.JUJU_ADMIN_USER, password=settings.JUJU_ADMIN_PASSWORD, cacert=con['ca_cert'])
@@ -49,7 +52,7 @@ async def add_user_to_controller(username, password, controller, juju_username):
         for l in lines:
             logger.error(l)
     finally:
-        await juju.disconnect(controller_connection)
+        await controller_connection.disconnect()
 
 
 if __name__ == '__main__':

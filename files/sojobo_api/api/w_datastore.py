@@ -82,20 +82,13 @@ def get_users_info():
     that the users have access to."""
     aql = ('FOR u in users '
                'LET controllers = '
-                    '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
-                        'LET models = '
-                            '(FOR model, mEdge in 1..1 INBOUND u._id modelAccess '
-                                'FILTER model._key in controller.models '
-                                'RETURN {name: model.name, '
-                                        'access: mEdge.access}) '
-                        'RETURN {name: controller.name, '
-                                'type: controller.type, '
-                                'access: cEdge.access, '
-                                'models: models}) '
-                'RETURN {name: u.name, '
-                        'credentials: u.credentials, '
-                        'ssh_keys: u.ssh_keys, '
-                        'controllers: controllers} ')
+                   '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
+                       'LET models = '
+                           '(FOR model, mEdge in 1..1 INBOUND u._id modelAccess '
+                               'FILTER model._key in controller.models '
+                               'RETURN MERGE(model, {access: mEdge.access})) '
+                       'RETURN MERGE(controller, { access: cEdge.access, models: models})) '
+               'RETURN MERGE(u, {controllers: controllers})')
     users = execute_aql_query(aql, rawResults=True)
     results = []
     for u in users:
@@ -107,24 +100,16 @@ def get_user_info(username):
     """Returns info of the given user, including which controllers and models
     that the user has access to."""
     u_id = get_user_id(username)
-    aql = ('LET u = DOCUMENT(@user) '
-           'LET controllers = '
+    aql = ( 'LET u = DOCUMENT(@user) '
+            'LET controllers = '
                 '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
                     'LET models = '
                         '(FOR model, mEdge in 1..1 INBOUND u._id modelAccess '
                             'FILTER model._key in controller.models '
-                            'RETURN {name: model.name, '
-                                    'access: mEdge.access}) '
-                    'RETURN {name: controller.name, '
-                            'type: controller.type, '
-                            'access: cEdge.access, '
-                            'models: models}) '
-            'RETURN {name: u.name, '
-                    'juju_username: u.juju_username, '
-                    'credentials: u.credentials, '
-                    'ssh_keys: u.ssh_keys, '
-                    'controllers: controllers} ')
-    return  execute_aql_query(aql, rawResults=True, user=u_id)[0]
+                            'RETURN MERGE(model, {access: mEdge.access})) '
+                    'RETURN MERGE(controller, { access: cEdge.access, models: models})) '
+            'RETURN MERGE(u, {controllers: controllers})')
+    return execute_aql_query(aql, rawResults=True, user=u_id)[0]
 
 
 def get_user_state(username):

@@ -718,18 +718,29 @@ def delete_user(username):
     for controller in controllers:
         Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR), username, controller['name']])
 
+
 def add_user_to_controllers(data, username, password):
     Popen(["python3", "{}/scripts/add_user_to_controllers.py".format(settings.SOJOBO_API_DIR),data, username, password])
 
 
-async def change_user_password(auth_data, password):
-    for controller in auth_data["user"]["controllers"]:
-        Popen(["python3", "{}/scripts/change_password.py".format(settings.SOJOBO_API_DIR), controller["name"], auth_data["juju_username"], password])
+def change_user_password(controllers, username, password):
+    user = datastore.get_user_info(username)
+    juju_username = user["juju_username"]
 
-    # for con in get_keys_controllers():
-    #     controller = Controller_Connection(token, con)
-    #     async with controller.connect(token) as juju:  #pylint: disable=E1701
-    #         await juju.change_user_password(username, password)
+    # A user its password is changed on all the controllers where the user resides.
+    # We only change the password if all controllers are ready, to avoid problems.
+    # This is a temporary solution until something better is found.
+    for controller in user["controllers"]:
+        if controller["state"] != "ready":
+            abort(403, """The password for user {} cannot be changed because not all controllers are ready yet.
+                          Please wait a few minutes before you try again.""".format(username))
+
+    for controller in user["controllers"]:
+        c_name = controller["name"]
+        endpoint = controller['endpoints'][0]
+        ca_cert = controller['ca_cert']
+        Popen(["python3", "{}/scripts/change_password.py".format(settings.SOJOBO_API_DIR),
+                c_name, endpoint, ca_cert, juju_username, password])
 
 
 def update_ssh_keys_user(user, ssh_keys):
@@ -793,8 +804,13 @@ def credential_exists(user, credential):
 
 
 def grant_user_to_controller(c_name, username, access):
+    controller_ds = datastore.get_controller(c_name)
+    user_ds = datastore.get_user(username)
+    endpoint = controller_ds['endpoints'][0]
+    cacert= controller_ds['ca_cert']
+    juju_username = user_ds["juju_username"]
     Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
-           c_name, username, access, settings.SOJOBO_API_DIR])
+           c_name, username, access, endpoint, cacert, juju_username])
 
 
 async def controller_grant(token, controller, username, access):

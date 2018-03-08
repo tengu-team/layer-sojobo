@@ -25,22 +25,20 @@ sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
-async def set_controller_acc(c_name, username, acl):
-    try:
-        controller_ds = datastore.get_controller(c_name)
-        user_ds = datastore.get_user(username)
 
-        logger.info('Setting up Controller connection for %s.', controller_ds['name'])
+async def set_controller_acc(c_name, username, acl, endpoint, cacert, juju_username):
+    try:
+        logger.info('Setting up Controller connection for %s.', c_name)
         controller_connection = Controller()
-        await controller_connection.connect(endpoint=controller_ds['endpoints'][0],
+        await controller_connection.connect(endpoint=endpoint,
                                             username=settings.JUJU_ADMIN_USER,
                                             password=settings.JUJU_ADMIN_PASSWORD,
-                                            cacert=controller_ds['ca_cert'])
+                                            cacert=cacert)
         logger.info('Controller connection as admin was successful.')
 
         logger.info('Initializing facade...')
         controller_facade = client.ControllerFacade.from_connection(controller_connection.connection)
-        juju_user = tag.user(user_ds["juju_username"])
+        juju_user = tag.user(juju_username)
 
         # Note that if the user already has higher permissions than the
         # provided ACL, this will do nothing so first we need to revoke access.
@@ -99,7 +97,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('set_controller_access')
-    hdlr = logging.FileHandler('{}/log/set_controller_access.log'.format(sys.argv[4]))
+    hdlr = logging.FileHandler('{}/log/set_controller_access.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -109,5 +107,6 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
     result = loop.run_until_complete(set_controller_acc(sys.argv[1], sys.argv[2],
-                                                        sys.argv[3]))
+                                                        sys.argv[3], sys.argv[4],
+                                                        sys.argv[5], sys.argv[6]))
     loop.close()
