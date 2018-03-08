@@ -32,29 +32,31 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: di
 async def delete_model(c_name, m_name, m_key, usr, pwd):
     try:
         # Get required information from database
-        auth_data = datastore.get_controller_connection_info(usr, c_name)
+        auth_data = datastore.get_model_connection_info(usr, c_name, m_key)
+        logger.info(auth_data)
 
         # Controller_Connection
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller_connection = Controller()
-        await controller_connection.connect(endpoint=auth_data['controller']['endpoints'][0], username=usr, password=pwd, cacert=auth_data['controller']['ca_cert'])
+        await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], pwd, auth_data['controller']['ca_cert'])
 
         # Remove A Model
         model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
-        await model_facade.DestroyModels([client.Entity(tag.model(m_name))])
+        await model_facade.DestroyModels([client.Entity(tag.model(auth_data['model']['uuid']))])
 
         # Destroy modle from datastore
         datastore.delete_model(c_name, m_key)
-
+        await controller_connection.disconnect()
         logger.info('%s -> succesfully Destroyed model', m_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
-        datastore.set_model_state(m_key, 'error: {}'.format(lines))
+        #datastore.set_model_state(m_key, 'deleting with error: {}'.format(lines))
     finally:
-        await juju.disconnect(controller_connection)
+        if 'controller_connection' in locals():
+            await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':

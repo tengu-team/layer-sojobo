@@ -97,34 +97,35 @@ def check_constraints(data):
             abort(error[0], error[1])
 
 
-async def authenticate(api_key, auth, data, controller=None, model=None):
+async def authenticate(api_key, authorization, auth_data, controller=None, model=None):
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
         if not controller and not model:
-            if check_if_admin(auth):
-                return data
+            if check_if_admin(authorization):
+                return True
             elif len(datastore.get_all_controllers()) == 0:
                 abort(error[0], error[1])
             else:
-                await connect_to_random_controller(auth)
-                return data
+                await connect_to_random_controller(authorization, auth_data)
+                return True
         try:
-            check_controller_state(data, auth)
-            check_user_state(data)
-            if data['c_access']:
+            check_controller_state(auth_data, authorization)
+            check_user_state(auth_data)
+            check_user_state(auth_data)
+            if auth_data['c_access']:
                 if controller and not model:
                     controller_connection = Controller()
-                    await controller_connection.connect(endpoint=data['controller']['endpoints'][0], username=auth.username, password=auth.password, cacert=data['controller']['ca_cert'])
+                    await controller_connection.connect(auth_data['controller']['endpoints'][0], authorization.username, authorization.password, auth_data['controller']['ca_cert'])
                     return controller_connection
                 elif model:
-                    check_model_state(data)
+                    check_model_state(auth_data)
                     model_connection = Model()
-                    await model_connection.connect(endpoint=data['controller']['endpoints'][0], uuid=data['model']['uuid'], username=auth.username, password=auth.password, cacert=data['controller']['ca_cert'])
+                    await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], authorization.username, authorization.password, auth_data['controller']['ca_cert'])
                     return model_connection
-            elif data['controller']['state'] == 'ready':
-                await connect_to_random_controller(auth)
-                add_user_to_controllers(data, auth.username, auth.password)
-                abort(409, 'User {} is being added to the {} environment'.format(data['controller']['name'], data['user']['name']))
+            elif auth_data['controller']['state'] == 'ready':
+                await connect_to_random_controller(authorization)
+                add_user_to_controllers(auth_data, authorization.username, authorization.password)
+                abort(409, 'User {} is being added to the {} environment'.format(auth_data['controller']['name'], auth_data['user']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
     else:
@@ -135,7 +136,7 @@ def check_if_admin(auth):
     return auth.username == settings.JUJU_ADMIN_USER and auth.password == settings.JUJU_ADMIN_PASSWORD
 
 
-async def connect_to_random_controller(authorization):
+async def connect_to_random_controller(authorization, auth_data):
     error = errors.unauthorized()
     try:
         ready_controllers = datastore.get_all_ready_controllers()
@@ -144,38 +145,47 @@ async def connect_to_random_controller(authorization):
         else:
             con = ready_controllers[randint(0, len(ready_controllers) - 1)]
             controller_connection = Controller()
-            await controller_connection.connect(endpoint=con['endpoints'][0], username=authorization.username,
+            await controller_connection.connect(endpoint=con['endpoints'][0], username=auth_data['user']['juju_username'],
                                                 password=authorization.password, cacert=con['ca_cert'])
             await controller_connection.disconnect()
     except JujuAPIError:
         abort(error[0], error[1])
 
 
-def check_user_state(data):
-    if data['user']:
-        if data['user']['state'] == 'pending':
+def check_user_state(auth_data):
+    if auth_data['user']:
+        if auth_data['user']['state'] == 'pending':
             abort(403, "The user is not ready yet to perform this action. Please wait untill the user is created!")
-        elif data['user']['state'] != 'ready':
+        elif auth_data['user']['state'] != 'ready':
             abort(403, "The user is being removed and not able to perform this action anymore!")
     else:
         abort(errors.unauthorized)
 
 
-def check_controller_state(data, auth):
-    if data['controller']:
-        if data['controller']['state'] != 'ready':
-            abort(403, "The Workspace is not ready yet. Please wait untill the workspace is created!")
-    elif check_if_admin(auth):
-        abort(404, 'The controller does not exist')
+def check_controller_state(auth_data, authorization):
+    if auth_data['controller']:
+        if auth_data['controller']['state'] != 'ready':
+            abort(403, "The Environment is not ready yet. Please wait untill the Environment is created!")
+    elif check_if_admin(authorization):
+        abort(404, 'The Environment does not exist')
     else:
         abort(errors.unauthorized)
 
 
-def check_model_state(data):
-    state = data['model']['state']
-    if data['model']:
+def check_model_state(auth_data):
+    state = auth_data['model']['state']
+    if auth_data['model']:
+        if state == 'accepted':
+            abort(403, "The Workspace is not ready yet. Please wait untill the workspace is created!")
+        elif state == 'deleting':
+            abort(403, "The Workspace is being removed!")
+        elif state.startswith('error'):
+            abort(403, "Model in error state => {}".format(state))
+    elif auth_data['c_access'] in ['superuser', 'add_model']:
+        abort(404, 'The Workspace does not exist')
+    else:
+        abort(errors.unauthorized)
 
-        return {'name': data['model']['name'], 'state': state, 'users' : {"user" : data['user']['name'], "access" : "admin"}}
 
 
 
@@ -231,7 +241,7 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 
 async def disconnect(connection):
-    if connection.connection.is_open:
+    if connection and connection.connection.is_open:
         await connection.disconnect()
 ###############################################################################
 # CONTROLLER FUNCTIONS
@@ -440,14 +450,14 @@ def create_model(authorization, m_name, cred_name, c_name):
         return errors.already_exists('model')
 
 
-def check_model_state(m_key, required_states):
-    """Checks if a model its state is one of the required states. Certain API calls
-    can only succeed if the model is in a certain state. F.e. the call to deploy
-    a bundle requires that the model is 'ready' or else a deployment will fail.
-    The call to delete a model requires that the model is in 'error' or 'ready' state."""
-    state = datastore.get_model_state(m_key)
-    if state in required_states:
-        return state
+# def check_model_state(m_key, required_states):
+#     """Checks if a model its state is one of the required states. Certain API calls
+#     can only succeed if the model is in a certain state. F.e. the call to deploy
+#     a bundle requires that the model is 'ready' or else a deployment will fail.
+#     The call to delete a model requires that the model is in 'error' or 'ready' state."""
+#     state = datastore.get_model_state(m_key)
+#     if state in required_states:
+#         return state
 
 
 # TODO: Functie die bij iedere POST die iets verandert aan een model checkt
@@ -457,10 +467,10 @@ def check_model_state(m_key, required_states):
 # model nog niet"
 
 
-async def delete_model(authorization, data):
-    datastore.set_model_state(data['model']['_key'], 'deleting model')
+def delete_model(username, password, controller, model, m_key):
+    datastore.set_model_state(m_key, 'deleting')
     Popen(["python3", "{}/scripts/delete_model.py".format(settings.SOJOBO_API_DIR),
-           data['controller']['name'], data['model']['name'], data['model']['_key'], authorization.username, authorization.password])
+           controller, model, m_key, username, password])
 #####################################################################################
 # Machines FUNCTIONS
 #####################################################################################
@@ -565,9 +575,9 @@ async def app_exists(token, controller, model, app_name):
     return False
 
 
-def add_bundle(authentication, data, bundle):
+def add_bundle(username, password, c_name, m_name, bundle):
     Popen(["python3", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR),
-           authentication.username, authentication.password, data['controller']['name'], data['model']['name'], str(bundle)])
+           username, password, c_name, m_name, str(bundle)])
 
 
 async def deploy_app(token, con, model, app_name, data):
@@ -864,7 +874,7 @@ def get_ucontroller_access(controller, username):
     return datastore.get_controller_and_access(controller, username)
 
 
-async def get_models_access(data):
+def get_models_access(data):
     return datastore.get_models_access(data['controller']['name'], data['user']['name'])
 
 

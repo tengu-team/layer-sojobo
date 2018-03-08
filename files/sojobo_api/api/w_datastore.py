@@ -560,12 +560,18 @@ def remove_model_from_controller(c_name, m_key):
 
 
 def set_model_state(m_key, state, credential=None, uuid=None):
-    aql = ('UPDATE @model WITH {'
-           'state: @state, '
-           'credential: @credential, '
-           'uuid: @uuid'
-           '} IN models')
-    execute_aql_query(aql, model=m_key, state=state, credential=credential, uuid=uuid)
+    if not credential and not uuid:
+        aql = ('UPDATE @model WITH {'
+               'state: @state '
+               '} IN models')
+        execute_aql_query(aql, model=m_key, state=state)
+    else:
+        aql = ('UPDATE @model WITH {'
+               'state: @state, '
+               'credential: @credential, '
+               'uuid: @uuid'
+               '} IN models')
+        execute_aql_query(aql, model=m_key, state=state, credential=credential, uuid=uuid)
 
 
 def get_model_state(m_key):
@@ -638,6 +644,7 @@ def get_model_connection_info(username, c_name, m_key):
     m_id = "models/" + m_key
     aql = ("LET user = DOCUMENT(@u_id) "
            "LET controller = DOCUMENT(@c_id) "
+           "LET model = DOCUMENT(@m_id) "
            "LET c_access = "
                 "FIRST((FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess "
                     "FILTER cEdge._from == @c_id "
@@ -646,7 +653,7 @@ def get_model_connection_info(username, c_name, m_key):
                 "FIRST((FOR m, mEdge IN 1..1 INBOUND @u_id modelAccess "
                     "FILTER mEdge._from == @m_id "
                     "RETURN mEdge.access)) "
-           "RETURN {user, controller, c_access, m_access}")
+           "RETURN {user, controller, model, c_access, m_access}")
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id, m_id=m_id)[0]
 
 def hash_username(username):
