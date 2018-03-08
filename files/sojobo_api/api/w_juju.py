@@ -350,16 +350,6 @@ async def get_model_info(connection, data):
             'state': state, 'credentials' : credentials}
 
 
-async def get_ssh_keys(token, model):
-    async with model.connect(token) as juju:
-        res = await juju.get_ssh_key(raw_ssh=True)
-    data = res.serialize()['results'][0].serialize()['result']
-    if data is None:
-        return []
-    else:
-        return data
-
-
 def get_ssh_keys_user(username):
     return datastore.get_ssh_keys(username)
 

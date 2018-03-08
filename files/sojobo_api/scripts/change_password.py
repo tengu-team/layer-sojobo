@@ -42,7 +42,7 @@ async def change_password(c_name, endpoint, ca_cert, juju_username, password):
 
         logger.info('Changing password...')
         await user_facade.SetPassword([entity])
-        logger.info('Password has been changed!')
+        logger.info('Changed password!')
 
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()

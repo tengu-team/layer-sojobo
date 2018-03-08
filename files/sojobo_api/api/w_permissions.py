@@ -83,6 +83,14 @@ permissions = {
 			"c_access": ["admin", "company_admin", "superuser"]
 		}
 	},
+	"/users/user/ssh-keys": {
+		"get": {
+			"c_access": ["admin", "company_admin", "superuser"]
+		},
+		"put": {
+			"c_access": ["admin", "company_admin", "superuser"]
+		}
+	},
     "/users/user/controllers/controller": {
 		"get": {
 			"c_access": ["admin", "company_admin", "superuser"]

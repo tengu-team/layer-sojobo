@@ -100,7 +100,7 @@ def create_user():
         LOGGER.info('/USERS [POST] => receiving call')
         data = request.json
         auth_data = juju.get_connection_info(request.authorization)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS [POST] => Authenticated!')
         if juju.check_if_admin(request.authorization):
             if juju.user_exists(data['username']):
@@ -137,7 +137,7 @@ def get_user_info(user):
     try:
         LOGGER.info('/USERS/%s [GET] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [GET] => Authenticated!', user)
         if juju.authorize(auth_data, '/users/user', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -238,9 +238,10 @@ def delete_user(user):
 def get_ssh_keys(user):
     try:
         LOGGER.info('/USERS/%s/ssh-keys [GET] => receiving call', user)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/ssh-keys [GET] => Authenticated!', user)
-        if token.is_admin or token.username == user:
+        if juju.authorize(auth_data, '/users/user/ssh-keys', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_ssh_keys_user(user)
                 LOGGER.info('/USERS/%s/ssh-keys [GET] => Succesfully returned ssh-keys!', user)
@@ -250,28 +251,31 @@ def get_ssh_keys(user):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/ssh-keys [GET] => No Permission to perform this action!', user)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/ssh-keys', methods=['PUT'])
 def update_ssh_keys(user):
     try:
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => receiving call', user)
-        data = request.json
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        http_body = request.json
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => Authenticated!', user)
-        if token.is_admin or token.username == user:
+        if juju.authorize(auth_data, '/users/user/ssh-keys', 'put', self_user=user, resource_user=user):
             if juju.user_exists(user):
-                for key in data['ssh-keys']:
+                for key in http_body['ssh-keys']:
                     try:
                         fp_key = base64.b64decode(key.strip().split()[1].encode('ascii'))
                         fp_plain = hashlib.md5(fp_key).hexdigest()
@@ -279,7 +283,7 @@ def update_ssh_keys(user):
                     except Exception:
                         code, response = errors.invalid_ssh_key(key)
                         return juju.create_response(code, response)
-                juju.update_ssh_keys_user(user, data['ssh-keys'])
+                juju.update_ssh_keys_user(user, http_body['ssh-keys'])
                 LOGGER.info('/USERS/%s/ssh-keys [PUT] => SSH-keys are being updated, check update_ssh_keys.log for more information!', user)
                 code, response = 202, 'SSH-keys are being updated'
             else:
@@ -288,16 +292,18 @@ def update_ssh_keys(user):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/ssh-keys [PUT] => No Permission to perform this action!', user)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials', methods=['GET'])
