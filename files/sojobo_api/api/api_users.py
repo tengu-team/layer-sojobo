@@ -578,49 +578,36 @@ def get_models_access(user, controller):
 def grant_to_model(user, controller):
     try:
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => receiving call', user, controller)
-        data = request.json
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        models_access_levels = request.json
+        auth_data = juju.get_connection_info(request.authorization, controller)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authenticated!', user, controller)
-        con = juju.authorize(token, controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authorized!', user, controller)
-        if (token.is_admin or con.c_access == 'superuser') and user != 'admin':
+        if juju.authorize(auth_data, '/users/user/controllers/controller/models', 'put'):
             if juju.user_exists(user):
-                print("=====DEBUGGING=====")
-                print("USER EXISTS according to juju.user_exists(user)")
-                juju.set_models_access(token, con, user, data)
+                juju.set_models_access(token, controller, user, models_access_levels)
                 LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Setting model access, check set_model_access.log for more information!', user, controller)
                 code, response = 202, 'The model access is being changed'
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => User %s does not exist!', user, controller, user)
         else:
-            # TODO: Cleanup
-            user_access = juju.get_models_access(con, user)
-            m_names = []
-            for mode in user_access:
-                m_names.append(mode["name"])
-            if juju.user_exists(user):
-                for mod in data:
-                    if not mod['name'] in m_names:
-                        LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => No Permission to perform this action!', user, controller)
-                        code, response = errors.no_permission()
-                        return juju.create_response(code, response)
-                juju.set_models_access(token, con, user, data)
-                LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Setting model access, check set_model_access.log for more information!', user, controller)
-                code, response = 202, 'The model access is being changed'
-            else:
-                code, response = errors.does_not_exist('user')
-                LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => User %s does not exist!', user, controller, user)
+            LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => No Permission to perform this action!', user, controller)
+            code, response = errors.no_permission()
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+    finally:
+        execute_task(juju.disconnect, connection)
 
 
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['GET'])

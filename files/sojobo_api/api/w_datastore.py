@@ -574,6 +574,18 @@ def get_model_access(c_name, m_name, username):
         return result[0]
 
 
+def get_model_and_access(m_key, username):
+    m_id = "models/" + m_key
+    u_id = get_user_id(username)
+    aql = ("LET m = DOCUMENT(@m_id) "
+           "LET m_access = "
+                "FIRST((FOR m, mEdge IN 1..1 INBOUND @u_id modelAccess "
+                    "FILTER mEdge._from == @m_id "
+                    "RETURN mEdge.access)) "
+           "RETURN {m, m_access} ")
+    return execute_aql_query(aql, rawResults=True, m_id=m_id, u_id=u_id)
+
+
 def get_models_access(c_name, username):
     u_id = get_user_id(username)
     c_id = "controllers/" + c_name

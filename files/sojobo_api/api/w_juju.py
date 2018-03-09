@@ -813,19 +813,20 @@ async def controller_revoke(token, controller, username):
         await juju.revoke(username)
 
 
-def set_models_access(token, controller, user, accesslist):
-    for mod in accesslist:
-        m_key = construct_model_key(controller.c_name, mod['name'])
-        if datastore.model_exists(m_key):
-            if not m_access_exists(mod['access']):
+def set_models_access(token, c_name, user, models_access):
+    for model in models_access:
+        m_key = construct_model_key(c_name, model['name'])
+        model_info = datastore.get_model_connection_info(user, c_name, m_key)
+        if model_info["m_access"] is not None:
+            if not m_access_exists(model['access']):
                 abort(400, 'Access Level {} is not supported. Change access for model {}'.format(mod['access'], mod['name']))
             else:
-                pass
+                Popen(["python3",
+                       "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR),
+                       token.username, token.password, user, model["access"],
+                       c_name])
         else:
             abort(404, 'Model {} not found'.format(mod['name']))
-    Popen(["python3", "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR), token.username,
-           token.password, settings.SOJOBO_API_DIR,
-           user, str(accesslist), controller.c_name])
 
 
 async def model_grant(token, model, username, access):

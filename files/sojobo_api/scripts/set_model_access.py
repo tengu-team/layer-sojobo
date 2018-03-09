@@ -19,41 +19,53 @@ import sys
 import ast
 import traceback
 import logging
+from juju import tag, errors
+from juju.client import client
+from juju.controller import Controller
 sys.path.append('/opt')
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 from juju.errors import JujuAPIError, JujuError
 
 
-async def set_model_acc(username, password, user, access, controller):
+async def set_model_acc(juju_username, password, controller, model, access):
     try:
-        logger.info('Starting process to set model access')
-        token = JuJu_Token
-        token.username = username
-        token.password = password
-        access_list = ast.literal_eval(access)
-        ssh_keys = datastore.get_ssh_keys(user)
-        for mod in access_list:
-            logger.info('setting Model Access for %s on %s!', user, mod['name'])
-            model = juju.Model_Connection(token, controller, mod['name'])
-            async with model.connect(token) as mod_con:
-                current_access = datastore.get_model_access(controller, mod['name'], user)
-                logger.info('Current Access level: %s', current_access)
-                if current_access:
-                    await mod_con.revoke(user)
-                await mod_con.grant(user, acl=mod['access'])
-                if mod['access'] in ['admin', 'write']:
-                    for key in ssh_keys:
-                        try:
-                            logger.info('Adding ssh-key: %s', key)
-                            mod_con.add_ssh_key(user, key)
-                        except (JujuAPIError, JujuError):
-                            exc_type, exc_value, exc_traceback = sys.exc_info()
-                            lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
-                            for l in lines:
-                                logger.error(l)
-            m_key = datastore.get_model_key(controller, mod['name'])
-            datastore.set_model_access(m_key, user, mod['access'])
-            logger.info('Model Access set for %s on %s!', user, mod['name'])
+        access_list = ast.literal_eval(models_access)
+        ssh_keys = datastore.get_ssh_keys(username)
+        endpoint = controller["endpoints"][0]
+        cacert = controller["ca_cert"]
+        m_name = model["name"]
+        m_key = model["_key"]
+        uuid = model["uuid"]
+
+        logger.info('Setting up Controller connection for %s.', c_name)
+        controller_connection = Controller()
+        await controller_connection.connect(endpoint=endpoint,
+                                            username=settings.JUJU_ADMIN_USER,
+                                            password=settings.JUJU_ADMIN_PASSWORD,
+                                            cacert=cacert)
+        logger.info('Controller connection as admin was successful.')
+
+        logger.info('setting Model Access for %s on %s!', juju_username, m_name)
+        current_access = datastore.get_model_and_access(mod['_key'], user)
+        logger.info('Current Access level: %s', current_access)
+
+        model_facade = client.ModelManagerFacade.from_connection(
+                        controller_connection.connection)
+        user = tag.user(juju_username)
+        model = tag.model(uuid)
+
+        if current_access:
+            changes = client.ModifyModelAccess('read', 'revoke', model, user)
+            await model_facade.ModifyModelAccess([changes])
+
+        changes = client.ModifyModelAccess(acl, 'grant', model, user)
+        await model_facade.ModifyModelAccess([changes])
+
+        if mod['access'] in ['admin', 'write']:
+            juju.update_ssh_keys_user(username, ssh_keys)
+
+        datastore.set_model_access(m_key, user, mod['access'])
+        logger.info('Model Access set for %s on %s!', user, mod['name'])
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -65,7 +77,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('set_model_access')
-    hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(sys.argv[3]))
+    hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(settings.SOJOBO_API_DIR,))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
