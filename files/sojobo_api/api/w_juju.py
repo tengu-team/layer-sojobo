@@ -231,7 +231,7 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 
 async def disconnect(connection):
-    if connection.connection().is_open:
+    if connection.connection.is_open:
         await connection.disconnect()
 ###############################################################################
 # CONTROLLER FUNCTIONS
@@ -553,9 +553,8 @@ def remove_machine(token, controller, model, machine):
 #####################################################################################
 
 
-async def app_exists(token, controller, model, app_name):
-    model_info = await get_model_info(token, controller, model)
-    for app in model_info['applications']:
+async def app_exists(connection, app_name):
+    for app in get_applications_info(connection):
         if app['name'] == app_name:
             return True
     return False
@@ -631,9 +630,9 @@ async def get_unit_info(token, model, application, unitnumber):
     return {}
 
 
-def add_unit(token, controller, model, app_name, amount, target):
-    Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), token.username,
-           token.password, settings.SOJOBO_API_DIR, controller.c_name, model.m_name,
+def add_unit(username, password, controller, model, app_name, amount, target):
+    Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), username,
+           password, controller, model,
            app_name, str(amount), target])
 
 

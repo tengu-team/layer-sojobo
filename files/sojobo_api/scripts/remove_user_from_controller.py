@@ -36,7 +36,7 @@ async def remove_user_from_controller(username, c_name):
         controller_connection = Controller()
         await controller_connection.connect(endpoint=data['controller']['endpoints'][0], username=settings.JUJU_ADMIN_USER, password=settings.JUJU_ADMIN_PASSWORD, cacert=data['controller']['ca_cert'])
         logger.info('Controller connection as admin was successful')
-        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection())
+        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection)
         entity = client.Entity(tag.user(data['user']['juju_username']))
         logger.info('Removing user from %s', c_name)
         await user_facade.RemoveUser([entity])

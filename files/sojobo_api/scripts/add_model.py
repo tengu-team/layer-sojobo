@@ -40,7 +40,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         controller_connection = Controller()
         await controller_connection.connect(endpoint=auth_data['controller']['endpoints'][0], username=auth_data['user']['juju_username'], password=pwd, cacert=auth_data['controller']['ca_cert'])
 
-        owner = controller_connection.connection().info['user-info']['identity']
+        owner = controller_connection.connection.info['user-info']['identity']
         cloud_name = await controller_connection.get_cloud()
         #Generate Tag for Credential
         credential_name = await controller_connection.add_credential(
