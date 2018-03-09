@@ -229,8 +229,8 @@ def remove_credential(username, cred_name):
     execute_aql_query(u_aql, c_id=c_id)
     credential = {'name': cred_name, 'key': c_id}
     aql = ('LET u = DOCUMENT(@u_id) '
-           'UPDATE u WITH { '
-           'credentials: REMOVE_VALUE(u.credentials, @credential) '
+           'UPDATE doc WITH { '
+           'credentials: REMOVE_VALUE(doc.credentials, @credential) '
            '} IN users')
     execute_aql_query(aql, u_id=u_id, credential=credential)
 

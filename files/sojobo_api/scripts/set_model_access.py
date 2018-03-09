@@ -26,6 +26,10 @@ sys.path.append('/opt')
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 from juju.errors import JujuAPIError, JujuError
 
+class JuJu_Token(object):  #pylint: disable=R0903
+    def __init__(self):
+        self.username = None
+        self.password = None
 
 async def set_model_acc(juju_username, password, controller, model, access):
     try:
