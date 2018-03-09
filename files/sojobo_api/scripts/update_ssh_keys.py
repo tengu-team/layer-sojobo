@@ -36,7 +36,7 @@ async def update_ssh_key(ssh_keys, username):
         new_keys = ast.literal_eval(ssh_keys)
 
         for controller in user_info["controllers"]:
-            endpoint = controller["endpoint"]
+            endpoint = controller["endpoints"][0]
             cacert = controller["ca_cert"]
 
             for model in controller['models']:
@@ -65,7 +65,7 @@ async def update_ssh_key(ssh_keys, username):
         logger.info('Updating ssh keys in database...')
         datastore.update_ssh_keys(username, new_keys)
         logger.info('Updated SSH keys!')
-        
+
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

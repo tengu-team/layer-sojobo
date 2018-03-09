@@ -873,7 +873,7 @@ def get_ucontroller_access(controller, username):
     return datastore.get_controller_and_access(controller, username)
 
 
-async def get_models_access(data):
+def get_models_access(data):
     return datastore.get_models_access(data['controller']['name'], data['user']['name'])
 
 

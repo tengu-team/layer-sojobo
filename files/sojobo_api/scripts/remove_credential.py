@@ -20,39 +20,50 @@ import traceback
 import logging
 import hashlib
 sys.path.append('/opt')
-from juju import tag
+from juju import tag, errors
 from juju.client import client
+from juju.controller import Controller
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as ds, w_juju as juju  #pylint: disable=C0413
 
-class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = settings.JUJU_ADMIN_USER
-        self.password = settings.JUJU_ADMIN_PASSWORD
-        self.is_admin = False
 
 async def remove_credential(username, cred_name):
     try:
-        token = JuJu_Token()
+        # TODO: If time, make it so that less datastore calls are made.
+        logger.info('Retrieving credential from database...')
         cred = juju.get_credential(username, cred_name)
         credential_name = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
-        logger.info('Succesfully retrieved credential, removing credential now')
+        logger.info('Succesfully retrieved credential from database...')
+
         c_type = cred['type']
         controllers = ds.get_cloud_controllers(c_type)
+
         for con in controllers:
-            controller = juju.Controller_Connection(token, con)
-            if controller.c_type == c_type:
-                async with controller.connect(token) as con_juju:
-                    cloud_facade = client.CloudFacade.from_connection(con_juju.connection)
-                    cloud_cred = client.Entity(tag.credential(c_type, username, credential_name))
-                    await cloud_facade.RevokeCredentials([cloud_cred])
+            if con["type"] == c_type:
+                logger.info('Setting up Controller connection for %s.', con["name"])
+                controller_connection = Controller()
+                await controller_connection.connect(endpoint=con["endpoints"][0],
+                                                    username=settings.JUJU_ADMIN_USER,
+                                                    password=settings.JUJU_ADMIN_PASSWORD,
+                                                    cacert=con["ca_cert"])
+                logger.info('Controller connection as admin was successful.')
+
+                logger.info('Removing credential from controller %s.', con["name"])
+                cloud_facade = client.CloudFacade.from_connection(controller_connection.connection)
+                cloud_cred = client.Entity(tag.credential(c_type, username, credential_name))
+                await cloud_facade.RevokeCredentials([cloud_cred])
+                logger.info('Credential was successfully removed from controller %s.', con["name"])
+
+        logger.info('Removing credential from database...')
         ds.remove_credential(username, cred_name)
-        logger.info('Succesfully removed credential')
+        logger.info('Succesfully removed credential!')
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+    finally:
+        await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':
