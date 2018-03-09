@@ -20,38 +20,52 @@ import ast
 import sys
 import traceback
 import logging
+from juju import tag, errors
+from juju.client import client
+from juju.model import Model
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
-class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = settings.JUJU_ADMIN_USER
-        self.password = settings.JUJU_ADMIN_PASSWORD
-        self.is_admin = True
-
 
 async def update_ssh_key(ssh_keys, username):
     try:
-        user = datastore.get_user(username)
-        controllers = datastore.get_controllers_access(username)
-        current_keys = user["ssh_keys"]
+        user_info = datastore.get_user_info(username)
+        juju_username = user_info["juju_username"]
+        current_keys = user_info["ssh_keys"]
         new_keys = ast.literal_eval(ssh_keys)
-        token = JuJu_Token()
-        for con in controllers:
-            for mod in con['models']:
-                mod_access = datastore.get_model_access(con['name'], mod, username)
+
+        for controller in user_info["controllers"]:
+            endpoint = controller["endpoints"][0]
+            cacert = controller["ca_cert"]
+
+            for model in controller['models']:
+                mod_access = model["access"]
+                uuid = model["uuid"]
                 if mod_access == 'write' or mod_access == 'admin':
-                    logger.info('Setting up Modelconnection for model: %s', mod)
-                    model = juju.Model_Connection(token, con['name'], mod)
-                    async with model.connect(token) as mod_con:
-                        for a_key in current_keys:
-                            logger.info('removing key: %s', a_key)
-                            await mod_con.remove_ssh_key(username, a_key)
-                        for r_key in new_keys:
-                            logger.info('adding key: %s', r_key)
-                            await mod_con.add_ssh_key(username, r_key)
+
+                    logger.info('Setting up model connection for model: %s', model)
+                    model_connection = Model()
+                    await model_connection.connect(endpoint, uuid, juju_username, password, cacert=cacert)
+                    logger.info('Model connection was successful.')
+
+                    logger.info('Initializing KeyManagerFacade...')
+                    key_facade = client.KeyManagerFacade.from_connection(model_connection)
+
+                    logger.info('Removing current ssh keys...')
+                    for key in current_keys:
+                        logger.info('removing key: %s', key)
+                        await key_facade.DeleteKeys([key], user)
+
+                    logger.info('Adding new ssh keys...')
+                    for key in new_keys:
+                        logger.info('adding key: %s', key)
+                        await key_facade.AddKeys([key], juju_username)
+
+        logger.info('Updating ssh keys in database...')
         datastore.update_ssh_keys(username, new_keys)
+        logger.info('Updated SSH keys!')
+
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
