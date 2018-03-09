@@ -19,27 +19,26 @@ import sys
 import traceback
 import logging
 import json
+from juju.client import client
 from juju.model import Model
+from juju.placement import parse as parse_placement
 sys.path.append('/opt')
-from sojobo_api.api import w_datastore
+from sojobo_api import settings
+from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
-async def add_unit(c_name, m_name, usr, pwd, app_name, amount, target):
+async def add_unit(username, password, c_name, m_name, app_name, amount, target):
     try:
-        controller = w_datastore.get_controller(c_name)
-        # We need the key of the model to get the actual model. Maybe one function
-        # can be made 'get_model(m_name)'.
-        m_key = w_datastore.get_model_key(c_name, m_name)
-        mod = w_datastore.get_model(m_key)
-        mod_con = Model()
+        m_key = datastore.get_model_key(c_name, m_name)
+        auth_data = get_model_connection_info(username, c_name, m_key)
+        model_connection = Model()
         logger.info('Setting up Model connection for %s:%s', c_name, m_name)
-        await mod_con.connect(controller['endpoints'][0], mod['uuid'], usr, pwd, controller['ca-cert'])
-        for app, entity in mod_con.state.applications.items():
-            if app == app_name:
-                logger.info('Adding units to %s', app_name)
-                if target == 'None':
-                    target = None
-                await entity.add_unit(count=int(amount), to=target)
+        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca-cert'])
+        logger.info('Model connection was successful')
+        app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
+        await app_facade.AddUnits(application=app_name,
+                                  placement=parse_placement(target) if target else None,
+                                  num_units=amount)
         logger.info('Units added to %s', app_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -48,14 +47,14 @@ async def add_unit(c_name, m_name, usr, pwd, app_name, amount, target):
             logger.error(l)
     finally:
         if 'mod_con' in locals():
-            await mod_con.disconnect()
+            await juju.disconnect(model_connection)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('add-unit')
-    hdlr = logging.FileHandler('{}/log/add_unit.log'.format(sys.argv[3]))
+    logger = logging.getLogger('add_unit')
+    hdlr = logging.FileHandler('{}/log/add_unit.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -64,6 +63,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(add_unit(sys.argv[4], sys.argv[5], sys.argv[1],
-                                     sys.argv[2], sys.argv[6],sys.argv[7],sys.argv[8]))
+    loop.run_until_complete(add_unit(sys.argv[1], sys.argv[2], sys.argv[3],
+                                     sys.argv[4], sys.argv[5],sys.argv[6],sys.argv[7]))
     loop.close()
