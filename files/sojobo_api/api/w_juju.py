@@ -241,7 +241,7 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 
 async def disconnect(connection):
-    if connection and connection.connection.is_open:
+    if connection.connection and connection.connection.is_open:
         await connection.disconnect()
 ###############################################################################
 # CONTROLLER FUNCTIONS
