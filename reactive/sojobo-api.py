@@ -194,7 +194,7 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 
 
 def install_api():
-    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments','gitpython',
+    for pkg in ['Jinja2', 'flask', 'pyyaml', 'click', 'pygments','gitpython',
                 'asyncio_extras', 'requests', 'juju==0.6.1', 'async_generator']:
         subprocess.check_call(['pip3', 'install', pkg])
     mergecopytree('files/sojobo_api', API_DIR)

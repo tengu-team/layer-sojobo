@@ -229,8 +229,8 @@ def remove_credential(username, cred_name):
     execute_aql_query(u_aql, c_id=c_id)
     credential = {'name': cred_name, 'key': c_id}
     aql = ('LET u = DOCUMENT(@u_id) '
-           'UPDATE doc WITH { '
-           'credentials: REMOVE_VALUE(doc.credentials, @credential) '
+           'UPDATE u WITH { '
+           'credentials: REMOVE_VALUE(u.credentials, @credential) '
            '} IN users')
     execute_aql_query(aql, u_id=u_id, credential=credential)
 
@@ -577,13 +577,13 @@ def get_model_access(c_name, m_name, username):
 def get_model_and_access(m_key, username):
     m_id = "models/" + m_key
     u_id = get_user_id(username)
-    aql = ("LET m = DOCUMENT(@m_id) "
+    aql = ("LET mod = DOCUMENT(@m_id) "
            "LET m_access = "
                 "FIRST((FOR m, mEdge IN 1..1 INBOUND @u_id modelAccess "
                     "FILTER mEdge._from == @m_id "
                     "RETURN mEdge.access)) "
-           "RETURN {m, m_access} ")
-    return execute_aql_query(aql, rawResults=True, m_id=m_id, u_id=u_id)
+           "RETURN {mod, m_access} ")
+    return execute_aql_query(aql, rawResults=True, m_id=m_id, u_id=u_id)[0]
 
 
 def get_models_access(c_name, username):
@@ -636,6 +636,7 @@ def get_model_connection_info(username, c_name, m_key):
     m_id = "models/" + m_key
     aql = ("LET user = DOCUMENT(@u_id) "
            "LET controller = DOCUMENT(@c_id) "
+           "LET model = DOCUMENT(@m_id) "
            "LET c_access = "
                 "FIRST((FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess "
                     "FILTER cEdge._from == @c_id "
@@ -644,11 +645,13 @@ def get_model_connection_info(username, c_name, m_key):
                 "FIRST((FOR m, mEdge IN 1..1 INBOUND @u_id modelAccess "
                     "FILTER mEdge._from == @m_id "
                     "RETURN mEdge.access)) "
-           "RETURN {user, controller, c_access, m_access}")
+           "RETURN {user, controller, model, c_access, m_access}")
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id, m_id=m_id)[0]
+
 
 def hash_username(username):
     return hashlib.md5(username.encode('utf')).hexdigest()
+
 
 def get_user_id(username):
     return "users/" + hash_username(username)

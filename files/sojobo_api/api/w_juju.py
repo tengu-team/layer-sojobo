@@ -733,11 +733,21 @@ def change_user_password(controllers, username, password):
                 c_name, endpoint, ca_cert, juju_username, password])
 
 
-def update_ssh_keys_user(user, ssh_keys):
+def update_ssh_keys_user(username, ssh_keys):
+    user_info = datastore.get_user_info(username)
+
+    # A user its ssh-keys is changed on all the controllers where the user resides.
+    # We only update the ssh-keys if all controllers are ready, to avoid problems.
+    # This is a temporary solution until something better is found.
+    for controller in user_info["controllers"]:
+        if controller["state"] != "ready":
+            abort(403, """The ssh-keys for user {} cannot be updated because not all controllers are ready yet.
+                          Please wait a few minutes before you try again.""".format(username))
+
     Popen([
         "python3",
         "{}/scripts/update_ssh_keys.py".format(settings.SOJOBO_API_DIR),
-        str(ssh_keys), user, settings.SOJOBO_API_DIR])
+        str(ssh_keys), username, settings.SOJOBO_API_DIR])
 
 
 def get_users_controller(controller):
@@ -813,18 +823,21 @@ async def controller_revoke(token, controller, username):
         await juju.revoke(username)
 
 
-def set_models_access(token, c_name, user, models_access):
+def set_models_access(username, c_name, models_access):
+    # TODO: If time, reduce datastore calls.
     for model in models_access:
         m_key = construct_model_key(c_name, model['name'])
-        model_info = datastore.get_model_connection_info(user, c_name, m_key)
-        if model_info["m_access"] is not None:
+        model_info = datastore.get_model_connection_info(username, c_name, m_key)
+        uuid = model_info["model"]["uuid"]
+        endpoint = model_info["controller"]["endpoints"][0]
+        cacert = model_info["controller"]["ca_cert"]
+        if datastore.model_exists(m_key):
             if not m_access_exists(model['access']):
                 abort(400, 'Access Level {} is not supported. Change access for model {}'.format(mod['access'], mod['name']))
             else:
                 Popen(["python3",
                        "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR),
-                       token.username, token.password, user, model["access"],
-                       c_name])
+                       username, c_name, endpoint, cacert, m_key, uuid, model["access"]])
         else:
             abort(404, 'Model {} not found'.format(mod['name']))
 
@@ -874,8 +887,8 @@ def get_ucontroller_access(controller, username):
     return datastore.get_controller_and_access(controller, username)
 
 
-async def get_models_access(data):
-    return datastore.get_models_access(data['controller']['name'], data['user']['name'])
+def get_models_access(username, c_name):
+    return datastore.get_models_access(c_name, username)
 
 
 def check_models_access(token, controller, user):

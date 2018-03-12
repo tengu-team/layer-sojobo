@@ -23,23 +23,16 @@ from juju import tag, errors
 from juju.client import client
 from juju.controller import Controller
 sys.path.append('/opt')
+from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 from juju.errors import JujuAPIError, JujuError
 
-class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = None
-        self.password = None
 
-async def set_model_acc(juju_username, password, controller, model, access):
+async def set_model_acc(username, c_name, endpoint, cacert, m_key, uuid, access):
     try:
-        access_list = ast.literal_eval(models_access)
-        ssh_keys = datastore.get_ssh_keys(username)
-        endpoint = controller["endpoints"][0]
-        cacert = controller["ca_cert"]
-        m_name = model["name"]
-        m_key = model["_key"]
-        uuid = model["uuid"]
+        user_info = datastore.get_user_info(username)
+        juju_username = user_info["juju_username"]
+        ssh_keys = user_info["ssh_keys"]
 
         logger.info('Setting up Controller connection for %s.', c_name)
         controller_connection = Controller()
@@ -49,8 +42,8 @@ async def set_model_acc(juju_username, password, controller, model, access):
                                             cacert=cacert)
         logger.info('Controller connection as admin was successful.')
 
-        logger.info('setting Model Access for %s on %s!', juju_username, m_name)
-        current_access = datastore.get_model_and_access(mod['_key'], user)
+        logger.info('setting Model Access for %s on %s!', juju_username, m_key)
+        current_access = datastore.get_model_and_access(m_key, username)
         logger.info('Current Access level: %s', current_access)
 
         model_facade = client.ModelManagerFacade.from_connection(
@@ -58,23 +51,29 @@ async def set_model_acc(juju_username, password, controller, model, access):
         user = tag.user(juju_username)
         model = tag.model(uuid)
 
-        if current_access:
+        print("Current access:")
+        print(current_access)
+
+        if current_access["m_access"]:
             changes = client.ModifyModelAccess('read', 'revoke', model, user)
             await model_facade.ModifyModelAccess([changes])
 
-        changes = client.ModifyModelAccess(acl, 'grant', model, user)
+        changes = client.ModifyModelAccess(access, 'grant', model, user)
         await model_facade.ModifyModelAccess([changes])
 
-        if mod['access'] in ['admin', 'write']:
+        if access in ['admin', 'write']:
             juju.update_ssh_keys_user(username, ssh_keys)
 
-        datastore.set_model_access(m_key, user, mod['access'])
-        logger.info('Model Access set for %s on %s!', user, mod['name'])
+        datastore.set_model_access(m_key, username, access)
+        logger.info('Model Access set for %s on %s!', username, m_key)
+
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+    finally:
+        await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':
@@ -91,5 +90,7 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
     result = loop.run_until_complete(set_model_acc(sys.argv[1], sys.argv[2],
-                                                   sys.argv[4], sys.argv[5], sys.argv[6]))
+                                                   sys.argv[3], sys.argv[4],
+                                                   sys.argv[5], sys.argv[6],
+                                                   sys.argv[7]))
     loop.close()

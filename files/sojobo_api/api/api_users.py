@@ -310,9 +310,10 @@ def update_ssh_keys(user):
 def get_credentials(user):
     try:
         LOGGER.info('/USERS/%s/credentials [GET] => receiving call', user)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials [GET] => Authenticated!', user)
-        if token.is_admin or token.username == user:
+        if juju.authorize(auth_data, '/users/user/credentials', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_credentials(user)
                 LOGGER.info('/USERS/%s/credentials [GET] => Succesfully retrieved credentials!', user)
@@ -322,16 +323,18 @@ def get_credentials(user):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials [GET] => No Permission to perform this action!', user)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials', methods=['POST'])
@@ -377,9 +380,10 @@ def add_credential(user):
 def get_credential(user, credential):
     try:
         LOGGER.info('/USERS/%s/credentials/%s [GET] => receiving call', user, credential)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials/%s [GET] => Authenticated!', user, credential)
-        if token.is_admin or token.username == user:
+        if juju.authorize(auth_data, '/users/credentials/credential', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 if juju.credential_exists(user, credential):
                     code, response = 200, juju.get_credential(user, credential)
@@ -392,25 +396,28 @@ def get_credential(user, credential):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials/%s [GET] => No Permission to perform this action!', user, credential)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
 def remove_credential(user, credential):
     try:
         LOGGER.info('/USERS/%s/credentials/%s [DELETE] => receiving call', user, credential)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Authenticated!', user, credential)
-        if token.is_admin or token.username == user:
+        if juju.authorize(auth_data, '/users/credentials/credential', 'del', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 if juju.credential_exists(user, credential):
                     juju.remove_credential(user, credential)
@@ -424,55 +431,60 @@ def remove_credential(user, credential):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials/%s [DELETE] => No Permission to perform this action!', user, credential)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers', methods=['GET'])
 def get_controllers_access(user):
     try:
         LOGGER.info('/USERS/%s/controllers [GET] => receiving call', user)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers [GET] => Authenticated', user)
-        if token.is_admin or token.username == user:
+        if juju.authorize(auth_data, '/users/controllers', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_controllers_access(user)
                 LOGGER.info('/USERS/%s/controllers [GET] => Succesfully retrieved controllers access!', user)
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/controllers [GET] => User %s does not exist', user, user)
-        elif juju.check_controllers_access(token, user)[0]:
-                code, response = 200, juju.check_controllers_access(token, user)[1]
-                LOGGER.info('/USERS/%s/controllers [GET] => Succesfully retrieved controllers access!', user)
+        # elif juju.check_controllers_access(token, user)[0]:
+        #         code, response = 200, juju.check_controllers_access(token, user)[1]
+        #         LOGGER.info('/USERS/%s/controllers [GET] => Succesfully retrieved controllers access!', user)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/controllers [GET] => No Permission to perform this action!', user)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['GET'])
 def get_ucontroller_access(user, controller):
     try:
         LOGGER.info('/USERS/%s/controllers/%s [GET] => receiving call', user, controller)
-        auth_data = juju.get_connection_info(request.authorization.username)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s [GET] => Authenticated!', user, controller)
         if juju.authorize(auth_data, '/users/user/controllers/controller', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -485,16 +497,18 @@ def get_ucontroller_access(user, controller):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/controllers/%s [GET] => No Permission to perform this action', user, controller)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['PUT'])
@@ -540,33 +554,35 @@ def grant_to_controller(user, controller):
 def get_models_access(user, controller):
     try:
         LOGGER.info('/USERS/%s/controllers/%s/models [GET] => receiving call', user, controller)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Authenticated!', user, controller)
-        con = juju.authorize(token, controller)
-        if token.is_admin or token.username == user or con.access == 'superuser':
+        if juju.authorize(auth_data, '/users/user/controllers/controller/models', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Authorized!', user, controller)
-                code, response = 200, juju.get_models_access(con, user)
+                code, response = 200, juju.get_models_access(user, controller)
                 LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Succesfully retrieved models access!', user, controller)
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/controllers/%s/models [GET] => User %s does not exist!', user, controller, user)
-        elif juju.check_models_access(token, controller, user)[0]:
-                code, response = 200, juju.check_models_access(token, controller, user)[1]
-                LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Succesfully retrieved models access!', user, controller)
+        # elif juju.check_models_access(token, controller, user)[0]:
+        #         code, response = 200, juju.check_models_access(token, controller, user)[1]
+        #         LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Succesfully retrieved models access!', user, controller)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/controllers/%s/models [GET] => No Permission to perform this action!', user, controller)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>/models', methods=['PUT'])
@@ -574,13 +590,13 @@ def grant_to_model(user, controller):
     try:
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => receiving call', user, controller)
         models_access_levels = request.json
-        auth_data = juju.get_connection_info(request.authorization, controller)
+        auth_data = juju.get_connection_info(request.authorization)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authenticated!', user, controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authorized!', user, controller)
         if juju.authorize(auth_data, '/users/user/controllers/controller/models', 'put'):
             if juju.user_exists(user):
-                juju.set_models_access(token, controller, user, models_access_levels)
+                juju.set_models_access(user, controller, models_access_levels)
                 LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Setting model access, check set_model_access.log for more information!', user, controller)
                 code, response = 202, 'The model access is being changed'
             else:
@@ -601,8 +617,6 @@ def grant_to_model(user, controller):
         ers = error_log()
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
-    finally:
-        execute_task(juju.disconnect, connection)
 
 
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['GET'])

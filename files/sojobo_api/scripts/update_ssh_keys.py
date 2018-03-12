@@ -36,7 +36,7 @@ async def update_ssh_key(ssh_keys, username):
         new_keys = ast.literal_eval(ssh_keys)
 
         for controller in user_info["controllers"]:
-            endpoint = controller["endpoint"]
+            endpoint = controller["endpoints"][0]
             cacert = controller["ca_cert"]
 
             for model in controller['models']:
@@ -46,26 +46,29 @@ async def update_ssh_key(ssh_keys, username):
 
                     logger.info('Setting up model connection for model: %s', model)
                     model_connection = Model()
-                    await model_connection.connect(endpoint, uuid, juju_username, password, cacert=cacert)
+                    await model_connection.connect(endpoint, uuid, settings.JUJU_ADMIN_USER,
+                    settings.JUJU_ADMIN_PASSWORD, cacert=cacert)
                     logger.info('Model connection was successful.')
 
                     logger.info('Initializing KeyManagerFacade...')
-                    key_facade = client.KeyManagerFacade.from_connection(model_connection)
+                    key_facade = client.KeyManagerFacade.from_connection(model_connection.connection)
 
                     logger.info('Removing current ssh keys...')
                     for key in current_keys:
                         logger.info('removing key: %s', key)
-                        await key_facade.DeleteKeys([key], user)
+                        await key_facade.DeleteKeys([key], juju_username)
 
                     logger.info('Adding new ssh keys...')
                     for key in new_keys:
                         logger.info('adding key: %s', key)
                         await key_facade.AddKeys([key], juju_username)
 
+                    await model_connection.disconnect()
+
         logger.info('Updating ssh keys in database...')
         datastore.update_ssh_keys(username, new_keys)
         logger.info('Updated SSH keys!')
-        
+
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
