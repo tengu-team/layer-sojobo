@@ -97,34 +97,38 @@ def check_constraints(data):
             abort(error[0], error[1])
 
 
-async def authenticate(api_key, auth, data, controller=None, model=None):
+async def authenticate(api_key, authorization, auth_data, controller=None, model=None):
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
         if not controller and not model:
-            if check_if_admin(auth):
-                return data
+            if check_if_admin(authorization):
+                return True
             elif len(datastore.get_all_controllers()) == 0:
                 abort(error[0], error[1])
             else:
-                await connect_to_random_controller(auth)
-                return data
+                await connect_to_random_controller(authorization, auth_data)
+                return True
         try:
-            check_controller_state(data, auth)
-            check_user_state(data)
-            if data['c_access']:
+            check_controller_state(auth_data, authorization)
+            check_user_state(auth_data)
+            check_user_state(auth_data)
+            if auth_data['c_access']:
                 if controller and not model:
                     controller_connection = Controller()
-                    await controller_connection.connect(endpoint=data['controller']['endpoints'][0], username=auth.username, password=auth.password, cacert=data['controller']['ca_cert'])
+                    await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
                     return controller_connection
                 elif model:
-                    check_model_state(data)
+                    print('{} ------ found controller and model'.format(datetime.datetime.now()))
+                    check_model_state(auth_data)
                     model_connection = Model()
-                    await model_connection.connect(endpoint=data['controller']['endpoints'][0], uuid=data['model']['uuid'], username=auth.username, password=auth.password, cacert=data['controller']['ca_cert'])
+                    print('{} ------ starting connection'.format(datetime.datetime.now()))
+                    await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
+                    print('{} ------ returning connection'.format(datetime.datetime.now()))
                     return model_connection
-            elif data['controller']['state'] == 'ready':
-                await connect_to_random_controller(auth)
-                add_user_to_controllers(data, auth.username, auth.password)
-                abort(501, 'User {} is being added to the {} environment'.format(data['controller']['name'], data['user']['name']))
+            elif auth_data['controller']['state'] == 'ready':
+                await connect_to_random_controller(authorization)
+                add_user_to_controllers(auth_data, authorization.username, authorization.password)
+                abort(409, 'User {} is being added to the {} environment'.format(auth_data['controller']['name'], auth_data['user']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
     else:
@@ -135,7 +139,7 @@ def check_if_admin(auth):
     return auth.username == settings.JUJU_ADMIN_USER and auth.password == settings.JUJU_ADMIN_PASSWORD
 
 
-async def connect_to_random_controller(authorization):
+async def connect_to_random_controller(authorization, auth_data):
     error = errors.unauthorized()
     try:
         ready_controllers = datastore.get_all_ready_controllers()
@@ -144,38 +148,47 @@ async def connect_to_random_controller(authorization):
         else:
             con = ready_controllers[randint(0, len(ready_controllers) - 1)]
             controller_connection = Controller()
-            await controller_connection.connect(endpoint=con['endpoints'][0], username=authorization.username,
+            await controller_connection.connect(endpoint=con['endpoints'][0], username=auth_data['user']['juju_username'],
                                                 password=authorization.password, cacert=con['ca_cert'])
             await controller_connection.disconnect()
     except JujuAPIError:
         abort(error[0], error[1])
 
 
-def check_user_state(data):
-    if data['user']:
-        if data['user']['state'] == 'pending':
+def check_user_state(auth_data):
+    if auth_data['user']:
+        if auth_data['user']['state'] == 'pending':
             abort(403, "The user is not ready yet to perform this action. Please wait untill the user is created!")
-        elif data['user']['state'] != 'ready':
+        elif auth_data['user']['state'] != 'ready':
             abort(403, "The user is being removed and not able to perform this action anymore!")
     else:
         abort(errors.unauthorized)
 
 
-def check_controller_state(data, auth):
-    if data['controller']:
-        if data['controller']['state'] != 'ready':
-            abort(403, "The Workspace is not ready yet. Please wait untill the workspace is created!")
-    elif check_if_admin(auth):
-        abort(404, 'The controller does not exist')
+def check_controller_state(auth_data, authorization):
+    if auth_data['controller']:
+        if auth_data['controller']['state'] != 'ready':
+            abort(403, "The Environment is not ready yet. Please wait untill the Environment is created!")
+    elif check_if_admin(authorization):
+        abort(404, 'The Environment does not exist')
     else:
         abort(errors.unauthorized)
 
 
-def check_model_state(data):
-    state = data['model']['state']
-    if data['model']:
+def check_model_state(auth_data):
+    if auth_data['model']:
+        state = auth_data['model']['state']
+        if state == 'accepted':
+            abort(403, "The Workspace is not ready yet. Please wait untill the workspace is created!")
+        elif state == 'deleting':
+            abort(403, "The Workspace is being removed!")
+        elif state.startswith('error'):
+            abort(403, "Model in error state => {}".format(state))
+    elif auth_data['c_access'] in ['superuser', 'add_model', 'admin']:
+        abort(404, 'The Workspace does not exist')
+    else:
+        abort(errors.unauthorized)
 
-        return {'name': data['model']['name'], 'state': state, 'users' : {"user" : data['user']['name'], "access" : "admin"}}
 
 
 
@@ -231,7 +244,7 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 
 async def disconnect(connection):
-    if connection.connection.is_open:
+    if connection.connection and connection.connection.is_open:
         await connection.disconnect()
 ###############################################################################
 # CONTROLLER FUNCTIONS
@@ -339,12 +352,17 @@ def get_model_access(model, controller, username):
 
 
 async def get_model_info(connection, data):
+    print('{} ------ getting modelinfo'.format(datetime.datetime.now()))
     state = data['model']['state']
     users = get_users_model(data)
+    print('{} ----- got users'.format(datetime.datetime.now()))
     applications = get_applications_info(connection)
-    machines = get_machines_info(connection)
+    print('{} ------ got applications'.format(datetime.datetime.now()))
+    machines = await get_machines_info(connection)
+    print('{} ------ got machines'.format(datetime.datetime.now()))
     gui = get_gui_url(data)
-    credentials = {'cloud': data['controller']['type'], 'credential-name': ['model']['credential']}
+    print('{} ------ got gui'.format(datetime.datetime.now()))
+    credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
     return {'name': data['model']['name'], 'users': users,
             'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
             'state': state, 'credentials' : credentials}
@@ -403,7 +421,7 @@ async def get_public_ip_controller(token, controller):
 
 
 def get_gui_url(data):
-    return 'https://{}/gui/{}'.format(data['controller']['endpoint'], data['model']['uuid'])
+    return 'https://{}/gui/{}'.format(data['controller']['endpoints'][0], data['model']['uuid'])
 
 
 def create_model(authorization, m_name, cred_name, c_name):
@@ -430,14 +448,14 @@ def create_model(authorization, m_name, cred_name, c_name):
         return errors.already_exists('model')
 
 
-def check_model_state(m_key, required_states):
-    """Checks if a model its state is one of the required states. Certain API calls
-    can only succeed if the model is in a certain state. F.e. the call to deploy
-    a bundle requires that the model is 'ready' or else a deployment will fail.
-    The call to delete a model requires that the model is in 'error' or 'ready' state."""
-    state = datastore.get_model_state(m_key)
-    if state in required_states:
-        return state
+# def check_model_state(m_key, required_states):
+#     """Checks if a model its state is one of the required states. Certain API calls
+#     can only succeed if the model is in a certain state. F.e. the call to deploy
+#     a bundle requires that the model is 'ready' or else a deployment will fail.
+#     The call to delete a model requires that the model is in 'error' or 'ready' state."""
+#     state = datastore.get_model_state(m_key)
+#     if state in required_states:
+#         return state
 
 
 # TODO: Functie die bij iedere POST die iets verandert aan een model checkt
@@ -447,10 +465,10 @@ def check_model_state(m_key, required_states):
 # model nog niet"
 
 
-async def delete_model(authorization, data):
-    datastore.set_model_state(data['model']['_key'], 'deleting model')
+def delete_model(username, password, controller, model, m_key):
+    datastore.set_model_state(m_key, 'deleting')
     Popen(["python3", "{}/scripts/delete_model.py".format(settings.SOJOBO_API_DIR),
-           data['controller']['name'], data['model']['name'], data['model']['_key'], authorization.username, authorization.password])
+           controller, model, m_key, username, password])
 #####################################################################################
 # Machines FUNCTIONS
 #####################################################################################
@@ -547,17 +565,16 @@ def remove_machine(token, controller, model, machine):
 #####################################################################################
 
 
-async def app_exists(token, controller, model, app_name):
-    model_info = await get_model_info(token, controller, model)
-    for app in model_info['applications']:
+async def app_exists(connection, app_name):
+    for app in get_applications_info(connection):
         if app['name'] == app_name:
             return True
     return False
 
 
-def add_bundle(authentication, data, bundle):
+def add_bundle(username, password, c_name, m_name, bundle):
     Popen(["python3", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR),
-           authentication.username, authentication.password, data['controller']['name'], data['model']['name'], str(bundle)])
+           username, password, c_name, m_name, str(bundle)])
 
 
 async def deploy_app(token, con, model, app_name, data):
@@ -625,9 +642,9 @@ async def get_unit_info(token, model, application, unitnumber):
     return {}
 
 
-def add_unit(token, controller, model, app_name, amount, target):
-    Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), token.username,
-           token.password, settings.SOJOBO_API_DIR, controller.c_name, model.m_name,
+def add_unit(username, password, controller, model, app_name, amount, target):
+    Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), username,
+           password, controller, model,
            app_name, str(amount), target])
 
 
@@ -796,7 +813,6 @@ def remove_credential(user, cred_name):
 
 def credential_exists(user, credential):
    for cred in get_credentials(user):
-       print(cred)
        if cred:
            if cred['name'] == credential:
                return True

@@ -546,12 +546,18 @@ def remove_model_from_controller(c_name, m_key):
 
 
 def set_model_state(m_key, state, credential=None, uuid=None):
-    aql = ('UPDATE @model WITH {'
-           'state: @state, '
-           'credential: @credential, '
-           'uuid: @uuid'
-           '} IN models')
-    execute_aql_query(aql, model=m_key, state=state, credential=credential, uuid=uuid)
+    if not credential and not uuid:
+        aql = ('UPDATE @model WITH {'
+               'state: @state '
+               '} IN models')
+        execute_aql_query(aql, model=m_key, state=state)
+    else:
+        aql = ('UPDATE @model WITH {'
+               'state: @state, '
+               'credential: @credential, '
+               'uuid: @uuid'
+               '} IN models')
+        execute_aql_query(aql, model=m_key, state=state, credential=credential, uuid=uuid)
 
 
 def get_model_state(m_key):
@@ -610,7 +616,7 @@ def get_users_model(m_key):
     m_id = "models/" + m_key
     aql = ('FOR u, mEdge IN 1..1 OUTBOUND @m_id modelAccess '
                'RETURN {name: u.name, access: mEdge.access}')
-    return execute_aql_query(aql, rawResults=True, m_id=m_id)
+    return execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
 
 ################################################################################
 #                          CONNECTION FUNCTIONS                                #
