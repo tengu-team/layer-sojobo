@@ -20,6 +20,7 @@ import ast
 import sys
 import traceback
 import logging
+import base64, hashlib
 from juju import tag, errors
 from juju.client import client
 from juju.model import Model
@@ -55,6 +56,9 @@ async def update_ssh_key(ssh_keys, username):
 
                     logger.info('Removing current ssh keys...')
                     for key in current_keys:
+                        key = base64.b64decode(bytes(key.strip().split()[1].encode('ascii')))
+                        key = hashlib.md5(key).hexdigest()
+                        key = ':'.join(a+b for a, b in zip(key[::2], key[1::2]))
                         logger.info('removing key: %s', key)
                         await key_facade.DeleteKeys([key], juju_username)
 

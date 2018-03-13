@@ -32,16 +32,22 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: di
 async def remove_user_from_controller(username, c_name):
     try:
         data = datastore.get_controller_connection_info(username, c_name)
+
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller_connection = Controller()
-        await controller_connection.connect(endpoint=data['controller']['endpoints'][0], username=settings.JUJU_ADMIN_USER, password=settings.JUJU_ADMIN_PASSWORD, cacert=data['controller']['ca_cert'])
+        await controller_connection.connect(endpoint=data['controller']['endpoints'][0],
+                                            username=settings.JUJU_ADMIN_USER,
+                                            password=settings.JUJU_ADMIN_PASSWORD,
+                                            cacert=data['controller']['ca_cert'])
         logger.info('Controller connection as admin was successful')
+
         user_facade = client.UserManagerFacade.from_connection(controller_connection.connection)
         entity = client.Entity(tag.user(data['user']['juju_username']))
+
         logger.info('Removing user from %s', c_name)
         await user_facade.RemoveUser([entity])
-        logger.info('Removed user %s from Controller %s', username ,c_name)
         datastore.delete_user(username)
+        logger.info('Removed user %s from Controller %s!', username ,c_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

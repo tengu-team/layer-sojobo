@@ -457,7 +457,7 @@ def get_superuser_matching_controllers(user, resource_user):
     """Get controllers where the given user has superuser access and where
     the resource_user resides."""
     u_id = get_user_id(user)
-    ru_id = "users/" + resource_user
+    ru_id = get_user_id(resource_user)
     aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess '
                 'FILTER cEdge.access == "superuser" '
                 'FOR c, E IN 1..1 INBOUND @ru_id controllerAccess '

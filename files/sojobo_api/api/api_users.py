@@ -133,7 +133,6 @@ def create_user():
 
 @USERS.route('/<user>', methods=['GET'])
 def get_user_info(user):
-    # TODO: TEST! With superuser! First controller-access change must be possible.
     try:
         LOGGER.info('/USERS/%s [GET] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
@@ -174,7 +173,7 @@ def change_user_password(user):
             if juju.user_exists(user):
                 pwd = request.json['password']
                 if pwd:
-                    juju.change_user_password(auth_data["user"]["controllers"], user, pwd)
+                    juju.change_user_password(user, pwd)
                     code, response = 200, 'Succesfully changed password for user {}'.format(user)
                     LOGGER.info('/USERS/%s [PUT] => Succesfully changed password for user %s!', user, user)
                 else:
@@ -205,7 +204,7 @@ def delete_user(user):
     try:
         LOGGER.info('/USERS/%s [DELETE] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [DELETE] => Authenticated!', user)
         if juju.check_if_admin(request.authorization):
             if juju.user_exists(user):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-from sojobo_api.api import w_juju
+from sojobo_api.api import w_datastore
+from sojobo_api import settings
 
 """
 This module has a static dictionary with each call and its required access levels.
@@ -128,5 +129,14 @@ def m_authorize(model_connection_info, resource, method):
     return model_access in allowed_access_levels
 
 
-def superuser_authorize(user_info, resource_user):
-	return w_juju.has_superuser_access_over_user(user_info['name'], resource_user)
+def superuser_authorize(superuser, resource_user):
+	"""Checks if there is at least one controller where the given user has superuser
+	   access over the resource_user."""
+	# A superuser is not allowed to see information about admin user.
+	if resource_user == settings.JUJU_ADMIN_USER and superuser != settings.JUJU_ADMIN_USER:
+		return False
+	else:
+		matching_controllers = w_datastore.get_superuser_matching_controllers(superuser, resource_user)
+		print("Matching controllers: ")
+		print(matching_controllers)
+		return bool(matching_controllers)

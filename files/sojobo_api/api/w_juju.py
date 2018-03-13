@@ -135,8 +135,8 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
         abort(error[0], error[1])
 
 
-def check_if_admin(auth):
-    return auth.username == settings.JUJU_ADMIN_USER and auth.password == settings.JUJU_ADMIN_PASSWORD
+def check_if_admin(auth_data):
+    return auth_data.username == settings.JUJU_ADMIN_USER and auth_data.password == settings.JUJU_ADMIN_PASSWORD
 
 
 async def connect_to_random_controller(authorization, auth_data):
@@ -217,7 +217,7 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
     # Admin has authorization in every situation.
     if connection_info["user"]["name"] == settings.JUJU_ADMIN_USER:
         return True
-    elif self_user == connection_info["user"]["username"]:
+    elif self_user == connection_info["user"]["name"]:
         return True
     elif "m_access" in connection_info:
         return permissions.m_authorize(connection_info, resource, method)
@@ -226,8 +226,8 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
     # If no 'm_access' or 'c_access' is found in the connection info then there will
     # only be user info.
     elif "user" in connection_info and resource_user:
-        return permissions.superuser_authorize(connection_info["user"], resource_user)
-
+        return permissions.superuser_authorize(connection_info["user"]["name"],
+                                               resource_user)
 
 
 def get_connection_info(authorization, c_name=None, m_name=None):
@@ -709,12 +709,23 @@ async def get_application_config(token, model, app_name):
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
+
+
 def create_user(username, password):
+    # We create a seperate name with a timestamp that will be used in Juju.
+    # This is because Juju doesn't allow a username that has been used before.
+    # F.e. Juju does not allow you create a user 'bob', then delete him
+    # and then try to add a user that is also named 'bob', therefore we add a timestamp.
     juju_username = 'u{}{}'.format(hashlib.md5(username.encode('utf')).hexdigest(), give_timestamp())
     datastore.create_user(username, juju_username)
     controllers = datastore.get_ready_controllers()
+
     for controller in controllers:
-        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR), username, password, controller['name'], juju_username])
+        c_name = controller['name']
+        endpoint = controller["endpoints"][0]
+        cacert = controller["ca_cert"]
+        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR),
+        username, password, juju_username, c_name, endpoint, cacert])
     if len(controllers) == 0:
         datastore.set_user_state(username, 'ready')
 
@@ -723,14 +734,15 @@ def delete_user(username):
     datastore.set_user_state(username, 'deleting')
     controllers = datastore.get_ready_controllers()
     for controller in controllers:
-        Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR), username, controller['name']])
+        Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR),
+        username, controller['name']])
 
 
 def add_user_to_controllers(data, username, password):
     Popen(["python3", "{}/scripts/add_user_to_controllers.py".format(settings.SOJOBO_API_DIR),data, username, password])
 
 
-def change_user_password(controllers, username, password):
+def change_user_password(username, password):
     user = datastore.get_user_info(username)
     juju_username = user["juju_username"]
 
@@ -793,7 +805,7 @@ def add_credential(user, data):
     try:
         return get_controller_types()[data['type']].add_credential(user, data)
     except NotImplementedError as e:
-        return 400, "This type of controller does not need credentials"
+        return 400, "This type of controller does not need credentials."
 
 
 async def update_cloud(controller, cloud, credential, username):
@@ -808,7 +820,8 @@ async def update_cloud(controller, cloud, credential, username):
 
 
 def remove_credential(user, cred_name):
-    Popen(["python3", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR), user, cred_name, settings.SOJOBO_API_DIR])
+    Popen(["python3", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR),
+    user, cred_name, settings.SOJOBO_API_DIR])
 
 
 def credential_exists(user, credential):
@@ -856,6 +869,24 @@ def set_models_access(username, c_name, models_access):
                        username, c_name, endpoint, cacert, m_key, uuid, model["access"]])
         else:
             abort(404, 'Model {} not found'.format(mod['name']))
+
+
+def set_model_access(username, c_name, m_key, access):
+    # TODO: If time, reduce datastore calls.
+    if datastore.model_exists(m_key):
+        if not m_access_exists(access):
+            abort(400, 'Access Level {} is not supported. Change access for model {}'.format(access, m_key))
+        else:
+            model_info = datastore.get_model_connection_info(username, c_name, m_key)
+            uuid = model_info["model"]["uuid"]
+            endpoint = model_info["controller"]["endpoints"][0]
+            cacert = model_info["controller"]["ca_cert"]
+
+            Popen(["python3",
+                   "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR),
+                   username, c_name, endpoint, cacert, m_key, uuid, access])
+    else:
+        abort(404, 'Model not found')
 
 
 async def model_grant(token, model, username, access):
@@ -927,15 +958,6 @@ def c_access_exists(access):
 
 def m_access_exists(access):
     return access in ['read', 'write', 'admin']
-
-
-def has_superuser_access_over_user(superuser, resource_user):
-    """Checks if there is at least one controller where the given user has superuser
-    access over the resource_user."""
-    matching_controllers = datastore.get_superuser_matching_controllers(superuser, resource_user)
-    print("Matching controllers: ")
-    print(matching_controllers)
-    return bool(matching_controllers)
 
 
 # def check_access(access):
