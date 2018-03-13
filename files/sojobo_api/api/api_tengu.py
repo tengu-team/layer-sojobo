@@ -235,6 +235,7 @@ def get_model_info(controller, model):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => receiving call', controller, model)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => got connection info', controller, model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => Authenticated!', controller, model)
         if juju.authorize(auth_data, '/controllers/controller/models/model', 'get'):
@@ -263,7 +264,6 @@ def add_bundle(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => receiving call', controller, model)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
-        print(auth_data)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authenticated!', controller, model)
         if juju.authorize(auth_data, '/controllers/controller/models/model', 'post'):
