@@ -115,12 +115,15 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
             if auth_data['c_access']:
                 if controller and not model:
                     controller_connection = Controller()
-                    await controller_connection.connect(auth_data['controller']['endpoints'][0], authorization.username, authorization.password, auth_data['controller']['ca_cert'])
+                    await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
                     return controller_connection
                 elif model:
+                    print('{} ------ found controller and model'.format(datetime.datetime.now()))
                     check_model_state(auth_data)
                     model_connection = Model()
-                    await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], authorization.username, authorization.password, auth_data['controller']['ca_cert'])
+                    print('{} ------ starting connection'.format(datetime.datetime.now()))
+                    await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
+                    print('{} ------ returning connection'.format(datetime.datetime.now()))
                     return model_connection
             elif auth_data['controller']['state'] == 'ready':
                 await connect_to_random_controller(authorization)
@@ -173,15 +176,15 @@ def check_controller_state(auth_data, authorization):
 
 
 def check_model_state(auth_data):
-    state = auth_data['model']['state']
     if auth_data['model']:
+        state = auth_data['model']['state']
         if state == 'accepted':
             abort(403, "The Workspace is not ready yet. Please wait untill the workspace is created!")
         elif state == 'deleting':
             abort(403, "The Workspace is being removed!")
         elif state.startswith('error'):
             abort(403, "Model in error state => {}".format(state))
-    elif auth_data['c_access'] in ['superuser', 'add_model']:
+    elif auth_data['c_access'] in ['superuser', 'add_model', 'admin']:
         abort(404, 'The Workspace does not exist')
     else:
         abort(errors.unauthorized)
@@ -240,7 +243,7 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 
 async def disconnect(connection):
-    if connection and connection.connection.is_open:
+    if connection.connection and connection.connection.is_open:
         await connection.disconnect()
 ###############################################################################
 # CONTROLLER FUNCTIONS
@@ -348,12 +351,17 @@ def get_model_access(model, controller, username):
 
 
 async def get_model_info(connection, data):
+    print('{} ------ getting modelinfo'.format(datetime.datetime.now()))
     state = data['model']['state']
     users = get_users_model(data)
+    print('{} ----- got users'.format(datetime.datetime.now()))
     applications = get_applications_info(connection)
-    machines = get_machines_info(connection)
+    print('{} ------ got applications'.format(datetime.datetime.now()))
+    machines = await get_machines_info(connection)
+    print('{} ------ got machines'.format(datetime.datetime.now()))
     gui = get_gui_url(data)
-    credentials = {'cloud': data['controller']['type'], 'credential-name': ['model']['credential']}
+    print('{} ------ got gui'.format(datetime.datetime.now()))
+    credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
     return {'name': data['model']['name'], 'users': users,
             'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
             'state': state, 'credentials' : credentials}
@@ -412,7 +420,7 @@ async def get_public_ip_controller(token, controller):
 
 
 def get_gui_url(data):
-    return 'https://{}/gui/{}'.format(data['controller']['endpoint'], data['model']['uuid'])
+    return 'https://{}/gui/{}'.format(data['controller']['endpoints'][0], data['model']['uuid'])
 
 
 def create_model(authorization, m_name, cred_name, c_name):
@@ -791,7 +799,6 @@ def remove_credential(user, cred_name):
 
 def credential_exists(user, credential):
    for cred in get_credentials(user):
-       print(cred)
        if cred:
            if cred['name'] == credential:
                return True

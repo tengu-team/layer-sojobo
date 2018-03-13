@@ -73,7 +73,7 @@ def get_users_info():
     try:
         LOGGER.info('/USERS [GET] => receiving call')
         auth_data = juju.get_connection_info(request.authorization)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS [GET] => Authenticated!')
         if juju.check_if_admin(request.authorization):
             code, response = 200, juju.get_users_info(auth_data['user'])
