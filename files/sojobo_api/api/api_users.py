@@ -591,7 +591,7 @@ def grant_to_model(user, controller):
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => receiving call', user, controller)
         models_access_levels = request.json
         auth_data = juju.get_connection_info(request.authorization)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authenticated!', user, controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authorized!', user, controller)
         if juju.authorize(auth_data, '/users/user/controllers/controller/models', 'put'):
@@ -623,13 +623,13 @@ def grant_to_model(user, controller):
 def get_model_access(user, controller, model):
     try:
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => receiving call!', user, controller, model)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authenticated!', user, controller, model)
-        con, mod = juju.authorize(token, controller, model)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authorized!', user, controller, model)
-        if token.is_admin or token.username == user or mod.access == 'admin' or con.access == 'superuser':
+        if juju.authorize(auth_data, '/users/user/controllers/controller/models/model', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
-                access = juju.get_model_access(mod.m_name, con.c_name, user)
+                access = juju.get_model_access(model, controller, user)
                 code, response = 200, {'access' : access}
                 LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Succesfully retrieved model access!', user, controller, model)
             else:
