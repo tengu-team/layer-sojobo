@@ -1,5 +1,7 @@
-includes: ['layer:basic', 'layer:leadership', 'layer:apt', 'layer:juju-client', 'layer:nginx-passenger', 'layer:metrics', 'interface:sojobo', 'interface:arangodb']
+includes: ['layer:basic', 'layer:leadership', 'layer:apt', 'layer:juju-client',
+'layer:nginx-passenger', 'layer:metrics', 'interface:sojobo', 'interface:arangodb',
+'interface:nginx-stats']
 repo: git@github.com:Qrama/Sojobo-api.git
 options:
   apt:
-    packages: ['maas-cli', 'python3-lxml', 'python3.6']
+    packages: ['python3-lxml']
