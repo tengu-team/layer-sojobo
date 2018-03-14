@@ -23,10 +23,10 @@ import traceback
 import ast
 import logging
 import yaml
-import json
-from juju.model import Model
+from juju.model import Model, BundleHandler
 sys.path.append('/opt')
-from sojobo_api.api import w_datastore as datastore
+from sojobo_api import settings
+from sojobo_api.api import w_datastore as datastore, w_juju as juju
 ################################################################################
 # Helper Functions
 ################################################################################
@@ -35,10 +35,14 @@ def quoted_presenter(dumper, data):
 ################################################################################
 # Async Functions
 ################################################################################
-async def deploy_bundle(username, password, controller_name, m_key, bundle):
+async def deploy_bundle(username, password, c_name, m_name, bundle):
     try:
         logger.info('Authenticated and starting bundle deployment!')
+        m_key = datastore.get_model_key(c_name, m_name)
+        auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         dirpath = tempfile.mkdtemp()
+
+        logger.info('Create the bundle in tmp dir')
         os.mkdir('{}/bundle'.format(dirpath))
         bundle_dict = ast.literal_eval(bundle)
         yaml.add_representer(str, quoted_presenter)
@@ -47,31 +51,43 @@ async def deploy_bundle(username, password, controller_name, m_key, bundle):
         with open('{}/bundle/README.md'.format(dirpath), 'w+') as readmefile:
             readmefile.write('##Overview')
         logger.info('Tmp file created and ready to be deployed! %s', outfile)
-        con = datastore.get_controller(controller_name)
-        mod = datastore.get_model(m_key)
-        logger.info('Setting up Modelconnection for model: %s', mod["name"])
+        logger.info('Setting up Modelconnection for model: %s', m_name)
         model = Model()
-        await model.connect(con['endpoints'][0], mod['uuid'], username, password)
+        await model.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], username, password, auth_data['controller']['ca_cert'])
         logger.info('Deploying bundle from %s/bundle', dirpath)
-        if 'series' in bundle_dict.keys():
-            await model.deploy('{}/bundle'.format(dirpath), series=bundle_dict['series'])
-        await model.deploy('{}/bundle'.format(dirpath))
-        logger.info('Bundle successfully deployed for %s:%s', controller_name, mod["name"])
+
+        handler = BundleHandler(model)
+        await handler.fetch_plan('{}/bundle'.format(dirpath))
+        await handler.execute_plan()
+        extant_apps = {app for app in model.applications}
+        pending_apps = set(handler.applications) - extant_apps
+        if pending_apps:
+            # new apps will usually be in the model by now, but if some
+            # haven't made it yet we'll need to wait on them to be added
+            await asyncio.gather(*[
+                asyncio.ensure_future(
+                    model._wait_for_new('application', app_name),
+                    loop=model.loop)
+                for app_name in pending_apps
+            ], loop=model.loop)
+        logger.info('Bundle successfully deployed for %s:%s', c_name, m_name)
         await model.disconnect()
-        logger.info('Successfully disconnected %s', mod["name"])
+        logger.info('Successfully disconnected %s', m_name)
         shutil.rmtree(dirpath)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
-
+    finally:
+        if 'model' in locals():
+            await juju.disconnect(model)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('bundle_deployment')
-    hdlr = logging.FileHandler('{}/log/bundle_deployment.log'.format(sys.argv[3]))
+    hdlr = logging.FileHandler('{}/log/bundle_deployment.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -80,6 +96,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(deploy_bundle(sys.argv[1], sys.argv[2], sys.argv[4],
-                                          sys.argv[5], sys.argv[6]))
+    loop.run_until_complete(deploy_bundle(sys.argv[1], sys.argv[2], sys.argv[3],
+                                          sys.argv[4], sys.argv[5]))
     loop.close()

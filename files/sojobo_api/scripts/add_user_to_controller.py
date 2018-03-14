@@ -18,51 +18,49 @@ import asyncio
 import logging
 import sys
 import traceback
+from juju.client import client
+from juju.controller import Controller
 sys.path.append('/opt')
-from juju import tag
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
-from juju.client import client
-
-
-class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = settings.JUJU_ADMIN_USER
-        self.password = settings.JUJU_ADMIN_PASSWORD
-        self.is_admin = True
 
 ################################################################################
 # Async method
 ################################################################################
-async def delete_user(username):
+async def add_user_to_controller(username, password, juju_username, c_name, endpoint, cacert):
     try:
-        token = JuJu_Token()
-        #TO DO => libjuju implementation
-        controllers = datastore.get_keys_controllers()
-        datastore.set_user_state(username, 'deleting')
-        for con in controllers:
-            logger.info('Setting up Controllerconnection for %s', con)
-            controller = juju.Controller_Connection(token, con)
-            async with controller.connect(token) as con_juju:
-                user_facade = client.UserManagerFacade.from_connection(con_juju.connection)
-                entity = client.Entity(tag.user(username))
-                logger.info('Removing user from %s', con)
-                await user_facade.RemoveUser([entity])
-                # if wrapper ready =>
-                # await con_juju.remove(username)
-            logger.info('Removed user %s from Controller %s', username ,con)
-        datastore.delete_user(username)
+        logger.info('Adding user %s to controller %s...', username, c_name)
+        logger.info('Setting up Controller connection for %s...', c_name)
+        controller_connection = Controller()
+        await controller_connection.connect(endpoint=endpoint,
+                                            username=settings.JUJU_ADMIN_USER,
+                                            password=settings.JUJU_ADMIN_PASSWORD,
+                                            cacert=cacert)
+        logger.info('Controller connection as admin was successful.')
+
+        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection)
+        users = [client.AddUser(display_name=juju_username,
+                                username=juju_username,
+                                password=password)]
+        await user_facade.AddUser(users)
+
+        datastore.add_user_to_controller(c_name, username, 'login')
+        logger.info('Succesfully added user %s to controller %s!', username, c_name)
+        datastore.set_user_state(username, 'ready')
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+    finally:
+        await controller_connection.disconnect()
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger('delete-user')
+    logger = logging.getLogger('add_user_to_controller')
     ws_logger = logging.getLogger('websockets.protocol')
-    hdlr = logging.FileHandler('{}/log/delete_user.log'.format(settings.SOJOBO_API_DIR))
+    hdlr = logging.FileHandler('{}/log/add_user_to_controller.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -71,5 +69,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
-    loop.run_until_complete(delete_user(sys.argv[1]))
+    loop.run_until_complete(add_user_to_controller(sys.argv[1], sys.argv[2],
+                                                   sys.argv[3], sys.argv[4],
+                                                   sys.argv[5], sys.argv[6]))
     loop.close()
