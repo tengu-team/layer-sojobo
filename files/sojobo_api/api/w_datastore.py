@@ -330,7 +330,7 @@ def get_users_controller(c_name):
     """Returns a list with users and access of given controller."""
     c_id = "controllers/" + c_name
     aql = ('FOR u, cEdge IN 1..1 OUTBOUND @c_id controllerAccess '
-               'RETURN {name: u.name, access: cEdge.access}')
+               'RETURN {name: u.name, juju_username: u.juju_username, access: cEdge.access}')
     return execute_aql_query(aql, rawResults=True, c_id=c_id)
 
 

@@ -91,8 +91,9 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         logger.info('%s -> retrieving users: %s', m_name, con_users)
         for u in con_users:
             if u['access'] == 'superuser' and u['name'] != usr:
-                user = tag.user(u['name'])
-                changes = client.ModifyModelAccess('admin', 'grant', model, user)
+                user = tag.user(u['juju_username'])
+                uuid_tag = tag.model(model_info.uuid)
+                changes = client.ModifyModelAccess('admin', 'grant', uuid_tag, user)
                 await model_facade.ModifyModelAccess([changes])
                 datastore.set_model_access(m_key, u['name'], 'admin')
                 for key in datastore.get_ssh_keys(u['name']):
