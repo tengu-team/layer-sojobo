@@ -29,14 +29,15 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 async def remove_unit(username, password, c_name, m_key, unit_name):
     try:
-        auth_data = get_model_connection_info(username, c_name, m_key)
+        auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         model_connection = Model()
         logger.info('Setting up Model connection for %s:%s', c_name, auth_data['model']['name'])
-        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca-cert'])
+        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
         logger.info('Model connection was successful')
         app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
         await app_facade.DestroyUnits(list(unit_name))
         logger.info('%s has been removed', unit_name)
+        await model_connection.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)

@@ -641,7 +641,7 @@ async def get_unit_info(token, model, application, unitnumber):
     return {}
 
 
-def add_unit(username, password, controller, model, mod_key, app_name, amount, target):
+def add_unit(username, password, controller, mod_key, app_name, amount, target):
     Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), username,
            password, controller, mod_key, app_name, str(amount), target])
 

@@ -32,13 +32,16 @@ async def add_unit(username, password, c_name, m_key, app_name, amount, target):
         auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         model_connection = Model()
         logger.info('Setting up Model connection for %s:%s', c_name, auth_data['model']['name'])
-        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca-cert'])
+        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
         logger.info('Model connection was successful')
         app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
+        if target == 'None':
+            target = None
         await app_facade.AddUnits(application=app_name,
-                                  placement=parse_placement(target) if target else None,
-                                  num_units=amount)
+                                  placement=parse_placement(target),
+                                  num_units=int(amount))
         logger.info('Units added to %s', app_name)
+        await model_connection.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
