@@ -775,8 +775,17 @@ def update_ssh_keys_user(username, ssh_keys):
 
     Popen([
         "python3",
-        "{}/scripts/update_ssh_keys.py".format(settings.SOJOBO_API_DIR),
-        str(ssh_keys), username, settings.SOJOBO_API_DIR])
+        "{}/scripts/update_ssh_keys_all_models.py".format(settings.SOJOBO_API_DIR),
+        str(ssh_keys), username])
+
+
+def update_ssh_keys_model(username, ssh_keys, c_name, m_key):
+    user_info = datastore.get_user_info(username)
+
+    Popen([
+        "python3",
+        "{}/scripts/update_ssh_keys_model.py".format(settings.SOJOBO_API_DIR),
+        str(ssh_keys), username, c_name, m_key])
 
 
 def get_users_controller(controller):
@@ -838,7 +847,7 @@ def grant_user_to_controller(c_name, username, access):
     endpoint = controller_ds['endpoints'][0]
     cacert= controller_ds['ca_cert']
     juju_username = user_ds["juju_username"]
-    
+
     Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
            c_name, username, access, endpoint, cacert, juju_username])
 

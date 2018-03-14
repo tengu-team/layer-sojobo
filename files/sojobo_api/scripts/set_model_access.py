@@ -62,7 +62,7 @@ async def set_model_acc(username, c_name, endpoint, cacert, m_key, uuid, access)
         await model_facade.ModifyModelAccess([changes])
 
         if access in ['admin', 'write']:
-            juju.update_ssh_keys_user(username, ssh_keys)
+            juju.update_ssh_keys_model(username, ssh_keys, c_name, m_key)
 
         datastore.set_model_access(m_key, username, access)
         logger.info('Model Access set for %s on %s!', username, m_key)
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('set_model_access')
-    hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(settings.SOJOBO_API_DIR,))
+    hdlr = logging.FileHandler('{}/log/set_model_access.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)

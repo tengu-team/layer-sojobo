@@ -88,7 +88,7 @@ async def set_controller_acc(c_name, username, acl, endpoint, cacert, juju_usern
         if acl == 'superuser':
             print("===== Access is superuser =====")
             for mod in datastore.get_all_models(c_name):
-                w_juju.set_model_access(username, c_name, mod[_key], 'admin')
+                juju.set_model_access(username, c_name, mod['_key'], 'admin')
 
     except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()

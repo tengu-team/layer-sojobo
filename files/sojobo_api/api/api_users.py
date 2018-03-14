@@ -283,7 +283,7 @@ def update_ssh_keys(user):
                         code, response = errors.invalid_ssh_key(key)
                         return juju.create_response(code, response)
                 juju.update_ssh_keys_user(user, http_body['ssh-keys'])
-                LOGGER.info('/USERS/%s/ssh-keys [PUT] => SSH-keys are being updated, check update_ssh_keys.log for more information!', user)
+                LOGGER.info('/USERS/%s/ssh-keys [PUT] => SSH-keys are being updated, check update_ssh_keys_all_models.log for more information!', user)
                 code, response = 202, 'SSH-keys are being updated'
             else:
                 code, response = errors.does_not_exist('user')
