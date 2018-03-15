@@ -21,24 +21,23 @@ import logging
 import json
 from juju.client import client
 from juju.model import Model
-from juju.Application import Application
 from juju.placement import parse as parse_placement
 sys.path.append('/opt')
 from sojobo_api import settings
 from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
-async def remove_application(username, password, c_name, m_key, app_name)):
+async def remove_application(username, password, c_name, m_key, app_name):
     try:
 
-        auth_data = get_model_connection_info(username, c_name, m_key)
+        auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         model_connection = Model()
-        logger.info('Setting up Model connection for %s:%s', c_name, m_name)
-        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca-cert'])
+        logger.info('Setting up Model connection for %s:%s', c_name, auth_data['model']['name'])
+        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
         logger.info('Model connection was successful')
 
         logger.info('Removing Application')
-        entity = await juju.get_application_entity(model_connection, app_name)
+        entity = juju.get_application_entity(model_connection, app_name)
         app_facade = client.ApplicationFacade.from_connection(entity.connection)
         await app_facade.Destroy(entity.name)
 
@@ -67,6 +66,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(add_unit(sys.argv[1], sys.argv[2], sys.argv[3],
+    loop.run_until_complete(remove_application(sys.argv[1], sys.argv[2], sys.argv[3],
                                      sys.argv[4], sys.argv[5]))
     loop.close()
