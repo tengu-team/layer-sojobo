@@ -27,8 +27,7 @@ from sojobo_api import settings
 from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
-async def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
-                       relation1, relation2):
+async def add_relation(c_name, endpoint, cacert, m_name, uuid, juju_username, password, relation1, relation2):
     try:
         #auth_data = get_model_connection_info(username, c_name, m_key)
         logger.info('Setting up Model connection for %s:%s.', c_name, m_name)
@@ -38,7 +37,7 @@ async def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, p
                                        juju_username,
                                        password,
                                        cacert)
-        logger.info('Model connection was successful'.)
+        logger.info('Model connection was successful.')
 
         app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
 
@@ -76,5 +75,5 @@ if __name__ == '__main__':
     loop.set_debug(True)
     loop.run_until_complete(add_relation(sys.argv[1], sys.argv[2], sys.argv[3],
                                          sys.argv[4], sys.argv[5], sys.argv[6],
-                                         sys.argv[7, sys.argv[8], sys.argv[9]]))
+                                         sys.argv[7], sys.argv[8], sys.argv[9]))
     loop.close()

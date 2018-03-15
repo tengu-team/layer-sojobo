@@ -828,19 +828,27 @@ def add_relation(controller, model):
             LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authorized!', controller, model)
             # TODO: Proper check will have to be implemented!
             relation1, relation2 = data['app1'], data['app2']
-            if execute_task(juju.app_exists, model_connection, app1) and execute_task(juju.app_exists, model_connection, app2):
+            app1, app2 = data['app1'], data['app2']
+            if ':' in app1:
+                app1 = app1.split(':')[0]
+            if ':' in app2:
+                app2 = app2.split(':')[0]
+            print(app1)
+            print(app2)
 
-                endpoint = model_connection["controller"]["endpoints"][0]
-                cacert = model_connection["controller"]["cacert"]
-                m_name = model_connection["model"]["name"]
-                uuid = model_connection["model"]["uuid"]
-                juju_username = model_connection["user"]["juju_username"]
+            if juju.app_exists(model_connection, app1) and juju.app_exists(model_connection, app2):
+
+                endpoint = auth_data["controller"]["endpoints"][0]
+                cacert = auth_data["controller"]["ca_cert"]
+                m_name = auth_data["model"]["name"]
+                uuid = auth_data["model"]["uuid"]
+                juju_username = auth_data["user"]["juju_username"]
                 password = request.authorization.password
-                execute_task(juju.add_relation, controller, endpoint, cacert,
-                                                m_name, uuid, juju_username,
-                                                password, relation1, relation2)
+                juju.add_relation(controller, endpoint, cacert,m_name, uuid,
+                                  juju_username, password, relation1, relation2)
 
-                code, response = 200, execute_task(juju.get_relations_info, token, mod)
+                #code, response = 200, execute_task(juju.get_relations_info, token, mod)
+                code, response = 200, "Success"
                 LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Relationship succesfully created.', controller, model)
             else:
                 code, response = errors.does_not_exist('application')

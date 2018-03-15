@@ -665,7 +665,7 @@ async def get_relations_info(token, model):
 
 
 def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, relation1, relation2):
-    Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR),
+    Popen(["python3", "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
            c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
            relation1, relation2])
 
