@@ -817,23 +817,33 @@ def add_relation(controller, model):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => receiving call', controller, model)
         data = request.json
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization, controller, model)
+        model_connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authenticated!', controller, model)
-        con, mod = juju.authorize( token, controller, model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authorized!', controller, model)
-        #proper check will have to be implemented
-        app1, app2 = data['app1'], data['app2']
-        if execute_task(juju.app_exists, token, con, mod, app1) and execute_task(juju.app_exists, token, con, mod, app2):
-            if mod.m_access == 'write' or mod.m_access == 'admin':
-                execute_task(juju.add_relation, token, mod, app1, app2)
+        if juju.authorize(auth_data, '/controllers/controller/models/model/relations', 'put'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authorized!', controller, model)
+            # TODO: Proper check will have to be implemented!
+            relation1, relation2 = data['app1'], data['app2']
+            if execute_task(juju.app_exists, model_connection, app1) and execute_task(juju.app_exists, model_connection, app2):
+
+                endpoint = model_connection["controller"]["endpoints"][0]
+                cacert = model_connection["controller"]["cacert"]
+                m_name = model_connection["model"]["name"]
+                uuid = model_connection["model"]["uuid"]
+                juju_username = model_connection["user"]["juju_username"]
+                password = request.authorization.password
+                execute_task(juju.add_relation, controller, endpoint, cacert,
+                                                m_name, uuid, juju_username,
+                                                password, relation1, relation2)
+
                 code, response = 200, execute_task(juju.get_relations_info, token, mod)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Relationship succesfully created.', controller, model)
             else:
-                code, response = errors.no_permission()
-                LOGGER.error('/TENGU/controllers/%s/models/%s/relations [PUT] => No permission to perform this acion!', controller, model)
+                code, response = errors.does_not_exist('application')
+                LOGGER.error('/TENGU/controllers/%s/models/%s/relations [PUT] => Application does not exist!', controller, model)
         else:
-            code, response = errors.does_not_exist('application')
-            LOGGER.error('/TENGU/controllers/%s/models/%s/relations [PUT] => Application does not exist!', controller, model)
+            code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s/relations [PUT] => No permission to perform this acion!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()

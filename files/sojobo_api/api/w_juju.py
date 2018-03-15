@@ -661,12 +661,13 @@ async def get_relations_info(token, model):
     return [{'name': a['name'], 'relations': a['relations']} for a in data]
 
 
-async def add_relation(token, model, app1, app2):
-    async with model.connect(token) as juju:
-        await juju.add_relation(app1, app2)
+def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, relation1, relation2):
+    Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR),
+           c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
+           relation1, relation2])
 
 
-async def remove_relation(token, model, app1, app2):
+async def tion(token, model, app1, app2):
     async with model.connect(token) as juju:
         data = juju.state.state
         application = await get_application_entity(token, model, app1)
