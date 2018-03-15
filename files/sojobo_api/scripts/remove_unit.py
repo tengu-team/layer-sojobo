@@ -35,7 +35,7 @@ async def remove_unit(username, password, c_name, m_key, unit_name):
         await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
         logger.info('Model connection was successful')
         app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
-        await app_facade.DestroyUnits(list(unit_name))
+        await app_facade.DestroyUnits([unit_name])
         logger.info('%s has been removed', unit_name)
         await model_connection.disconnect()
     except Exception as e:

@@ -190,8 +190,6 @@ def check_model_state(auth_data):
         abort(errors.unauthorized)
 
 
-
-
 def authorize(connection_info, resource, method, self_user=None, resource_user=None):
     """Checks if a user is authorized to perform a certain http method on
     a certain resource. F.e. Is the user allowed to create a model?

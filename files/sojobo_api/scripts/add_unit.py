@@ -40,7 +40,7 @@ async def add_unit(username, password, c_name, m_key, app_name, amount, target):
         await app_facade.AddUnits(application=app_name,
                                   placement=parse_placement(target),
                                   num_units=int(amount))
-        logger.info('Units added to %s', app_name)
+        logger.info('Units added to application %s', app_name)
         await model_connection.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
