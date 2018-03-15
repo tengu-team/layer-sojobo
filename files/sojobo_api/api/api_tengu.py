@@ -371,9 +371,9 @@ def add_application(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authenticated!', controller, model)
         if juju.authorize(auth_data, '/controllers/controller/models/model/applications', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authorized!', controller, model)
-            execute_task(juju.deploy_app, connection, auth_data['controller']['type'], data.get('units', "1"), controller, auth_data['model']['_key'],
-                         auth_data['user']['juju_username'], request.authorization.password, data.get('config', None), data.get('target', None),
-                         data.get('application',None), data.get('series', None))
+            juju.deploy_app(connection, controller, auth_data['model']['_key'], auth_data['user']['juju_username'], request.authorization.password,
+                            auth_data['controller']['type'], data.get('units', "1"), data.get('config', ''), data.get('target', None),
+                            data.get('application', None), data.get('series', None))
             code, response = 202, 'Application is being deployed!'
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller, model)
             return juju.create_response(code, response)
@@ -469,7 +469,7 @@ def remove_app(controller, model, application):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Authenticated!', controller, model, application)
         if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application', 'delete'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Authorized!', controller, model, application)
-            execute_task(juju.remove_app, token, mod, application)
+            juju.remove_app(connection, application, request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'])
             code, response = 202, "The application is being removed"
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Removing application!', controller, model, application)
             return juju.create_response(code, response)
