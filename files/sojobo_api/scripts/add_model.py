@@ -39,7 +39,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller_connection = Controller()
         await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], pwd, auth_data['controller']['ca_cert'])
-        owner = tag.user(usr)
+        owner = tag.user(auth_data['user']['juju_username'])
 
         #Generate Tag for Credential
         credential = tag.credential(
@@ -91,7 +91,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         logger.info('%s -> retrieving users: %s', m_name, con_users)
         for u in con_users:
             if u['access'] == 'superuser' and u['name'] != usr:
-                user = tag.user(u['name'])
+                user = tag.user(u['juju_username'])
                 changes = client.ModifyModelAccess('admin', 'grant', model, user)
                 await model_facade.ModifyModelAccess([changes])
                 datastore.set_model_access(m_key, u['name'], 'admin')

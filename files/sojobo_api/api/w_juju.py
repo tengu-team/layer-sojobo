@@ -249,11 +249,11 @@ async def disconnect(connection):
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
-def cloud_supports_series(controller_connection, series):
+def cloud_supports_series(controller_type, series):
     if series is None:
         return True
     else:
-        return series in get_controller_types()[controller_connection.c_type].get_supported_series()
+        return series in get_controller_types()[controller_type].get_supported_series()
 
 
 def check_c_type(c_type):
@@ -352,16 +352,11 @@ def get_model_access(model, controller, username):
 
 
 async def get_model_info(connection, data):
-    print('{} ------ getting modelinfo'.format(datetime.datetime.now()))
     state = data['model']['state']
     users = get_users_model(data)
-    print('{} ----- got users'.format(datetime.datetime.now()))
     applications = get_applications_info(connection)
-    print('{} ------ got applications'.format(datetime.datetime.now()))
-    machines = await get_machines_info(connection)
-    print('{} ------ got machines'.format(datetime.datetime.now()))
+    machines = get_machines_info(connection)
     gui = get_gui_url(data)
-    print('{} ------ got gui'.format(datetime.datetime.now()))
     credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
     return {'name': data['model']['name'], 'users': users,
             'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
@@ -472,7 +467,7 @@ def delete_model(username, password, controller, model, m_key):
 #####################################################################################
 # Machines FUNCTIONS
 #####################################################################################
-async def get_machines_info(connection):
+def get_machines_info(connection):
     result = {}
     for machine, data in connection.state.state.get('machine', {}).items():
         try:
@@ -501,10 +496,9 @@ async def get_machines_info(connection):
     return [info for info in result.values()]
 
 
-async def get_machine_info(token, model, machine):
+def get_machine_info(connection, machine):
     try:
-        async with model.connect(token) as juju:
-            data = juju.state.state['machine']
+        data = connection.state.state['machine']
         machine_data = data[machine][0]
         if machine_data['agent-status']['current'] == 'error' and machine_data['addresses'] is None:
             result = {'name': machine, 'Error': machine_data['agent-status']['message']}
@@ -544,20 +538,19 @@ def get_machine_ip(machine_data):
             mach_ips['internal_ip'] = machine['value']
     return mach_ips
 
+def add_machine(username, password, series, contstraints, spec):
+    Popen(["python3", "{}/scripts/add_machine.py".format(settings.SOJOBO_API_DIR), username,
+           password, controller_name, model_key, series, str(constraints), spec])
 
-async def add_machine(token, model, ser=None, cont=None, spec=None):
-    async with model.connect(token) as juju:
-        await juju.add_machine(series=ser, constraints=cont, spec=spec)
-
-
-async def machine_exists(token, model, machine):
-    async with model.connect(token) as juju:
-        return machine in juju.state.state.get('machine', {}).keys()
+def machine_exists(connection, machine):
+    return machine in connection.state.state.get('machine', {}).keys()
 
 
-def remove_machine(token, controller, model, machine):
-    Popen(["python3", "{}/scripts/remove_machine.py".format(settings.SOJOBO_API_DIR), token.username,
-           token.password, settings.SOJOBO_API_DIR, controller.c_name, model.m_name, machine])
+def remove_machine(username, password, controller_name, model_key, machine):
+    if not machine_exists(connection, machine):
+        abort(404, errors.does_not_exist('machine')[1])
+    Popen(["python3", "{}/scripts/remove_machine.py".format(settings.SOJOBO_API_DIR), username,
+           password, controller_name, model_key, machine])
 
 
 #####################################################################################
@@ -565,7 +558,7 @@ def remove_machine(token, controller, model, machine):
 #####################################################################################
 
 
-async def app_exists(connection, app_name):
+def app_exists(connection, app_name):
     for app in get_applications_info(connection):
         if app['name'] == app_name:
             return True
@@ -577,61 +570,62 @@ def add_bundle(username, password, c_name, m_name, bundle):
            username, password, c_name, m_name, str(bundle)])
 
 
-async def deploy_app(token, con, model, app_name, data):
-    ser = data.get('series', None)
-    if(cloud_supports_series(con, ser)):
-        conf = data.get('config', None)
-        machine = data.get('target', None)
-        if machine and not machine_exists(token, model, machine):
+def deploy_app(connection, controller, modelkey, username, password, controller_type,
+                     units, machine, conf, application, series):
+    if app_exists(connection, app_name):
+        abort(403. 'Application already exists!')
+    if(cloud_supports_series(controller_type, series)):
+        if machine and not machine_exists(connection, machine):
             error = errors.does_not_exist(machine)
             abort(error[0], error[1])
-        units = data.get('units', "1")
-        async with model.connect(token) as juju:
-            try:
-                await juju.deploy(app_name, application_name=app_name, series=ser, to=machine, config=conf, num_units=int(units))
-            except JujuError as e:
-                if e == 'subordinate application must be deployed without units':
-                    await juju.deploy(app_name, application_name=app_name, series=ser, config=conf, num_units=0)
+        Popen(["python3", "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
+               controller, modelkey, username, password, units, machine,
+               str(config), application, series)
     else:
-        error = errors.invalid_option(data)
+        error = errors.invalid_option(series)
         abort(error[0], error[1])
 
 
 
-async def check_if_exposed(token, model, app_name):
-    app_info = await get_application_info(token, model, app_name)
+def check_if_exposed(connection, app_name):
+    app_info = await get_application_info(connection, app_name)
     return app_info['exposed']
 
 
-async def expose_app(token, model, app_name):
-    async with model.connect(token):
-        app = await get_application_entity(token, model, app_name)
-        await app.expose()
+async def expose_app(connection, app_name):
+    if check_if_exposed(connection, app_name):
+        abort(400, 'Application already exposed!')
+    app = get_application_entity(connection, app_name)
+    await app.expose()
 
 
-async def unexpose_app(token, model, app_name):
-    async with model.connect(token):
-        app = await get_application_entity(token, model, app_name)
-        await app.unexpose()
+
+async def unexpose_app(connection, app_name):
+    if not check_if_exposed(connection, app_name):
+        abort(400, 'Application already unexposed!')
+    app = get_application_entity(connection, app_name)
+    await app.unexpose()
 
 
-async def get_application_entity(token, model, app_name):
-    async with model.connect(token) as juju:
-        for app in juju.state.applications.items():
-            if app[0] == app_name:
-                return app[1]
+def get_application_entity(connection, app_name):
+    for app in connection.state.applications.items():
+        if app[0] == app_name:
+            return app[1]
 
 
-async def remove_app(token, model, app_name):
-    async with model.connect(token):
-        app = await get_application_entity(token, model, app_name)
-        if app is not None:
-            await app.remove()
+def remove_app(connection, application, username, password, controller, model_key):
+    if not app_exists(connection, application):
+        abort(404, 'The application does not exist!')
+    Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), username,
+           password, controller, model_key, application])
 
 
-async def get_application_info(token, model, applic):
-    for app in await get_applications_info(token, model):
-        if app['name'] == applic:
+
+def get_application_info(connection, application):
+    if not app_exists(connection, application):
+        abort(404, 'The application does not exist!')
+    for app in get_applications_info(connection):
+        if app['name'] == application:
             return app
 
 
@@ -642,9 +636,9 @@ async def get_unit_info(token, model, application, unitnumber):
     return {}
 
 
-def add_unit(username, password, controller, model, app_name, amount, target):
+def add_unit(username, password, controller, model_key, app_name, amount, target):
     Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), username,
-           password, controller, model,
+           password, controller, model_key,
            app_name, str(amount), target])
 
 
@@ -663,7 +657,7 @@ def get_unit_ports(unit):
 
 
 async def get_relations_info(token, model):
-    data = await get_applications_info(token, model)
+    data = get_applications_info(token, model)
     return [{'name': a['name'], 'relations': a['relations']} for a in data]
 
 
