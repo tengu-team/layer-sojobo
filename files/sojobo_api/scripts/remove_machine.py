@@ -20,14 +20,15 @@ import traceback
 import logging
 import json
 from juju.model import Model
+from juju.client import client
 sys.path.append('/opt')
 from sojobo_api import settings
-from sojobo_api.api import w_datastore
+from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
 async def remove_machine(username, password, controller_name, model_key, machine):
     try:
-        auth_data = get_model_connection_info(username, controller_name, model_key)
+        auth_data = datastore.get_model_connection_info(username, controller_name, model_key)
         model_connection = Model()
         logger.info('Setting up Model connection for %s:%s', controller_name, auth_data['model']['name'])
         await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
@@ -37,9 +38,9 @@ async def remove_machine(username, password, controller_name, model_key, machine
             if mach == machine:
                 logger.info('Destroying machine %s', machine)
                 facade = client.ClientFacade.from_connection(entity.connection)
-                await facade.DestroyMachines(force, [entity.id])
+                await facade.DestroyMachines(True, [entity.id])
         logger.info('Machine %s destroyed', machine)
-        model_connection.disconnect()
+        await model_connection.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
