@@ -39,7 +39,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller_connection = Controller()
         await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], pwd, auth_data['controller']['ca_cert'])
-        owner = tag.user(usr)
+        owner = tag.user(auth_data['user']['juju_username'])
 
         #Generate Tag for Credential
         credential = tag.credential(
