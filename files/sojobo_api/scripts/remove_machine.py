@@ -21,39 +21,40 @@ import logging
 import json
 from juju.model import Model
 sys.path.append('/opt')
+from sojobo_api import settings
 from sojobo_api.api import w_datastore
 
 
-async def remove_machine(c_name, m_name, usr, pwd, machine):
+async def remove_machine(username, password, controller_name, model_key, machine):
     try:
-        controller = w_datastore.get_controller(c_name)
-        # We need the key of the model to get the actual model. Maybe one function
-        # can be made 'get_model(m_name)'.
-        m_key = w_datastore.get_model_key(c_name, m_name)
-        mod = w_datastore.get_model(m_key)
-        mod_con = Model()
-        logger.info('Setting up Model connection for %s:%s', c_name, m_name)
-        await mod_con.connect(controller['endpoints'][0], mod['uuid'], usr, pwd, controller['ca-cert'])
-        for mach, entity in mod_con.state.machines.items():
+        auth_data = get_model_connection_info(username, controller_name, model_key)
+        model_connection = Model()
+        logger.info('Setting up Model connection for %s:%s', controller_name, auth_data['model']['name'])
+        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca-cert'])
+        logger.info('Model connection was successful')
+
+        for mach, entity in model_connection.state.machines.items():
             if mach == machine:
                 logger.info('Destroying machine %s', machine)
-                await entity.destroy(force=True)
+                facade = client.ClientFacade.from_connection(entity.connection)
+                await facade.DestroyMachines(force, [entity.id])
         logger.info('Machine %s destroyed', machine)
+        model_connection.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
     finally:
-        #if 'mod_con' in locals():
-        await mod_con.disconnect()
+        if 'model_connection' in locals():
+            await juju.disconnect(model_connection)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('remove-machine')
-    hdlr = logging.FileHandler('{}/log/remove_machine.log'.format(sys.argv[3]))
+    logger = logging.getLogger('remove_machine')
+    hdlr = logging.FileHandler('{}/log/remove_machine.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -62,6 +63,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(remove_machine(sys.argv[4], sys.argv[5], sys.argv[1],
-                                         sys.argv[2], sys.argv[6]))
+    loop.run_until_complete(remove_machine(sys.argv[1], sys.argv[2], sys.argv[3],
+                                         sys.argv[4], sys.argv[5]))
     loop.close()

@@ -21,39 +21,56 @@ import logging
 import json
 from juju.model import Model
 sys.path.append('/opt')
+from sojobo_api import settings
 from sojobo_api.api import w_datastore
 
 
-async def remove_machine(c_name, m_name, usr, pwd, machine):
+async def add_machine(username, password, controller_name, model_key, series, constraints, spec):
     try:
-        controller = w_datastore.get_controller(c_name)
-        # We need the key of the model to get the actual model. Maybe one function
-        # can be made 'get_model(m_name)'.
-        m_key = w_datastore.get_model_key(c_name, m_name)
-        mod = w_datastore.get_model(m_key)
-        mod_con = Model()
-        logger.info('Setting up Model connection for %s:%s', c_name, m_name)
-        await mod_con.connect(controller['endpoints'][0], mod['uuid'], usr, pwd, controller['ca-cert'])
-        for mach, entity in mod_con.state.machines.items():
-            if mach == machine:
-                logger.info('Destroying machine %s', machine)
-                await entity.destroy(force=True)
-        logger.info('Machine %s destroyed', machine)
+        auth_data = get_model_connection_info(username, controller_name, model_key)
+        cons = ast.literal_eval(constraints)
+        model_connection = Model()
+        logger.info('Setting up Model connection for %s:%s', controller_name, auth_data['model']['name'])
+        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca-cert'])
+        logger.info('Model connection was successful')
+
+
+        params = client.AddMachineParams()
+        params.jobs = ['JobHostUnits']
+
+        if spec != 'None':
+            placement = parse_placement(spec)
+            if placement:
+                params.placement = placement[0]
+
+        if constraints != None:
+            params.constraints = client.Value.from_json(constraints)
+
+        client_facade = client.ClientFacade.from_connection(model_connection.connection)
+        results = await client_facade.AddMachines([params])
+        error = results.machines[0].error
+        if error:
+            raise ValueError("Error adding machine: %s" % error.message)
+        machine_id = results.machines[0].machine
+        log.debug('Added new machine %s', machine_id)
+        await model_connection._wait_for_new('machine', machine_id)
+        logger.info('Machine %s created', machine)
+        model_connection.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
     finally:
-        #if 'mod_con' in locals():
-        await mod_con.disconnect()
+        if 'model_connection' in locals():
+            await juju.disconnect(model_connection)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('add-machine')
-    hdlr = logging.FileHandler('{}/log/add_machine.log'.format(sys.argv[3]))
+    logger = logging.getLogger('add_machine')
+    hdlr = logging.FileHandler('{}/log/add_machine.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -62,6 +79,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(remove_machine(sys.argv[4], sys.argv[5], sys.argv[1],
-                                         sys.argv[2], sys.argv[6]))
+    loop.run_until_complete(remove_machine(sys.argv[1], sys.argv[2], sys.argv[3],
+                                           sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7]))
     loop.close()
