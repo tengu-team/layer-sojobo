@@ -571,16 +571,19 @@ def add_bundle(username, password, c_name, m_name, bundle):
 
 
 def deploy_app(connection, controller, modelkey, username, password, controller_type,
-                     units, machine, conf, application, series):
-    if app_exists(connection, app_name):
+                     units, config, machine, application, series):
+    if app_exists(connection, application):
         abort(403, 'Application already exists!')
     if(cloud_supports_series(controller_type, series)):
         if machine and not machine_exists(connection, machine):
             error = errors.does_not_exist(machine)
             abort(error[0], error[1])
+        serie = '' if series is None else str(series)
+        target = '' if machine is None else str(machine)
+        print('config: ----- {}'.format(config))
         Popen(["python3", "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
-               controller, modelkey, username, password, units, machine,
-               str(config), application, series])
+               controller, modelkey, username, password, units, target,
+               config, application, serie])
     else:
         error = errors.invalid_option(series)
         abort(error[0], error[1])
@@ -616,7 +619,7 @@ def get_application_entity(connection, app_name):
 def remove_app(connection, application, username, password, controller, model_key):
     if not app_exists(connection, application):
         abort(404, 'The application does not exist!')
-    Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), username,
+    Popen(["python3", "{}/scripts/remove_application.py".format(settings.SOJOBO_API_DIR), username,
            password, controller, model_key, application])
 
 
