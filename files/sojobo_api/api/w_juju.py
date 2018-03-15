@@ -538,7 +538,7 @@ def get_machine_ip(machine_data):
             mach_ips['internal_ip'] = machine['value']
     return mach_ips
 
-def add_machine(username, password, series, contstraints, spec):
+def add_machine(username, password, controller_name, model_key, series, contstraints, spec):
     Popen(["python3", "{}/scripts/add_machine.py".format(settings.SOJOBO_API_DIR), username,
            password, controller_name, model_key, series, str(constraints), spec])
 
@@ -573,14 +573,14 @@ def add_bundle(username, password, c_name, m_name, bundle):
 def deploy_app(connection, controller, modelkey, username, password, controller_type,
                      units, machine, conf, application, series):
     if app_exists(connection, app_name):
-        abort(403. 'Application already exists!')
+        abort(403, 'Application already exists!')
     if(cloud_supports_series(controller_type, series)):
         if machine and not machine_exists(connection, machine):
             error = errors.does_not_exist(machine)
             abort(error[0], error[1])
         Popen(["python3", "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
                controller, modelkey, username, password, units, machine,
-               str(config), application, series)
+               str(config), application, series])
     else:
         error = errors.invalid_option(series)
         abort(error[0], error[1])
@@ -588,7 +588,7 @@ def deploy_app(connection, controller, modelkey, username, password, controller_
 
 
 def check_if_exposed(connection, app_name):
-    app_info = await get_application_info(connection, app_name)
+    app_info = get_application_info(connection, app_name)
     return app_info['exposed']
 
 
