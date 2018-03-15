@@ -30,7 +30,7 @@ async def remove_machine(username, password, controller_name, model_key, machine
         auth_data = get_model_connection_info(username, controller_name, model_key)
         model_connection = Model()
         logger.info('Setting up Model connection for %s:%s', controller_name, auth_data['model']['name'])
-        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca-cert'])
+        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
         logger.info('Model connection was successful')
 
         for mach, entity in model_connection.state.machines.items():
