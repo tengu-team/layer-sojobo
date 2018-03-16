@@ -19,16 +19,17 @@ import sys
 import traceback
 import logging
 import json
+import ast
 from juju.model import Model
+from juju.client import client
 sys.path.append('/opt')
 from sojobo_api import settings
-from sojobo_api.api import w_datastore
+from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
 async def add_machine(username, password, controller_name, model_key, series, constraints, spec):
     try:
-        auth_data = get_model_connection_info(username, controller_name, model_key)
-        cons = ast.literal_eval(constraints)
+        auth_data = datastore.get_model_connection_info(username, controller_name, model_key)
         model_connection = Model()
         logger.info('Setting up Model connection for %s:%s', controller_name, auth_data['model']['name'])
         await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
@@ -38,13 +39,14 @@ async def add_machine(username, password, controller_name, model_key, series, co
         params = client.AddMachineParams()
         params.jobs = ['JobHostUnits']
 
-        if spec != 'None':
+        if spec != '':
             placement = parse_placement(spec)
             if placement:
                 params.placement = placement[0]
 
-        if constraints != None:
-            params.constraints = client.Value.from_json(constraints)
+        if constraints != '':
+            cons = ast.literal_eval(constraints)
+            params.constraints = client.Value.from_json(cons)
 
         client_facade = client.ClientFacade.from_connection(model_connection.connection)
         results = await client_facade.AddMachines([params])
@@ -52,10 +54,10 @@ async def add_machine(username, password, controller_name, model_key, series, co
         if error:
             raise ValueError("Error adding machine: %s" % error.message)
         machine_id = results.machines[0].machine
-        log.debug('Added new machine %s', machine_id)
+        logger.debug('Added new machine %s', machine_id)
         await model_connection._wait_for_new('machine', machine_id)
-        logger.info('Machine %s created', machine)
-        model_connection.disconnect()
+        logger.info('Machine %s created', machine_id)
+        await model_connection.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -79,6 +81,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(remove_machine(sys.argv[1], sys.argv[2], sys.argv[3],
+    loop.run_until_complete(add_machine(sys.argv[1], sys.argv[2], sys.argv[3],
                                            sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7]))
     loop.close()

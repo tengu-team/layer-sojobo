@@ -591,12 +591,15 @@ def add_machine(controller, model):
                 juju.add_machine(request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], series, constraints, spec)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller, model)
                 code, response = 202, 'Machine is being deployed!'
+                return juju.create_response(code, response)
             else:
                 code, response = 400, 'This cloud does not support this version of Ubuntu'
                 LOGGER.error('/TENGU/controllers/%s/models/%s/machines [POST] => This cloud does not support this version of Ubuntu!', controller, model)
+                return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/TENGU/controllers/%s/models/%s/machines [POST] => No Permission to perform this action!', controller, model)
+            return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -651,7 +654,7 @@ def remove_machine(controller, model, machine):
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => Authenticated!', controller, model, machine)
         if juju.authorize(auth_data, '/controllers/controller/models/model/machines/machine', 'delete'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => Authorized!', controller, model, machine)
-            juju.remove_machine(request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], machine)
+            juju.remove_machine(connection, request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], machine)
             code, response = 202, 'Machine being removed'
             LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Destroying machine, check remove_machine.log for more information!', controller, model, machine)
             return juju.create_response(code, response)

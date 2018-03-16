@@ -538,15 +538,18 @@ def get_machine_ip(machine_data):
             mach_ips['internal_ip'] = machine['value']
     return mach_ips
 
-def add_machine(username, password, controller_name, model_key, series, contstraints, spec):
+def add_machine(username, password, controller_name, model_key, series, constraints, spec):
+    cons = '' if constraints is None else str(constraints)
+    specifications = '' if spec is None else str(spec)
+    serie = '' if series is None else str(series)
     Popen(["python3", "{}/scripts/add_machine.py".format(settings.SOJOBO_API_DIR), username,
-           password, controller_name, model_key, series, str(constraints), spec])
+           password, controller_name, model_key, serie, cons, specifications])
 
 def machine_exists(connection, machine):
     return machine in connection.state.state.get('machine', {}).keys()
 
 
-def remove_machine(username, password, controller_name, model_key, machine):
+def remove_machine(connection, username, password, controller_name, model_key, machine):
     if not machine_exists(connection, machine):
         abort(404, errors.does_not_exist('machine')[1])
     Popen(["python3", "{}/scripts/remove_machine.py".format(settings.SOJOBO_API_DIR), username,
