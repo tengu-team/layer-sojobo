@@ -132,8 +132,8 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
         abort(error[0], error[1])
 
 
-def check_if_admin(auth):
-    return auth.username == settings.JUJU_ADMIN_USER and auth.password == settings.JUJU_ADMIN_PASSWORD
+def check_if_admin(auth_data):
+    return auth_data.username == settings.JUJU_ADMIN_USER and auth_data.password == settings.JUJU_ADMIN_PASSWORD
 
 
 async def connect_to_random_controller(authorization, auth_data):
@@ -214,7 +214,7 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
     # Admin has authorization in every situation.
     if connection_info["user"]["name"] == settings.JUJU_ADMIN_USER:
         return True
-    elif self_user == connection_info["user"]["username"]:
+    elif self_user == connection_info["user"]["name"]:
         return True
     elif "m_access" in connection_info:
         return permissions.m_authorize(connection_info, resource, method)
@@ -223,8 +223,8 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
     # If no 'm_access' or 'c_access' is found in the connection info then there will
     # only be user info.
     elif "user" in connection_info and resource_user:
-        return permissions.superuser_authorize(connection_info["user"], resource_user)
-
+        return permissions.superuser_authorize(connection_info["user"]["name"],
+                                               resource_user)
 
 
 def get_connection_info(authorization, c_name=None, m_name=None):
@@ -663,17 +663,24 @@ def get_unit_ports(unit):
     return ports
 
 
-async def get_relations_info(token, model):
-    data = get_applications_info(token, model)
+def get_relations_info(connection):
+    data = get_applications_info(connection)
     return [{'name': a['name'], 'relations': a['relations']} for a in data]
 
 
-async def add_relation(token, model, app1, app2):
-    async with model.connect(token) as juju:
-        await juju.add_relation(app1, app2)
+def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, relation1, relation2):
+    Popen(["python3", "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
+           c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
+           relation1, relation2])
 
 
-async def remove_relation(token, model, app1, app2):
+def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, app1, app2):
+    Popen(["python3", "{}/scripts/remove_relation.py".format(settings.SOJOBO_API_DIR),
+           c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
+           app1, app2])
+
+
+async def tion(token, model, app1, app2):
     async with model.connect(token) as juju:
         data = juju.state.state
         application = await get_application_entity(token, model, app1)
@@ -708,12 +715,23 @@ async def get_application_config(connection, application):
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
+
+
 def create_user(username, password):
+    # We create a seperate name with a timestamp that will be used in Juju.
+    # This is because Juju doesn't allow a username that has been used before.
+    # F.e. Juju does not allow you create a user 'bob', then delete him
+    # and then try to add a user that is also named 'bob', therefore we add a timestamp.
     juju_username = 'u{}{}'.format(hashlib.md5(username.encode('utf')).hexdigest(), give_timestamp())
     datastore.create_user(username, juju_username)
     controllers = datastore.get_ready_controllers()
+
     for controller in controllers:
-        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR), username, password, controller['name'], juju_username])
+        c_name = controller['name']
+        endpoint = controller["endpoints"][0]
+        cacert = controller["ca_cert"]
+        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR),
+        username, password, juju_username, c_name, endpoint, cacert])
     if len(controllers) == 0:
         datastore.set_user_state(username, 'ready')
 
@@ -722,14 +740,15 @@ def delete_user(username):
     datastore.set_user_state(username, 'deleting')
     controllers = datastore.get_ready_controllers()
     for controller in controllers:
-        Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR), username, controller['name']])
+        Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR),
+        username, controller['name']])
 
 
 def add_user_to_controllers(data, username, password):
     Popen(["python3", "{}/scripts/add_user_to_controllers.py".format(settings.SOJOBO_API_DIR),data, username, password])
 
 
-def change_user_password(controllers, username, password):
+def change_user_password(username, password):
     user = datastore.get_user_info(username)
     juju_username = user["juju_username"]
 
@@ -749,11 +768,30 @@ def change_user_password(controllers, username, password):
                 c_name, endpoint, ca_cert, juju_username, password])
 
 
-def update_ssh_keys_user(user, ssh_keys):
+def update_ssh_keys_user(username, ssh_keys):
+    user_info = datastore.get_user_info(username)
+
+    # A user its ssh-keys is changed on all the controllers where the user resides.
+    # We only update the ssh-keys if all controllers are ready, to avoid problems.
+    # This is a temporary solution until something better is found.
+    for controller in user_info["controllers"]:
+        if controller["state"] != "ready":
+            abort(403, """The ssh-keys for user {} cannot be updated because not all controllers are ready yet.
+                          Please wait a few minutes before you try again.""".format(username))
+
     Popen([
         "python3",
-        "{}/scripts/update_ssh_keys.py".format(settings.SOJOBO_API_DIR),
-        str(ssh_keys), user, settings.SOJOBO_API_DIR])
+        "{}/scripts/update_ssh_keys_all_models.py".format(settings.SOJOBO_API_DIR),
+        str(ssh_keys), username])
+
+
+def update_ssh_keys_model(username, ssh_keys, c_name, m_key):
+    user_info = datastore.get_user_info(username)
+
+    Popen([
+        "python3",
+        "{}/scripts/update_ssh_keys_model.py".format(settings.SOJOBO_API_DIR),
+        str(ssh_keys), username, c_name, m_key])
 
 
 def get_users_controller(controller):
@@ -782,7 +820,7 @@ def add_credential(user, data):
     try:
         return get_controller_types()[data['type']].add_credential(user, data)
     except NotImplementedError as e:
-        return 400, "This type of controller does not need credentials"
+        return 400, "This type of controller does not need credentials."
 
 
 async def update_cloud(controller, cloud, credential, username):
@@ -797,7 +835,8 @@ async def update_cloud(controller, cloud, credential, username):
 
 
 def remove_credential(user, cred_name):
-    Popen(["python3", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR), user, cred_name, settings.SOJOBO_API_DIR])
+    Popen(["python3", "{}/scripts/remove_credential.py".format(settings.SOJOBO_API_DIR),
+    user, cred_name, settings.SOJOBO_API_DIR])
 
 
 def credential_exists(user, credential):
@@ -814,6 +853,7 @@ def grant_user_to_controller(c_name, username, access):
     endpoint = controller_ds['endpoints'][0]
     cacert= controller_ds['ca_cert']
     juju_username = user_ds["juju_username"]
+
     Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
            c_name, username, access, endpoint, cacert, juju_username])
 
@@ -828,19 +868,41 @@ async def controller_revoke(token, controller, username):
         await juju.revoke(username)
 
 
-def set_models_access(token, controller, user, accesslist):
-    for mod in accesslist:
-        m_key = construct_model_key(controller.c_name, mod['name'])
+def set_models_access(username, c_name, models_access):
+    # TODO: If time, reduce datastore calls.
+    for model in models_access:
+        m_key = construct_model_key(c_name, model['name'])
+        model_info = datastore.get_model_connection_info(username, c_name, m_key)
+        uuid = model_info["model"]["uuid"]
+        endpoint = model_info["controller"]["endpoints"][0]
+        cacert = model_info["controller"]["ca_cert"]
         if datastore.model_exists(m_key):
-            if not m_access_exists(mod['access']):
+            if not m_access_exists(model['access']):
                 abort(400, 'Access Level {} is not supported. Change access for model {}'.format(mod['access'], mod['name']))
             else:
-                pass
+                Popen(["python3",
+                       "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR),
+                       username, c_name, endpoint, cacert, m_key, uuid, model["access"]])
         else:
             abort(404, 'Model {} not found'.format(mod['name']))
-    Popen(["python3", "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR), token.username,
-           token.password, settings.SOJOBO_API_DIR,
-           user, str(accesslist), controller.c_name])
+
+
+def set_model_access(username, c_name, m_key, access):
+    # TODO: If time, reduce datastore calls.
+    if datastore.model_exists(m_key):
+        if not m_access_exists(access):
+            abort(400, 'Access Level {} is not supported. Change access for model {}'.format(access, m_key))
+        else:
+            model_info = datastore.get_model_connection_info(username, c_name, m_key)
+            uuid = model_info["model"]["uuid"]
+            endpoint = model_info["controller"]["endpoints"][0]
+            cacert = model_info["controller"]["ca_cert"]
+
+            Popen(["python3",
+                   "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR),
+                   username, c_name, endpoint, cacert, m_key, uuid, access])
+    else:
+        abort(404, 'Model not found')
 
 
 async def model_grant(token, model, username, access):
@@ -888,8 +950,8 @@ def get_ucontroller_access(controller, username):
     return datastore.get_controller_and_access(controller, username)
 
 
-def get_models_access(data):
-    return datastore.get_models_access(data['controller']['name'], data['user']['name'])
+def get_models_access(username, c_name):
+    return datastore.get_models_access(c_name, username)
 
 
 def check_models_access(token, controller, user):
@@ -912,23 +974,6 @@ def c_access_exists(access):
 
 def m_access_exists(access):
     return access in ['read', 'write', 'admin']
-
-
-def has_superuser_access_over_user(superuser, resource_user):
-    """Checks if there is at least one controller where the given user has superuser
-    access over the resource_user."""
-    matching_controllers = datastore.get_superuser_matching_controllers(superuser, resource_user)
-    return bool(matching_controllers)
-
-
-# def check_access(access):
-#     acc = access.lower()
-#     if c_access_exists(acc) or m_access_exists(acc):
-#         return acc
-#     else:
-#         error = errors.invalid_access('access')
-#         abort(error[0], error[1])
-
 ########################################################################
 # AUXILIARY FUNCTIONS
 ########################################################################
