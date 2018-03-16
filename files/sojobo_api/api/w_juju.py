@@ -632,8 +632,8 @@ async def get_application_info(token, model, applic):
             return app
 
 
-async def get_unit_info(token, model, application, unitnumber):
-    for u in await get_units_info(token, model, application):
+def get_unit_info(connection, application, unitnumber):
+    for u in get_units_info(connection, application):
         if u['name'] == '{}/{}'.format(application, unitnumber):
             return u
     return {}
