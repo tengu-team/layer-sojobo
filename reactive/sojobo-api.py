@@ -167,6 +167,14 @@ def configure(sojobo):
 def configure_proxy(proxy):
     proxy.configure(config()['port'])
     set_state('api.proxy-configured')
+
+
+@when('nginx_stats.connected', 'api.running')
+def configure_nginx_stats(nginx_stats):
+    nginx_stats.configure(config()['port'], 'nginx_status')
+    set_state('api.nginx_stats-configured')
+
+
 ###############################################################################
 # UTILS
 ###############################################################################

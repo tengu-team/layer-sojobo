@@ -1,4 +1,6 @@
-includes: ['layer:basic', 'layer:leadership', 'layer:apt', 'layer:juju-client', 'layer:nginx-passenger', 'layer:metrics', 'interface:sojobo', 'interface:arangodb']
+includes: ['layer:basic', 'layer:leadership', 'layer:apt', 'layer:juju-client',
+'layer:nginx-passenger', 'layer:metrics', 'interface:sojobo', 'interface:arangodb',
+'interface:nginx-stats']
 repo: git@github.com:tengu-team/Sojobo-api.git
 options:
   apt:

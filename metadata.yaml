@@ -10,6 +10,8 @@ provides:
     interface: sojobo
   proxy:
     interface: http
+  nginx_stats:
+    interface: nginx-stats
 requires:
   arango:
     interface: arangodb
