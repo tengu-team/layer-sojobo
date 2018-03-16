@@ -682,48 +682,20 @@ def remove_machine(controller, model, machine):
 def get_units_info(controller, model, application):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => receiving call', controller, model, application)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Auhtenticated!', controller, model, application)
-        con, mod = juju.authorize( token, controller, model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Authorized!', controller, model, application)
-        if execute_task(juju.app_exists, token, con, mod, application):
-            code, response = 200, execute_task(juju.get_units_info, token, mod, application)
-            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Succesfully retrieved units info!', controller, model, application)
-        else:
-            code, response = errors.does_not_exist('application')
-            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Application does not exist!', controller, model, application)
-    except KeyError:
-        code, response = errors.invalid_data()
-        error_log()
-    except HTTPException:
-        ers = error_log()
-        raise
-    except Exception:
-        ers = error_log()
-        code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
-
-
-@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['POST'])
-def add_unit(controller, model, application):
-    try:
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => receiving call', controller, model, application)
-        data = request.json
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Authenticated!', controller, model, application)
-        if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units', 'post'):
-            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Authorized!', controller, model, application)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Auhtenticated!', controller, model, application)
+        if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units', 'get'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Authorized!', controller, model, application)
             if execute_task(juju.app_exists, connection, application):
-                juju.add_unit(request.authorization.username, request.authorization.password, controller, model, application, data.get('amount', 1), data.get('target', 'None'))
-                code, response = 202, "Unit is being created"
-                LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Unit is being created, check add_unit.log for more information!', controller, model, application)
+                code, response = 200, juju.get_units_info(connection, application)
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Succesfully retrieved units info!', controller, model, application)
             else:
-                code, response = errors.no_permission()
-                LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => No Permission to perform this action!', controller, model, application)
+                code, response = errors.does_not_exist('application')
+                LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Application does not exist!', controller, model, application)
         else:
-            code, response = errors.does_not_exist('application')
-            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Application does not exist!', controller, model, application)
+            code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => No Permission to perform this action!', controller, model, application)
         return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
@@ -739,62 +711,116 @@ def add_unit(controller, model, application):
     finally:
         execute_task(juju.disconnect, connection)
 
-@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['GET'])
-def get_unit_info(controller, model, application, unitnumber):
+
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['POST'])
+def add_unit(controller, model, application):
     try:
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => receiving call', controller, model, application, unitnumber)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Authenticated!', controller, model, application, unitnumber)
-        con, mod = juju.authorize( token, controller, model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Authorized!', controller, model, application, unitnumber)
-        unit = execute_task(juju.get_unit_info, token, mod, application, unitnumber)
-        if unit is not {}:
-            code, response = 200, unit
-            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Succesfully retrieved Unit information!', controller, model, application, unitnumber)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => receiving call', controller, model, application)
+        data = request.json
+        auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Authenticated!', controller, model, application)
+        if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units', 'post'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Authorized!', controller, model, application)
+            if execute_task(juju.app_exists, connection, application):
+                juju.add_unit(request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], application, data.get('amount', 1), data.get('target', 'None'))
+                code, response = 202, "Unit is being created"
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Unit is being created, check add_unit.log for more information!', controller, model, application)
+            else:
+                code, response = errors.does_not_exist('application')
+                LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Application does not exist!', controller, model, application)
         else:
-            code, response = errors.does_not_exist('unit')
-            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Unit does not exist!', controller, model, application, unitnumber)
+            code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => No Permission to perform this action!', controller, model, application)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+    finally:
+        execute_task(juju.disconnect, connection)
+
+
+@TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['GET'])
+def get_unit_info(controller, model, application, unitnumber):
+    try:
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => receiving call', controller, model, application, unitnumber)
+        auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Authenticated!', controller, model, application, unitnumber)
+        if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units/unitnumber', 'get'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Authorized!', controller, model, application, unitnumber)
+            if execute_task(juju.app_exists, connection, application):
+                unit = juju.get_unit_info(connection, application, unitnumber)
+                if len(unit) != 0:
+                    code, response = 200, unit
+                    LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Succesfully retrieved Unit information!', controller, model, application, unitnumber)
+                else:
+                    code, response = errors.does_not_exist('unit')
+                    LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Unit does not exist!', controller, model, application, unitnumber)
+            else:
+                code, response = errors.does_not_exist('application')
+                LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Application does not exist!', controller, model, application, unitnumber)
+        else:
+            code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => No Permission to perform this action!', controller, model, application, unitnumber)
+        return juju.create_response(code, response)
+    except KeyError:
+        code, response = errors.invalid_data()
+        error_log()
+        return juju.create_response(code, response)
+    except HTTPException:
+        ers = error_log()
+        raise
+    except Exception:
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
+        return juju.create_response(code, response)
+    finally:
+        execute_task(juju.disconnect, connection)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['DELETE'])
 def remove_unit(controller, model, application, unitnumber):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => receiving call', controller, model, application, unitnumber)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Authenticated!', controller, model, application, unitnumber)
-        con, mod = juju.authorize( token, controller, model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Authorized!', controller, model, application, unitnumber)
-        if execute_task(juju.get_unit_info, token, mod, application, unitnumber) is not {}:
-            if mod.m_access == 'write' or mod.m_access == 'admin':
-                execute_task(juju.remove_unit, token, mod, application, unitnumber)
-                LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Unit is being removed!', controller, model, application, unitnumber)
+        if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units/unitnumber', 'del'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Authorized!', controller, model, application, unitnumber)
+            if execute_task(juju.app_exists, connection, application):
+                unit_name = application + '/' + str(unitnumber)
+                juju.remove_unit(request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], unit_name)
                 code, response = 202, "Unit is being removed"
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Unit is being removed!', controller, model, application, unitnumber)
             else:
-                code, response = errors.no_permission()
-                LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => No Permission to perform this action!', controller, model, application, unitnumber)
+                code, response = errors.does_not_exist('unit')
+                LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Unit does not exist!', controller, model, application, unitnumber)
         else:
-            code, response = errors.does_not_exist('unit')
-            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Unit does not exist!', controller, model, application, unitnumber)
+            code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => No Permission to perform this action!', controller, model, application, unitnumber)
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return juju.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return juju.create_response(code, response)
+    finally:
+        execute_task(juju.disconnect, connection)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['GET'])

@@ -190,8 +190,6 @@ def check_model_state(auth_data):
         abort(errors.unauthorized)
 
 
-
-
 def authorize(connection_info, resource, method, self_user=None, resource_user=None):
     """Checks if a user is authorized to perform a certain http method on
     a certain resource. F.e. Is the user allowed to create a model?
@@ -228,7 +226,6 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
     elif "user" in connection_info and resource_user:
         return permissions.superuser_authorize(connection_info["user"]["name"],
                                                resource_user)
-
 
 def get_connection_info(authorization, c_name=None, m_name=None):
     if authorization:
@@ -635,24 +632,21 @@ def get_application_info(connection, application):
             return app
 
 
-async def get_unit_info(token, model, application, unitnumber):
-    for u in await get_units_info(token, model, application):
+def get_unit_info(connection, application, unitnumber):
+    for u in get_units_info(connection, application):
         if u['name'] == '{}/{}'.format(application, unitnumber):
             return u
     return {}
 
 
-def add_unit(username, password, controller, model_key, app_name, amount, target):
+def add_unit(username, password, controller, mod_key, app_name, amount, target):
     Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), username,
-           password, controller, model_key,
-           app_name, str(amount), target])
+           password, controller, mod_key, app_name, str(amount), target])
 
 
-async def remove_unit(token, model, application, unit_number):
-    async with model.connect(token):
-        app = await get_application_entity(token, model, application)
-        unit = '{}/{}'.format(application, unit_number)
-        await app.destroy_unit(unit)
+def remove_unit(username, password, controller, mod_key, unit_name):
+    Popen(["python3", "{}/scripts/remove_unit.py".format(settings.SOJOBO_API_DIR), username,
+           password, controller, mod_key, unit_name])
 
 
 def get_unit_ports(unit):
