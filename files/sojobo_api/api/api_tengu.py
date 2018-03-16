@@ -836,13 +836,18 @@ def remove_unit(controller, model, application, unitnumber):
         if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units/unitnumber', 'del'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Authorized!', controller, model, application, unitnumber)
             if execute_task(juju.app_exists, connection, application):
-                unit_name = application + '/' + str(unitnumber)
-                juju.remove_unit(request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], unit_name)
-                code, response = 202, "Unit is being removed"
-                LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Unit is being removed!', controller, model, application, unitnumber)
+                unit = juju.get_unit_info(connection, application, unitnumber)
+                if len(unit) != 0:
+                    unit_name = application + '/' + str(unitnumber)
+                    juju.remove_unit(request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], unit_name)
+                    code, response = 202, "Unit is being removed"
+                    LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Unit is being removed!', controller, model, application, unitnumber)
+                else:
+                    code, response = errors.does_not_exist('unit')
+                    LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Unit does not exist!', controller, model, application, unitnumber)
             else:
-                code, response = errors.does_not_exist('unit')
-                LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Unit does not exist!', controller, model, application, unitnumber)
+                code, response = errors.does_not_exist('application')
+                LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Application does not exist!', controller, model, application, unitnumber)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => No Permission to perform this action!', controller, model, application, unitnumber)
