@@ -662,8 +662,8 @@ def get_unit_ports(unit):
     return ports
 
 
-async def get_relations_info(token, model):
-    data = get_applications_info(token, model)
+def get_relations_info(connection):
+    data = get_applications_info(connection)
     return [{'name': a['name'], 'relations': a['relations']} for a in data]
 
 
@@ -671,6 +671,12 @@ def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, passwor
     Popen(["python3", "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
            c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
            relation1, relation2])
+
+
+def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, app1, app2):
+    Popen(["python3", "{}/scripts/remove_relation.py".format(settings.SOJOBO_API_DIR),
+           c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
+           app1, app2])
 
 
 async def tion(token, model, app1, app2):

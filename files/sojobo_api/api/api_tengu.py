@@ -801,12 +801,16 @@ def remove_unit(controller, model, application, unitnumber):
 def get_relations_info(controller, model):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations [GET] => receiving call', controller, model)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization, controller, model)
+        model_connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations [GET] => Authenticated!', controller, model)
-        con, mod = juju.authorize( token, controller, model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/relations [GET] => Authorized!', controller, model)
-        code, response = 200, execute_task(juju.get_relations_info, token, mod)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/relations [GET] => Succesfully retrieved relation info!', controller, model)
+        if juju.authorize(auth_data, '/controllers/controller/models/model/relations', 'get'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s/relations [GET] => Authorized!', controller, model)
+            code, response = 200, juju.get_relations_info(model_connection)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/relations [GET] => Succesfully retrieved relation info!', controller, model)
+        else:
+            code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s/relations [GET] => No permission to perform this acion!', controller, model)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -875,16 +879,20 @@ def add_relation(controller, model):
 def get_relations(controller, model, application):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => receiving call', controller, model, application)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization, controller, model)
+        model_connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Authenticated!', controller, model, application)
-        con, mod = juju.authorize( token, controller, model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Authorized!', controller, model, application)
-        if execute_task(juju.app_exists, token, con, mod, application):
-            code, response = 200, execute_task(juju.get_application_info, token, mod, application)['relations']
-            LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Succesfully retrieved application info!', controller, model, application)
+        if juju.authorize(auth_data, '/controllers/controller/models/model/relations/application', 'get'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Authorized!', controller, model, application)
+            if juju.app_exists(model_connection, application):
+                code, response = 200, juju.get_application_info(model_connection, application)['relations']
+                LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Succesfully retrieved application info!', controller, model, application)
+            else:
+                code, response = errors.does_not_exist('application')
+                LOGGER.error('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Application does not exist!', controller, model, application)
         else:
-            code, response = errors.does_not_exist('application')
-            LOGGER.error('/TENGU/controllers/%s/models/%s/relations/%s [GET] => Application does not exist!', controller, model, application)
+            code, response = errors.no_permission()
+            LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] =>  No permission to perform this acion!', controller, model, application)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -901,21 +909,35 @@ def get_relations(controller, model, application):
 def remove_relation(controller, model, app1, app2):
     try:
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => receiving call', controller, model, app1, app2)
-        token = execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        auth_data = juju.get_connection_info(request.authorization, controller, model)
+        model_connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller, model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Authenticated!', controller, model, app1, app2)
-        con, mod = juju.authorize( token, controller, model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Authorized!', controller, model, app1, app2)
-        if execute_task(juju.app_exists, token, con, mod, app1) and execute_task(juju.app_exists, token, con, mod, app2):
-            if mod.m_access == 'write' or mod.m_access == 'admin':
-                execute_task(juju.remove_relation, token, mod, app1, app2)
+        if juju.authorize(auth_data, '/controllers/controller/models/model/relations/app1/app2', 'del'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Authorized!', controller, model, app1, app2)
+            # TODO: Does it have to be possible to give relations with ':' f.e. 'wordpress:db'
+            if ':' in app1:
+                app1 = app1.split(':')[0]
+            if ':' in app2:
+                app2 = app2.split(':')[0]
+
+            if juju.app_exists(model_connection, app1) and juju.app_exists(model_connection, app2):
+                endpoint = auth_data["controller"]["endpoints"][0]
+                cacert = auth_data["controller"]["ca_cert"]
+                m_name = auth_data["model"]["name"]
+                uuid = auth_data["model"]["uuid"]
+                juju_username = auth_data["user"]["juju_username"]
+                password = request.authorization.password
+
+                juju.remove_relation(controller, endpoint, cacert,m_name, uuid,
+                                  juju_username, password, app1, app2)
                 code, response = 202, 'The relation is being removed'
                 LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Relation is being removed!', controller, model, app1, app2)
             else:
-                code, response = errors.no_permission()
-                LOGGER.error('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => No Permission to perform this action!', controller, model, app1, app2)
+                code, response = errors.does_not_exist('application')
+                LOGGER.error('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Application does not exist!', controller, model, app1, app2)
         else:
-            code, response = errors.does_not_exist('application')
-            LOGGER.error('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Application does not exist!', controller, model, app1, app2)
+            code, response = errors.no_permission()
+            LOGGER.error('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => No Permission to perform this action!', controller, model, app1, app2)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()

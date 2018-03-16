@@ -70,8 +70,16 @@ permissions = {
 		}
 	},
 	"/controllers/controller/models/model/relations": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
+		},
 		"put": {
 			"m_access": ["admin", "write"]
+		}
+	},
+	"/controllers/controller/models/model/application": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
 		}
 	},
 	"/controllers/controller/models/model/relations/app1/app2": {

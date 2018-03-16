@@ -28,9 +28,8 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
 async def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
-                       relation1, relation2):
+                       app1, app2):
     try:
-        #auth_data = get_model_connection_info(username, c_name, m_key)
         logger.info('Setting up Model connection for %s:%s.', c_name, m_name)
         model_connection = Model()
         await model_connection.connect(endpoint,
@@ -38,11 +37,17 @@ async def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username
                                        juju_username,
                                        password,
                                        cacert)
-        logger.info('Model connection was successful'.)
+        logger.info('Model connection was successful.')
 
-        app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
+        logger.info('Getting application entity...')
+        entity = juju.get_application_entity(model_connection, app1)
+        logger.info('Initializing facade...')
+        app_facade = client.ApplicationFacade.from_connection(entity.connection)
 
-        await app_facade.DestroyRelation([relation1, relation2])
+        # First param must be name of relation that app1 has with app2. (local relation)
+        # Second param is remote relation name.
+        await app_facade.DestroyRelation([app2, app1])
+        logger.info('Relation %s <-> %s succesfully destroyed!', app1, app2)
 
         await model_connection.disconnect()
     except Exception as e:
@@ -70,5 +75,5 @@ if __name__ == '__main__':
     loop.set_debug(True)
     loop.run_until_complete(remove_relation(sys.argv[1], sys.argv[2], sys.argv[3],
                                          sys.argv[4], sys.argv[5], sys.argv[6],
-                                         sys.argv[7, sys.argv[8], sys.argv[9]]))
+                                         sys.argv[7], sys.argv[8], sys.argv[9]))
     loop.close()
