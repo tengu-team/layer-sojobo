@@ -118,12 +118,9 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
                     await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
                     return controller_connection
                 elif model:
-                    print('{} ------ found controller and model'.format(datetime.datetime.now()))
                     check_model_state(auth_data)
                     model_connection = Model()
-                    print('{} ------ starting connection'.format(datetime.datetime.now()))
                     await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
-                    print('{} ------ returning connection'.format(datetime.datetime.now()))
                     return model_connection
             elif auth_data['controller']['state'] == 'ready':
                 await connect_to_random_controller(authorization)
@@ -290,9 +287,9 @@ def create_controller(token, data):
     return get_controller_types()[c_type].create_controller(name, data)
 
 
-def delete_controller(data):
+def delete_controller(controller_name, controller_type):
     Popen(["python3", "{}/scripts/remove_controller.py".format(settings.SOJOBO_API_DIR),
-           data['controller']['name'], data['controller']['type']])
+           controller_name, controller_type])
 
 def get_supported_regions(c_type):
     return get_controller_types()[c_type].get_supported_regions()
@@ -583,7 +580,6 @@ def deploy_app(connection, controller, modelkey, username, password, controller_
             abort(error[0], error[1])
         serie = '' if series is None else str(series)
         target = '' if machine is None else str(machine)
-        print('config: ----- {}'.format(config))
         Popen(["python3", "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
                controller, modelkey, username, password, units, target,
                config, application, serie])
@@ -602,7 +598,8 @@ async def expose_app(connection, app_name):
     if check_if_exposed(connection, app_name):
         abort(400, 'Application already exposed!')
     app = get_application_entity(connection, app_name)
-    await app.expose()
+    app_facade = client.ApplicationFacade.from_connection(app.connection)
+    await app_facade.Expose(app.name)
 
 
 
@@ -610,13 +607,17 @@ async def unexpose_app(connection, app_name):
     if not check_if_exposed(connection, app_name):
         abort(400, 'Application already unexposed!')
     app = get_application_entity(connection, app_name)
-    await app.unexpose()
+    app_facade = client.ApplicationFacade.from_connection(app.connection)
+    await app_facade.Unexpose(app.name)
 
 
-def get_application_entity(connection, app_name):
+def get_application_entity(connection, application):
+    if not app_exists(connection, application):
+        abort(404, 'The application does not exist!')
     for app in connection.state.applications.items():
-        if app[0] == app_name:
+        if app[0] == application:
             return app[1]
+
 
 
 def remove_app(connection, application, username, password, controller, model_key):
@@ -690,21 +691,19 @@ async def remove_relation(token, model, app1, app2):
                         await application.destroy_relation(keys[1].split(':')[1], keys[0])
 
 
-async def set_application_config(token, model, app_name, config):
-    async with model.connect(token):
-        app = await get_application_entity(token, model, app_name)
-        for con in config:
-            config['con'] = str(config['con'])
-        await app.set_config(config)
+def set_application_config(connection, username, password, controller_name, model_key, application, config):
+    if not app_exists(connection, application):
+        abort(404, 'The application does not exist!')
+    for con in config:
+        config[con] = str(config[con])
+    Popen(["python3", "{}/scripts/set_application_config.py".format(settings.SOJOBO_API_DIR),
+           username, password, controller_name, model_key, application, str(config)])
 
 
-async def get_application_config(token, model, app_name):
-    async with model.connect(token):
-        app = await get_application_entity(token, model, app_name)
-        try:
-            return await app.get_config()
-        except AttributeError:
-            return errors.does_not_exist("application" + str(app_name))
+async def get_application_config(connection, application):
+    app = get_application_entity(connection, application)
+    app_facade = client.ApplicationFacade.from_connection(app.connection)
+    return (await app_facade.Get(app.name)).config
 
 ###############################################################################
 # USER FUNCTIONS
@@ -919,8 +918,6 @@ def has_superuser_access_over_user(superuser, resource_user):
     """Checks if there is at least one controller where the given user has superuser
     access over the resource_user."""
     matching_controllers = datastore.get_superuser_matching_controllers(superuser, resource_user)
-    print("Matching controllers: ")
-    print(matching_controllers)
     return bool(matching_controllers)
 
 
