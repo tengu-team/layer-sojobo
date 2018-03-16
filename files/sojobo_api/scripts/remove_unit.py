@@ -27,7 +27,7 @@ from sojobo_api import settings
 from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
-async def add_unit(username, password, c_name, m_key, app_name, amount, target):
+async def remove_unit(username, password, c_name, m_key, unit_name):
     try:
         auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         model_connection = Model()
@@ -35,12 +35,8 @@ async def add_unit(username, password, c_name, m_key, app_name, amount, target):
         await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
         logger.info('Model connection was successful')
         app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
-        if target == 'None':
-            target = None
-        await app_facade.AddUnits(application=app_name,
-                                  placement=parse_placement(target),
-                                  num_units=int(amount))
-        logger.info('Units added to application %s', app_name)
+        await app_facade.DestroyUnits([unit_name])
+        logger.info('%s has been removed', unit_name)
         await model_connection.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -55,8 +51,8 @@ async def add_unit(username, password, c_name, m_key, app_name, amount, target):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('add_unit')
-    hdlr = logging.FileHandler('{}/log/add_unit.log'.format(settings.SOJOBO_API_DIR))
+    logger = logging.getLogger('remove_unit')
+    hdlr = logging.FileHandler('{}/log/remove_unit.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -65,6 +61,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(add_unit(sys.argv[1], sys.argv[2], sys.argv[3],
-                                     sys.argv[4], sys.argv[5],sys.argv[6],sys.argv[7]))
+    loop.run_until_complete(remove_unit(sys.argv[1], sys.argv[2], sys.argv[3],
+                                     sys.argv[4], sys.argv[5]))
     loop.close()

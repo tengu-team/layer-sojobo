@@ -18,45 +18,76 @@ import asyncio
 import sys
 import traceback
 import logging
-import json
+import yaml
+import ast
 from juju.client import client
 from juju.model import Model
-from juju.placement import parse as parse_placement
 sys.path.append('/opt')
 from sojobo_api import settings
 from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
-async def add_unit(username, password, c_name, m_key, app_name, amount, target):
+async def add_application(c_name, m_key, username, password, units, machine, config, application, series):
     try:
+
         auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         model_connection = Model()
+        print(auth_data)
         logger.info('Setting up Model connection for %s:%s', c_name, auth_data['model']['name'])
         await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
         logger.info('Model connection was successful')
+
+        entity = await model_connection.charmstore.entity(application, channel=None)
+        entity_id = entity['Id']
+        logger.info('Created modelentity')
+
+        client_facade = client.ClientFacade.from_connection(model_connection.connection)
         app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
-        if target == 'None':
-            target = None
-        await app_facade.AddUnits(application=app_name,
-                                  placement=parse_placement(target),
-                                  num_units=int(amount))
-        logger.info('Units added to application %s', app_name)
+
+        if series == '':
+            series = model_connection._get_series(application, entity)
+        await client_facade.AddCharm(None, entity_id)
+
+        if not config == '':
+            conf = {k: str(v) for k, v in ast.literal_eval(config).items()}
+        else:
+            conf = {}
+        config = yaml.dump({application: conf},
+                                default_flow_style=False)
+
+
+        app = client.ApplicationDeploy(
+            charm_url=entity_id,
+            application=application,
+            series=series,
+            channel=None,
+            config_yaml=config,
+            constraints=None,
+            endpoint_bindings=None,
+            num_units=int(units),
+            resources=None,
+            storage=None,
+            placement=machine
+        )
+
+        await app_facade.Deploy([app])
         await model_connection.disconnect()
+        logger.info('Application %s succesfully added!', application)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
     finally:
-        if 'mod_con' in locals():
+        if 'model_connection' in locals():
             await juju.disconnect(model_connection)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('add_unit')
-    hdlr = logging.FileHandler('{}/log/add_unit.log'.format(settings.SOJOBO_API_DIR))
+    logger = logging.getLogger('add_application')
+    hdlr = logging.FileHandler('{}/log/add_application.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -65,6 +96,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(add_unit(sys.argv[1], sys.argv[2], sys.argv[3],
-                                     sys.argv[4], sys.argv[5],sys.argv[6],sys.argv[7]))
+    loop.run_until_complete(add_application(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5],
+                                            sys.argv[6],sys.argv[7], sys.argv[8], sys.argv[9]))
     loop.close()

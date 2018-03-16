@@ -1,0 +1,71 @@
+{
+	"/controllers/controller": {
+		"get": {
+			"c_access": ["admin", "company_admin", "superuser"]
+		},
+		"del": {
+			"c_access": ["admin", "company_admin", "superuser"]
+		}
+	},
+	"/controllers/controller/models": {
+		"post": {
+			"c_access": ["admin", "company_admin", "superuser", "add-model"]
+		}
+	},
+	"/controllers/controller/models/model": {
+		"post": {
+			"m_access": ["admin", "write"]
+		},
+		"del": {
+			"m_access": ["admin"]
+		}
+	},
+	"/controllers/controller/models/model/applications": {
+		"post": {
+			"m_access": ["admin", "write"]
+		}
+	},
+	"/controllers/controller/models/model/applications/application": {
+		"put": {
+			"m_access": ["admin", "write"]
+		},
+		"del": {
+			"m_access": ["admin", "write"]
+		}
+	},
+	"/controllers/controller/models/model/applications/application/config": {
+		"put": {
+			"m_access": ["admin", "write"]
+		}
+	},
+	"/controllers/controller/models/model/machines": {
+		"post": {
+			"m_access": ["admin", "write"]
+		}
+	},
+	"/controllers/controller/models/model/machines/machine": {
+		"del": {
+			"m_access": ["admin", "write"]
+		}
+	},
+	"/controllers/controller/models/model/applications/application/units": {
+		"post": {
+			"m_access": ["admin", "write"]
+		}
+	},
+	"/controllers/controller/models/model/applications/application/units/unit": {
+		"del": {
+			"m_access": ["admin", "write"]
+		}
+	},
+	"/controllers/controller/models/model/relations": {
+		"put": {
+			"m_access": ["admin", "write"]
+		}
+	},
+	"/controllers/controller/models/model/relations/app1/app2": {
+		"del": {
+			"m_access": ["admin", "write"]
+		}
+	}
+}

@@ -15,50 +15,49 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
-import logging
 import sys
 import traceback
+import logging
+from juju import tag, errors
+from juju.client import client
+from juju.controller import Controller
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
 
-class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = settings.JUJU_ADMIN_USER
-        self.password = settings.JUJU_ADMIN_PASSWORD
-        self.is_admin = True
-
-################################################################################
-# Async method
-################################################################################
-async def create_user(username, password):
+async def change_password(c_name, endpoint, ca_cert, juju_username, password):
     try:
-        datastore.create_user(username)
-        logger.info('Succesfully created user %s', username)
-        controllers = datastore.get_keys_controllers()
-        token = JuJu_Token()
-        for con in controllers:
-            logger.info('Setting up Controllerconnection for %s', con)
-            controller = juju.Controller_Connection(token, con)
-            async with controller.connect(token) as con_juju:  #pylint: disable=E1701
-                await con_juju.add_user(username, password)
-                await con_juju.grant(username)
-                datastore.add_user_to_controller(con, username, 'login')
-                logger.info('Succesfully added user %s to controller %s', username, con)
-        datastore.set_user_state(username, 'ready')
-    except Exception as e:
+        logger.info('Setting up Controller connection for %s.', c_name)
+        controller_connection = Controller()
+        await controller_connection.connect(endpoint=endpoint,
+                                            username=settings.JUJU_ADMIN_USER,
+                                            password=settings.JUJU_ADMIN_PASSWORD,
+                                            cacert=ca_cert)
+        logger.info('Controller connection as admin was successful.')
+
+        logger.info('Initializing user manager facade...')
+        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection)
+        entity = client.EntityPassword(password, tag.user(juju_username))
+
+        logger.info('Changing password...')
+        await user_facade.SetPassword([entity])
+        logger.info('Changed password!')
+
+    except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+    finally:
+        await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger('add-user')
     ws_logger = logging.getLogger('websockets.protocol')
-    hdlr = logging.FileHandler('{}/log/add_user.log'.format(settings.SOJOBO_API_DIR))
+    logger = logging.getLogger('change_password')
+    hdlr = logging.FileHandler('{}/log/change_password.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -66,6 +65,8 @@ if __name__ == '__main__':
     logger.addHandler(hdlr)
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
-    loop.set_debug(False)
-    loop.run_until_complete(create_user(sys.argv[1], sys.argv[2]))
+    loop.set_debug(True)
+    result = loop.run_until_complete(change_password(sys.argv[1], sys.argv[2],
+                                                     sys.argv[3], sys.argv[4],
+                                                     sys.argv[5]))
     loop.close()
