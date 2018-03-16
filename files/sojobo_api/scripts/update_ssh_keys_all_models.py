@@ -20,6 +20,7 @@ import ast
 import sys
 import traceback
 import logging
+import base64, hashlib
 from juju import tag, errors
 from juju.client import client
 from juju.model import Model
@@ -28,7 +29,9 @@ from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
 
-async def update_ssh_key(ssh_keys, username):
+async def update_ssh_keys_all_models(ssh_keys, username):
+    """Updates the ssh keys of a user on every model where the user has admin
+    or write access to."""
     try:
         user_info = datastore.get_user_info(username)
         juju_username = user_info["juju_username"]
@@ -46,21 +49,27 @@ async def update_ssh_key(ssh_keys, username):
 
                     logger.info('Setting up model connection for model: %s', model)
                     model_connection = Model()
-                    await model_connection.connect(endpoint, uuid, juju_username, password, cacert=cacert)
+                    await model_connection.connect(endpoint, uuid, settings.JUJU_ADMIN_USER,
+                    settings.JUJU_ADMIN_PASSWORD, cacert=cacert)
                     logger.info('Model connection was successful.')
 
                     logger.info('Initializing KeyManagerFacade...')
-                    key_facade = client.KeyManagerFacade.from_connection(model_connection)
+                    key_facade = client.KeyManagerFacade.from_connection(model_connection.connection)
 
                     logger.info('Removing current ssh keys...')
                     for key in current_keys:
+                        key = base64.b64decode(bytes(key.strip().split()[1].encode('ascii')))
+                        key = hashlib.md5(key).hexdigest()
+                        key = ':'.join(a+b for a, b in zip(key[::2], key[1::2]))
                         logger.info('removing key: %s', key)
-                        await key_facade.DeleteKeys([key], user)
+                        await key_facade.DeleteKeys([key], juju_username)
 
                     logger.info('Adding new ssh keys...')
                     for key in new_keys:
                         logger.info('adding key: %s', key)
                         await key_facade.AddKeys([key], juju_username)
+
+                    await model_connection.disconnect()
 
         logger.info('Updating ssh keys in database...')
         datastore.update_ssh_keys(username, new_keys)
@@ -77,7 +86,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('remove_ssh_keys')
-    hdlr = logging.FileHandler('{}/log/update_ssh_keys.log'.format(sys.argv[3]))
+    hdlr = logging.FileHandler('{}/log/update_ssh_keys_all_models.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -86,5 +95,5 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    result = loop.run_until_complete(update_ssh_key(sys.argv[1], sys.argv[2]))
+    result = loop.run_until_complete(update_ssh_keys_all_models(sys.argv[1], sys.argv[2]))
     loop.close()

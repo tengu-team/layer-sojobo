@@ -330,7 +330,7 @@ def get_users_controller(c_name):
     """Returns a list with users and access of given controller."""
     c_id = "controllers/" + c_name
     aql = ('FOR u, cEdge IN 1..1 OUTBOUND @c_id controllerAccess '
-               'RETURN {name: u.name, access: cEdge.access}')
+               'RETURN {name: u.name, juju_username: u.juju_username, access: cEdge.access}')
     return execute_aql_query(aql, rawResults=True, c_id=c_id)
 
 
@@ -457,7 +457,7 @@ def get_superuser_matching_controllers(user, resource_user):
     """Get controllers where the given user has superuser access and where
     the resource_user resides."""
     u_id = get_user_id(user)
-    ru_id = "users/" + resource_user
+    ru_id = get_user_id(resource_user)
     aql = ('FOR controller, cEdge IN 1..1 INBOUND @u_id controllerAccess '
                 'FILTER cEdge.access == "superuser" '
                 'FOR c, E IN 1..1 INBOUND @ru_id controllerAccess '
@@ -580,6 +580,18 @@ def get_model_access(c_name, m_name, username):
         return result[0]
 
 
+def get_model_and_access(m_key, username):
+    m_id = "models/" + m_key
+    u_id = get_user_id(username)
+    aql = ("LET mod = DOCUMENT(@m_id) "
+           "LET m_access = "
+                "FIRST((FOR m, mEdge IN 1..1 INBOUND @u_id modelAccess "
+                    "FILTER mEdge._from == @m_id "
+                    "RETURN mEdge.access)) "
+           "RETURN {mod, m_access} ")
+    return execute_aql_query(aql, rawResults=True, m_id=m_id, u_id=u_id)[0]
+
+
 def get_models_access(c_name, username):
     u_id = get_user_id(username)
     c_id = "controllers/" + c_name
@@ -642,8 +654,10 @@ def get_model_connection_info(username, c_name, m_key):
            "RETURN {user, controller, model, c_access, m_access}")
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id, m_id=m_id)[0]
 
+
 def hash_username(username):
     return hashlib.md5(username.encode('utf')).hexdigest()
+
 
 def get_user_id(username):
     return "users/" + hash_username(username)

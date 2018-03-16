@@ -19,27 +19,36 @@ import sys
 import traceback
 import logging
 import json
-from juju.model import Model
 from juju.client import client
+from juju.model import Model
+from juju.placement import parse as parse_placement
 sys.path.append('/opt')
 from sojobo_api import settings
 from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
-async def remove_machine(username, password, controller_name, model_key, machine):
+async def add_relation(c_name, endpoint, cacert, m_name, uuid, juju_username, password, relation1, relation2):
     try:
-        auth_data = datastore.get_model_connection_info(username, controller_name, model_key)
+        #auth_data = get_model_connection_info(username, c_name, m_key)
+        logger.info('Setting up Model connection for %s:%s.', c_name, m_name)
         model_connection = Model()
-        logger.info('Setting up Model connection for %s:%s', controller_name, auth_data['model']['name'])
-        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
-        logger.info('Model connection was successful')
+        await model_connection.connect(endpoint,
+                                       uuid,
+                                       juju_username,
+                                       password,
+                                       cacert)
+        logger.info('Model connection was successful.')
 
-        for mach, entity in model_connection.state.machines.items():
-            if mach == machine:
-                logger.info('Destroying machine %s', machine)
-                facade = client.ClientFacade.from_connection(entity.connection)
-                await facade.DestroyMachines(True, [entity.id])
-        logger.info('Machine %s destroyed', machine)
+        app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
+
+        try:
+            await app_facade.AddRelation([relation1, relation2])
+            logger.info('Relation %s <-> %s succesfully created!', relation1, relation2)
+        except JujuAPIError as e:
+            if 'relation already exists' not in e.message:
+                raise
+            logger.info('Relation %s <-> %s already exists', relation1, relation2)
+
         await model_connection.disconnect()
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -54,8 +63,8 @@ async def remove_machine(username, password, controller_name, model_key, machine
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('remove_machine')
-    hdlr = logging.FileHandler('{}/log/remove_machine.log'.format(settings.SOJOBO_API_DIR))
+    logger = logging.getLogger('add_relation')
+    hdlr = logging.FileHandler('{}/log/add_relation.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -64,6 +73,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(remove_machine(sys.argv[1], sys.argv[2], sys.argv[3],
-                                         sys.argv[4], sys.argv[5]))
+    loop.run_until_complete(add_relation(sys.argv[1], sys.argv[2], sys.argv[3],
+                                         sys.argv[4], sys.argv[5], sys.argv[6],
+                                         sys.argv[7], sys.argv[8], sys.argv[9]))
     loop.close()
