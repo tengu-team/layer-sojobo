@@ -111,7 +111,6 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
         try:
             check_controller_state(auth_data, authorization)
             check_user_state(auth_data)
-            check_user_state(auth_data)
             if auth_data['c_access']:
                 if controller and not model:
                     controller_connection = Controller()
@@ -159,7 +158,8 @@ def check_user_state(auth_data):
         elif auth_data['user']['state'] != 'ready':
             abort(403, "The user is being removed and not able to perform this action anymore!")
     else:
-        abort(errors.unauthorized)
+        error = errors.unauthorized()
+        abort(error[0], error[1])
 
 
 def check_controller_state(auth_data, authorization):
@@ -169,7 +169,8 @@ def check_controller_state(auth_data, authorization):
     elif check_if_admin(authorization):
         abort(404, 'The Environment does not exist')
     else:
-        abort(errors.unauthorized)
+        error = errors.unauthorized()
+        abort(error[0], error[1])
 
 
 def check_model_state(auth_data):
@@ -184,7 +185,8 @@ def check_model_state(auth_data):
     elif auth_data['c_access'] in ['superuser', 'add_model', 'admin']:
         abort(404, 'The Workspace does not exist')
     else:
-        abort(errors.unauthorized)
+        error = errors.unauthorized()
+        abort(error[0], error[1])
 
 
 def authorize(connection_info, resource, method, self_user=None, resource_user=None):
@@ -295,7 +297,7 @@ def get_all_controllers():
     return datastore.get_all_controllers()
 
 def get_keys_controllers():
-    return datastore.get_keys_controllers()
+    return [key for key in datastore.get_keys_controllers()]
 
 
 def controller_exists(c_name):
@@ -307,9 +309,10 @@ def get_controller_access(con, username):
 
 
 def get_controller_info(data):
+    #TODO: Give better parameters
     con_info = data['controller']
     if con_info['state'] == 'ready':
-        con_info['models'] = [u['name'] for u in get_models_access(data)]
+        con_info['models'] = [m['name'] for m in get_models_access(data["user"]["name"], con_info["name"])]
     return con_info
 
 
@@ -492,6 +495,8 @@ def get_machines_info(connection):
 
 def get_machine_info(connection, machine):
     try:
+        if not machine_exists(connection, machine):
+            abort(404, 'The machine does not exist!')
         data = connection.state.state['machine']
         machine_data = data[machine][0]
         if machine_data['agent-status']['current'] == 'error' and machine_data['addresses'] is None:
