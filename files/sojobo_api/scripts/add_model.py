@@ -104,6 +104,9 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
                         key_facade.AddKeys([key], u['name'])
                     except (JujuAPIError, JujuError):
                         pass
+        juju.log_event('model.create',
+                       {'uuid': model_info.uuid,
+                        'name': m_name})
         logger.info('%s -> succesfully deployed model', m_name)
         await model.disconnect()
         await controller_connection.disconnect()

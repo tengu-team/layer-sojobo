@@ -51,8 +51,8 @@ def initialize():
 def get_all_controllers():
     try:
         LOGGER.info('/TENGU/controllers [GET] => receiving call')
-        # auth_data = juju.get_user_info(request.authorization.username)
-        # execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
         if juju.check_if_admin(request.authorization):
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
