@@ -547,7 +547,8 @@ def grant_to_controller(user, controller):
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
     finally:
-        execute_task(juju.disconnect, connection)
+        if 'connection' in locals():
+            execute_task(juju.disconnect, connection)
 
 
 @USERS.route('/<user>/controllers/<controller>/models', methods=['GET'])
