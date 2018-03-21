@@ -450,13 +450,6 @@ def create_model(authorization, m_name, cred_name, c_name):
 #         return state
 
 
-# TODO: Functie die bij iedere POST die iets verandert aan een model checkt
-# of het model er klaar voor is en een gepast bericht teruggeeft. Maak gebruik van
-# abort zoals in authorize. Bundle deployment, applicatie toevoegen, user access
-# veranderen, machines. "Model access aangepast voor dit, dit en dit model maar voor dit
-# model nog niet"
-
-
 def delete_model(username, password, controller, model, m_key):
     datastore.set_model_state(m_key, 'deleting')
     Popen(["python3", "{}/scripts/delete_model.py".format(settings.SOJOBO_API_DIR),
@@ -815,20 +808,20 @@ def get_credential(user, credential):
 
 
 
-def add_credential(user, data):
+def add_credential(username, juju_username, credential):
     try:
-        return get_controller_types()[data['type']].add_credential(user, data)
+        return get_controller_types()[credential['type']].add_credential(username, juju_username, credential)
     except NotImplementedError as e:
         return 400, "This type of controller does not need credentials."
 
 
-async def update_cloud(controller, cloud, credential, username):
-    credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
+async def update_cloud(controller, cloud, credential, juju_username):
+    credential_name = 't{}'.format(hashlib.md5(credential["name"].encode('utf')).hexdigest())
     cloud_facade = client.CloudFacade.from_connection(controller.connection)
-    cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential)
+    cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential["credential"])
     cloud_cred = client.UpdateCloudCredential(
         client.CloudCredential(cred['key'], cred['type']),
-        tag.credential(cloud, username, credential_name)
+        tag.credential(cloud, juju_username, credential_name)
     )
     await cloud_facade.UpdateCredentials([cloud_cred])
 

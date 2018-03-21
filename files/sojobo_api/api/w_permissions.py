@@ -20,7 +20,7 @@ permissions = {
 	},
 	"/controllers/controller/models": {
 		"get": {
-			"c_access": ["admin", "company_admin", "superuser", "login"]
+			"c_access": ["admin", "company_admin", "superuser", "add-model", "login"]
 		},
 		"post": {
 			"c_access": ["admin", "company_admin", "superuser", "add-model"]

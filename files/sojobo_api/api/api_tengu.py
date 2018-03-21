@@ -196,7 +196,8 @@ def create_model(controller):
                 return juju.create_response(400, 'Credential {} not found for user {}'.format(data['credential'], auth_data['user']['name']))
         else:
             LOGGER.error('/TENGU/controllers/%s/models [POST] => No Permission to perform this action!', controller)
-            return juju.create_response(errors.no_permission())
+            code, response = errors.no_permission()
+            return juju.create_response(code, response)
     except KeyError:
         error_log()
         return juju.create_response(errors.invalid_data()[0], errors.invalid_data()[1])
