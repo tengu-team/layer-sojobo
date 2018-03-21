@@ -48,7 +48,6 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
             credential_name
         )
 
-
         # model_info = await controller_connection.add_model(m_name)
         config = {}
         config['authorized-keys'] = await utils.read_ssh_key(loop=controller_connection.loop)

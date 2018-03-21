@@ -19,11 +19,17 @@ permissions = {
 		}
 	},
 	"/controllers/controller/models": {
+		"get": {
+			"c_access": ["admin", "company_admin", "superuser", "login"]
+		},
 		"post": {
 			"c_access": ["admin", "company_admin", "superuser", "add-model"]
 		}
 	},
 	"/controllers/controller/models/model": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
+		},
 		"post": {
 			"m_access": ["admin", "write"]
 		},
@@ -32,11 +38,17 @@ permissions = {
 		}
 	},
 	"/controllers/controller/models/model/applications": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
+		},
 		"post": {
 			"m_access": ["admin", "write"]
 		}
 	},
 	"/controllers/controller/models/model/applications/application": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
+		},
 		"put": {
 			"m_access": ["admin", "write"]
 		},
@@ -45,26 +57,41 @@ permissions = {
 		}
 	},
 	"/controllers/controller/models/model/applications/application/config": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
+		},
 		"put": {
 			"m_access": ["admin", "write"]
 		}
 	},
 	"/controllers/controller/models/model/machines": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
+		},
 		"post": {
 			"m_access": ["admin", "write"]
 		}
 	},
 	"/controllers/controller/models/model/machines/machine": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
+		},
 		"del": {
 			"m_access": ["admin", "write"]
 		}
 	},
 	"/controllers/controller/models/model/applications/application/units": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
+		},
 		"post": {
 			"m_access": ["admin", "write"]
 		}
 	},
-	"/controllers/controller/models/model/applications/application/units/unit": {
+	"/controllers/controller/models/model/applications/application/units/unitnumber": {
+		"get": {
+			"m_access": ["admin", "write", "read"]
+		},
 		"del": {
 			"m_access": ["admin", "write"]
 		}
@@ -77,7 +104,7 @@ permissions = {
 			"m_access": ["admin", "write"]
 		}
 	},
-	"/controllers/controller/models/model/application": {
+	"/controllers/controller/models/model/relations/application": {
 		"get": {
 			"m_access": ["admin", "write", "read"]
 		}
@@ -90,7 +117,13 @@ permissions = {
 	"/users/user": {
 		"get": {
 			"c_access": ["admin", "company_admin", "superuser"]
-		}
+		},
+		"put": {
+			"c_access": ["admin", "company_admin", "superuser"]
+		},
+		"del": {
+			"c_access": ["admin", "company_admin"]
+		},
 	},
 	"/users/user/ssh-keys": {
 		"get": {
@@ -100,12 +133,23 @@ permissions = {
 			"c_access": ["admin", "company_admin", "superuser"]
 		}
 	},
+	"/users/user/credentials": {
+		"get": {
+			"c_access": ["admin", "company_admin", "superuser"]
+		},
+		"post": {
+			"c_access": ["admin", "company_admin", "superuser"]
+		},
+		"del": {
+			"c_access": ["admin", "company_admin", "superuser"]
+		},
+	},
     "/users/user/controllers/controller": {
 		"get": {
 			"c_access": ["admin", "company_admin", "superuser"]
 		},
         "put": {
-			"c_access": ["admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin"]
 		}
 	},
     "/users/user/controllers/controller/models": {
@@ -145,6 +189,4 @@ def superuser_authorize(superuser, resource_user):
 		return False
 	else:
 		matching_controllers = w_datastore.get_superuser_matching_controllers(superuser, resource_user)
-		print("Matching controllers: ")
-		print(matching_controllers)
 		return bool(matching_controllers)

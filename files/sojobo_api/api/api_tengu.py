@@ -218,7 +218,7 @@ def get_models_info(controller):
         LOGGER.info('/TENGU/controllers/%s/models [GET] => Authenticated!', controller)
         if juju.authorize(auth_data, '/controllers/controller/models', 'get'):
             LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
-            code, response = 200, [u['name'] for u in juju.get_models_access(auth_data)]
+            code, response = 200, [m['name'] for m in juju.get_models_access(auth_data["user"]["name"], controller)]
             LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
             return juju.create_response(code, response)
         else:
@@ -384,7 +384,7 @@ def add_application(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authenticated!', controller, model)
         if juju.authorize(auth_data, '/controllers/controller/models/model/applications', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authorized!', controller, model)
-            juju.deploy_app(connection, controller, auth_data['model']['_key'], auth_data['user']['juju_username'], request.authorization.password,
+            juju.deploy_app(connection, controller, auth_data['model']['_key'], request.authorization.username, request.authorization.password,
                             auth_data['controller']['type'], data.get('units', "1"), data.get('config', ''), data.get('target', None),
                             data.get('application', None), data.get('series', None))
             code, response = 202, 'Application is being deployed!'
@@ -552,7 +552,7 @@ def set_application_config(controller, model, application):
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => Authenticated!', controller, model, application)
-        if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/config', 'get'):
+        if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/config', 'put'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => Authorized!', controller, model, application)
             config = data.get('config', None)
             if not config:
@@ -726,7 +726,7 @@ def get_units_info(controller, model, application):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Auhtenticated!', controller, model, application)
         if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units', 'get'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Authorized!', controller, model, application)
-            if execute_task(juju.app_exists, connection, application):
+            if juju.app_exists(connection, application):
                 code, response = 200, juju.get_units_info(connection, application)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => Succesfully retrieved units info!', controller, model, application)
             else:
@@ -748,7 +748,8 @@ def get_units_info(controller, model, application):
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
     finally:
-        execute_task(juju.disconnect, connection)
+        if 'connection' in locals():
+            execute_task(juju.disconnect, connection)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['POST'])
@@ -784,7 +785,8 @@ def add_unit(controller, model, application):
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
     finally:
-        execute_task(juju.disconnect, connection)
+        if 'connection' in locals():
+            execute_task(juju.disconnect, connection)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['GET'])
@@ -796,7 +798,7 @@ def get_unit_info(controller, model, application, unitnumber):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Authenticated!', controller, model, application, unitnumber)
         if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units/unitnumber', 'get'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => Authorized!', controller, model, application, unitnumber)
-            if execute_task(juju.app_exists, connection, application):
+            if juju.app_exists(connection, application):
                 unit = juju.get_unit_info(connection, application, unitnumber)
                 if len(unit) != 0:
                     code, response = 200, unit
@@ -823,7 +825,8 @@ def get_unit_info(controller, model, application, unitnumber):
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
     finally:
-        execute_task(juju.disconnect, connection)
+        if 'connection' in locals():
+            execute_task(juju.disconnect, connection)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['DELETE'])
@@ -864,7 +867,8 @@ def remove_unit(controller, model, application, unitnumber):
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
     finally:
-        execute_task(juju.disconnect, connection)
+        if 'connection' in locals():
+            execute_task(juju.disconnect, connection)
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['GET'])
