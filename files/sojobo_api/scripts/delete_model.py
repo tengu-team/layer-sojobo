@@ -47,6 +47,9 @@ async def delete_model(c_name, m_name, m_key, usr, pwd):
         # Destroy modle from datastore
         datastore.delete_model(c_name, m_key)
         await controller_connection.disconnect()
+        juju.log_event('model.delete',
+                       {'uuid': auth_data['model']['uuid'],
+                        'name': m_name})
         logger.info('%s -> succesfully Destroyed model', m_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

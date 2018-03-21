@@ -21,26 +21,27 @@ import os
 import re
 import base64
 import datetime
-from subprocess import check_output, check_call, Popen
+from subprocess import Popen
 import json
 import hashlib
 from flask import abort, Response
 from juju import tag
 from juju.client import client
 from juju.controller import Controller
-from juju.errors import JujuAPIError, JujuError
+from juju.errors import JujuAPIError
 from juju.model import Model
 from sojobo_api.api import w_errors as errors, w_datastore as datastore, w_permissions as permissions
 from sojobo_api import settings
 
 
-################################################################################
+###############################################################################
 # TENGU FUNCTIONS
-################################################################################
+###############################################################################
 def get_controller_types():
-    """Returns the types of the controllers (google, aws, etc.). This depends on
-    which subordinates (f.e. controller_google) are connected to the sojobo-api charm.
-    Each controller subordinate creates a file in the controllers dir."""
+    """Returns the types of the controllers (google, aws, etc.).
+     This depends on which subordinates (f.e. controller_google) are connected
+     to the sojobo-api charm. Each controller subordinate creates a file in
+     the controllers dir."""
     types = {}
     for f_path in os.listdir('{}/controllers'.format(settings.SOJOBO_API_DIR)):
         # TODO: Why the .pyc check?
@@ -81,7 +82,8 @@ def check_input(data, input_type):
 
 
 def check_constraints(data):
-    cons = ['mem', 'arch', 'cores', 'spaces', 'container', 'root-disk', 'tags', 'cpu-power', 'virt-type']
+    cons = ['mem', 'arch', 'cores', 'spaces', 'container',
+            'root-disk', 'tags', 'cpu-power', 'virt-type']
     for item in data:
         if item in cons:
             if item == 'arch':
@@ -239,7 +241,8 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 async def disconnect(connection):
     if connection.connection and connection.connection.is_open:
-        await connection.disconnect()
+        await connection.connection.close()
+        connection.connection = None
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
@@ -288,14 +291,17 @@ def delete_controller(controller_name, controller_type):
     Popen(["python3", "{}/scripts/remove_controller.py".format(settings.SOJOBO_API_DIR),
            controller_name, controller_type])
 
+
 def get_supported_regions(c_type):
     return get_controller_types()[c_type].get_supported_regions()
+
 
 def get_all_controllers():
     return datastore.get_all_controllers()
 
+
 def get_keys_controllers():
-    return datastore.get_keys_controllers()
+    return [key for key in datastore.get_keys_controllers()]
 
 
 def controller_exists(c_name):
@@ -968,6 +974,8 @@ def c_access_exists(access):
 
 def m_access_exists(access):
     return access in ['read', 'write', 'admin']
+
+
 ########################################################################
 # AUXILIARY FUNCTIONS
 ########################################################################
@@ -978,3 +986,13 @@ def give_timestamp():
     for value in dt_values:
         timestamp += str(value)
     return(timestamp)
+
+
+##############################################################################
+# Metering functionality
+##############################################################################
+def log_event(event_type, tags):
+    if os.path.isfile("{}/metering_settings.py".format(settings.SOJOBO_API_DIR)):
+        current_time = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        from sojobo_api.api import w_events as events
+        events.log_event(event_type, current_time, tags)

@@ -35,13 +35,13 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         auth_data = datastore.get_controller_connection_info(usr, c_name)
         credential_name = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
 
-        #Controller_Connection
+        # Controller_Connection
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller_connection = Controller()
         await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], pwd, auth_data['controller']['ca_cert'])
         owner = tag.user(auth_data['user']['juju_username'])
 
-        #Generate Tag for Credential
+        # Generate Tag for Credential
         credential = tag.credential(
             auth_data['controller']['type'],
             tag.untag('user-', owner),
@@ -49,16 +49,16 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         )
 
 
-        #model_info = await controller_connection.add_model(m_name)
+        # model_info = await controller_connection.add_model(m_name)
         config = {}
         config['authorized-keys'] = await utils.read_ssh_key(loop=controller_connection.loop)
         logger.info(config)
 
-        #Create A Model
+        # Create A Model
         model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
         model_info = await model_facade.CreateModel(tag.cloud(auth_data['controller']['type']),config,credential, m_name, owner,auth_data['controller']['region'])
         logger.info('%s -> Connected to model', m_name)
-        #Connect to created Model
+        # Connect to created Model
 
         model = Model()
         await model.connect(
@@ -101,6 +101,9 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
                         key_facade.AddKeys([key], u['name'])
                     except (JujuAPIError, JujuError):
                         pass
+        juju.log_event('model.create',
+                       {'uuid': model_info.uuid,
+                        'name': m_name})
         logger.info('%s -> succesfully deployed model', m_name)
         await model.disconnect()
         await controller_connection.disconnect()
