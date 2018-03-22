@@ -32,14 +32,17 @@ async def add_application(c_name, m_key, username, password, units, machine, con
 
         auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         model_connection = Model()
-        print(auth_data)
         logger.info('Setting up Model connection for %s:%s', c_name, auth_data['model']['name'])
-        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
+        await model_connection.connect(auth_data['controller']['endpoints'][0],
+                                       auth_data['model']['uuid'],
+                                       auth_data['user']['juju_username'],
+                                       password,
+                                       auth_data['controller']['ca_cert'])
         logger.info('Model connection was successful')
 
         entity = await model_connection.charmstore.entity(application, channel=None)
         entity_id = entity['Id']
-        logger.info('Created modelentity')
+        logger.info('Created model entity')
 
         client_facade = client.ClientFacade.from_connection(model_connection.connection)
         app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
@@ -48,13 +51,19 @@ async def add_application(c_name, m_key, username, password, units, machine, con
             series = model_connection._get_series(application, entity)
         await client_facade.AddCharm(None, entity_id)
 
+        # When someone tries to deploy a non-recommended app then they need to
+        # specify the whole name of the charm (including creator). F.e.
+        # 'cs:~chris.macnaughton/influxdb' in contrast to the recommended charm
+        # 'influxdb'. client.ApplicationDeploy().application only needs 'influxdb'
+        # and no other details.
+        if "/" in application:
+            application = application.split("/")[1]
+
         if not config == '':
             conf = {k: str(v) for k, v in ast.literal_eval(config).items()}
         else:
             conf = {}
-        config = yaml.dump({application: conf},
-                                default_flow_style=False)
-
+        config = yaml.dump({application: conf}, default_flow_style=False)
 
         app = client.ApplicationDeploy(
             charm_url=entity_id,
@@ -96,6 +105,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(add_application(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5],
-                                            sys.argv[6],sys.argv[7], sys.argv[8], sys.argv[9]))
+    loop.run_until_complete(add_application(sys.argv[1], sys.argv[2], sys.argv[3],
+                                            sys.argv[4], sys.argv[5], sys.argv[6],
+                                            sys.argv[7], sys.argv[8], sys.argv[9]))
     loop.close()

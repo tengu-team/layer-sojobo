@@ -374,8 +374,6 @@ def get_ssh_keys_user(username):
 
 
 def get_applications_info(connection):
-    print("====DEBUGGING====")
-    print(connection.state.state)
     result = []
     for data in connection.state.state.get('application', {}).values():
         res = {'name': data[0]['name'], 'relations': [], 'charm': data[0]['charm-url'], 'exposed': data[0]['exposed'],
