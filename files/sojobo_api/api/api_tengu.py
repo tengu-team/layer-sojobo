@@ -318,7 +318,7 @@ def delete_model(controller, model):
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Authenticated!', controller, model)
-        if juju.authorize(auth_data, '/controllers/controller/models/model', 'delete'):
+        if juju.authorize(auth_data, '/controllers/controller/models/model', 'del'):
             LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Authorized!', controller, model)
             juju.delete_model(request.authorization.username, request.authorization.password, controller, model, auth_data['model']['_key'])
             code, response = 202, 'Model is being deleted!'
@@ -489,7 +489,7 @@ def remove_app(controller, model, application):
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Authenticated!', controller, model, application)
-        if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application', 'delete'):
+        if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application', 'del'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => Authorized!', controller, model, application)
             juju.remove_app(connection, application, request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'])
             code, response = 202, "The application is being removed"
@@ -693,7 +693,7 @@ def remove_machine(controller, model, machine):
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => Authenticated!', controller, model, machine)
-        if juju.authorize(auth_data, '/controllers/controller/models/model/machines/machine', 'delete'):
+        if juju.authorize(auth_data, '/controllers/controller/models/model/machines/machine', 'del'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => Authorized!', controller, model, machine)
             juju.remove_machine(connection, request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], machine)
             code, response = 202, 'Machine being removed'
