@@ -386,12 +386,16 @@ def add_application(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authenticated!', controller, model)
         if juju.authorize(auth_data, '/controllers/controller/models/model/applications', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authorized!', controller, model)
-            juju.deploy_app(connection, controller, auth_data['model']['_key'], request.authorization.username, request.authorization.password,
-                            auth_data['controller']['type'], data.get('units', "1"), data.get('config', ''), data.get('target', None),
-                            data.get('application', None), data.get('series', None))
-            code, response = 202, 'Application is being deployed!'
-            LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller, model)
-            return juju.create_response(code, response)
+            if auth_data['model'] is not None:
+                juju.deploy_app(connection, controller, auth_data['model']['_key'], request.authorization.username, request.authorization.password,
+                                auth_data['controller']['type'], data.get('units', "1"), data.get('config', ''), data.get('target', None),
+                                data.get('application', None), data.get('series', None))
+                code, response = 202, 'Application is being deployed!'
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller, model)
+                return juju.create_response(code, response)
+            else:
+                code, response = errors.does_not_exist("model " + model)
+                return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/TENGU/controllers/%s/models/%s/applications [GET] => No Permission to perform this action!', controller, model)
