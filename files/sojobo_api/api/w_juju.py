@@ -242,9 +242,12 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 
 async def disconnect(connection):
-    if connection.connection and connection.connection.is_open:
-        await connection.connection.close()
-        connection.connection = None
+    if connection is not True:
+        if connection.connection and connection.connection.is_open:
+            await connection.connection.close()
+            connection.connection = None
+
+            
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
