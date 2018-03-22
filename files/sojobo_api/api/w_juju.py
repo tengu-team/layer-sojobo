@@ -102,9 +102,9 @@ def check_constraints(data):
 async def authenticate(api_key, authorization, auth_data, controller=None, model=None):
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
-        if check_if_admin(authorization):
-            return True
         if not controller and not model:
+            if check_if_admin(authorization):
+                return True
             if len(datastore.get_all_controllers()) == 0:
                 abort(error[0], error[1])
             else:
@@ -247,7 +247,7 @@ async def disconnect(connection):
             await connection.connection.close()
             connection.connection = None
 
-            
+
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
