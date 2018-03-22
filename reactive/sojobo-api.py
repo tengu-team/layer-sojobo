@@ -252,6 +252,8 @@ def create_arangodb_collections(sojobo_db):
     create_arangodb_collection(sojobo_db, "credentials")
     create_arangodb_collection(sojobo_db, "controllers")
     create_arangodb_collection(sojobo_db, "models")
+    create_arangodb_collection(sojobo_db, "companies")
+    create_arangodb_collection(sojobo_db, "companyAccess", edges=True)
     create_arangodb_collection(sojobo_db, "controllerAccess", edges=True)
     create_arangodb_collection(sojobo_db, "modelAccess", edges=True)
 

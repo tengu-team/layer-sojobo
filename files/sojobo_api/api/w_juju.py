@@ -133,8 +133,19 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
         abort(error[0], error[1])
 
 
-def check_if_admin(auth_data):
-    return auth_data.username == settings.JUJU_ADMIN_USER and auth_data.password == settings.JUJU_ADMIN_PASSWORD
+def check_if_admin(authz, company=None):
+    if check_if_company_admin(authz, company):
+        return True
+    else:
+        return authz.username == settings.JUJU_ADMIN_USER and authz.password == settings.JUJU_ADMIN_PASSWORD
+
+
+def check_if_company_admin(authz, company):
+    if not company:
+        return False
+    datastore.get_company(authz.username)
+    if datastore.get_company(authz.username)['company_access']['is_admin']:
+        return True
 
 
 async def connect_to_random_controller(authorization, auth_data):
@@ -968,6 +979,18 @@ def check_models_access(token, controller, user):
         return True, result
     else:
         return False, result
+
+
+##############################################################################
+# Company functionality
+##############################################################################
+def create_company(admin, name, uri):
+    if not admin or not name or not uri:
+        abort(400, "Please provide a Company-Name('name'), "
+                   "a company-admin('admin') and a valid Hubspot-uri('uri')")
+    elif not user_exists(admin):
+        abort(404, 'User does not exist!')
+    return 'Company is being created!'
 
 
 #########################
