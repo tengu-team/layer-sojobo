@@ -374,18 +374,21 @@ def get_ssh_keys_user(username):
 
 
 def get_applications_info(connection):
+    print("====DEBUGGING====")
+    print(connection.state.state)
     result = []
     for data in connection.state.state.get('application', {}).values():
         res = {'name': data[0]['name'], 'relations': [], 'charm': data[0]['charm-url'], 'exposed': data[0]['exposed'],
                'state': data[0]['status']}
-        for rels in connection.state.state['relation'].values():
-            keys = rels[0]['key'].split(" ")
-            if len(keys) == 1 and data[0]['name'] == keys[0].split(":")[0]:
-                res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
-            elif len(keys) == 2 and data[0]['name'] == keys[0].split(":")[0]:
-                res['relations'].extend([{'interface': keys[1].split(":")[1], 'with': keys[1].split(":")[0]}])
-            elif len(keys) == 2 and data[0]['name'] == keys[1].split(":")[0]:
-                res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
+        if 'relation' in connection.state.state:
+            for rels in connection.state.state['relation'].values():
+                keys = rels[0]['key'].split(" ")
+                if len(keys) == 1 and data[0]['name'] == keys[0].split(":")[0]:
+                    res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
+                elif len(keys) == 2 and data[0]['name'] == keys[0].split(":")[0]:
+                    res['relations'].extend([{'interface': keys[1].split(":")[1], 'with': keys[1].split(":")[0]}])
+                elif len(keys) == 2 and data[0]['name'] == keys[1].split(":")[0]:
+                    res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
         res['units'] = get_units_info(connection, data[0]['name'])
         result.append(res)
     return result
