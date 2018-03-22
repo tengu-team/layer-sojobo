@@ -678,24 +678,6 @@ def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, pass
            app1, app2])
 
 
-async def tion(token, model, app1, app2):
-    async with model.connect(token) as juju:
-        data = juju.state.state
-        application = await get_application_entity(token, model, app1)
-        if app1 == app2:
-            for relation in data['relation'].items():
-                keys = relation[1][0]['key'].split(':')
-                await application.destroy_relation(keys[1], '{}:{}'.format(keys[0], keys[1]))
-        else:
-            for relation in data['relation'].items():
-                keys = relation[1][0]['key'].split(' ')
-                if len(keys) > 1:
-                    if keys[0].startswith(app1):
-                        await application.destroy_relation(keys[0].split(':')[1], keys[1])
-                    elif keys[1].startswith(app1):
-                        await application.destroy_relation(keys[1].split(':')[1], keys[0])
-
-
 def set_application_config(connection, username, password, controller_name, model_key, application, config):
     if not app_exists(connection, application):
         abort(404, 'The application does not exist!')

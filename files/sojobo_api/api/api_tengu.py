@@ -47,6 +47,7 @@ def initialize():
     LOGGER.addHandler(hdlr)
     WS_LOGGER.addHandler(hdlr)
 
+
 @TENGU.route('/controllers', methods=['GET'])
 def get_all_controllers():
     try:
@@ -763,7 +764,7 @@ def add_unit(controller, model, application):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Authenticated!', controller, model, application)
         if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Authorized!', controller, model, application)
-            if execute_task(juju.app_exists, connection, application):
+            if juju.app_exists(connection, application):
                 juju.add_unit(request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], application, data.get('amount', 1), data.get('target', 'None'))
                 code, response = 202, "Unit is being created"
                 LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => Unit is being created, check add_unit.log for more information!', controller, model, application)
@@ -839,7 +840,7 @@ def remove_unit(controller, model, application, unitnumber):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Authenticated!', controller, model, application, unitnumber)
         if juju.authorize(auth_data, '/controllers/controller/models/model/applications/application/units/unitnumber', 'del'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => Authorized!', controller, model, application, unitnumber)
-            if execute_task(juju.app_exists, connection, application):
+            if juju.app_exists(connection, application):
                 unit = juju.get_unit_info(connection, application, unitnumber)
                 if len(unit) != 0:
                     unit_name = application + '/' + str(unitnumber)
