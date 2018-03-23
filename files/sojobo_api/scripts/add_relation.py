@@ -22,6 +22,7 @@ import json
 from juju.client import client
 from juju.model import Model
 from juju.placement import parse as parse_placement
+from juju.errors import JujuAPIError
 sys.path.append('/opt')
 from sojobo_api import settings
 from sojobo_api.api import w_datastore as datastore, w_juju as juju
@@ -29,7 +30,6 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 async def add_relation(c_name, endpoint, cacert, m_name, uuid, juju_username, password, relation1, relation2):
     try:
-        #auth_data = get_model_connection_info(username, c_name, m_key)
         logger.info('Setting up Model connection for %s:%s.', c_name, m_name)
         model_connection = Model()
         await model_connection.connect(endpoint,
@@ -45,9 +45,13 @@ async def add_relation(c_name, endpoint, cacert, m_name, uuid, juju_username, pa
             await app_facade.AddRelation([relation1, relation2])
             logger.info('Relation %s <-> %s succesfully created!', relation1, relation2)
         except JujuAPIError as e:
-            if 'relation already exists' not in e.message:
+            if 'ambiguous relation' in e.message:
+                logger.info('Relation %s <-> %s is ambiguous and cannot be added.', relation1, relation2)
+            if 'relation already exists' in e.message:
+                logger.info('Relation %s <-> %s already exists', relation1, relation2)
+            else:
                 raise
-            logger.info('Relation %s <-> %s already exists', relation1, relation2)
+
 
         await model_connection.disconnect()
     except Exception as e:

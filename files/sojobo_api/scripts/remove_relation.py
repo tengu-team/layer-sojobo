@@ -40,13 +40,16 @@ async def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username
         logger.info('Model connection was successful.')
 
         logger.info('Getting application entity...')
-        entity = juju.get_application_entity(model_connection, app1)
+        app1_name = app1
+        if ':' in app1:
+            app1_name = app1.split(':')[0]
+        entity = juju.get_application_entity(model_connection, app1_name)
         logger.info('Initializing facade...')
         app_facade = client.ApplicationFacade.from_connection(entity.connection)
 
         # First param must be name of relation that app1 has with app2. (local relation)
         # Second param is remote relation name.
-        await app_facade.DestroyRelation([app2, app1])
+        await app_facade.DestroyRelation([app1, app2])
         logger.info('Relation %s <-> %s succesfully destroyed!', app1, app2)
 
         await model_connection.disconnect()

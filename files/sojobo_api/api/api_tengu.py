@@ -920,10 +920,10 @@ def add_relation(controller, model):
                 app1 = app1.split(':')[0]
             if ':' in app2:
                 app2 = app2.split(':')[0]
-            print(app1)
-            print(app2)
 
             if juju.app_exists(model_connection, app1) and juju.app_exists(model_connection, app2):
+
+                # TODO: Check if relation is ambiguous.
 
                 endpoint = auth_data["controller"]["endpoints"][0]
                 cacert = auth_data["controller"]["ca_cert"]
@@ -934,8 +934,7 @@ def add_relation(controller, model):
                 juju.add_relation(controller, endpoint, cacert,m_name, uuid,
                                   juju_username, password, relation1, relation2)
 
-                #code, response = 200, execute_task(juju.get_relations_info, token, mod)
-                code, response = 200, "Success"
+                code, response = 202, "Relationship between {} and {} is being created!".format(app1, app2)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Relationship succesfully created.', controller, model)
             else:
                 code, response = errors.does_not_exist('application')
@@ -995,12 +994,14 @@ def remove_relation(controller, model, app1, app2):
         if juju.authorize(auth_data, '/controllers/controller/models/model/relations/app1/app2', 'del'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Authorized!', controller, model, app1, app2)
             # TODO: Does it have to be possible to give relations with ':' f.e. 'wordpress:db'
+            app1_name = app1
+            app2_name = app2
             if ':' in app1:
-                app1 = app1.split(':')[0]
+                app1_name = app1.split(':')[0]
             if ':' in app2:
-                app2 = app2.split(':')[0]
+                app2_name = app2.split(':')[0]
 
-            if juju.app_exists(model_connection, app1) and juju.app_exists(model_connection, app2):
+            if juju.app_exists(model_connection, app1_name) and juju.app_exists(model_connection, app2_name):
                 endpoint = auth_data["controller"]["endpoints"][0]
                 cacert = auth_data["controller"]["ca_cert"]
                 m_name = auth_data["model"]["name"]
@@ -1010,7 +1011,7 @@ def remove_relation(controller, model, app1, app2):
 
                 juju.remove_relation(controller, endpoint, cacert,m_name, uuid,
                                   juju_username, password, app1, app2)
-                code, response = 202, 'The relation is being removed'
+                code, response = 202, 'The relation is being removed!'
                 LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => Relation is being removed!', controller, model, app1, app2)
             else:
                 code, response = errors.does_not_exist('application')
