@@ -38,14 +38,19 @@ async def add_application(c_name, m_key, username, password, units, machine, con
                                        auth_data['user']['juju_username'],
                                        password,
                                        auth_data['controller']['ca_cert'])
-        logger.info('Model connection was successful')
+        logger.info('Model connection was successful.')
 
+        logger.info('Creating model entity...')
         entity = await model_connection.charmstore.entity(application, channel=None)
         entity_id = entity['Id']
-        logger.info('Created model entity')
+        logger.info('Created model entity.')
 
         client_facade = client.ClientFacade.from_connection(model_connection.connection)
         app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
+
+        # If the application is a subordinate it does not need any units.
+        if entity['Meta']['charm-metadata']['Subordinate']:
+            units = 0
 
         if series == '':
             series = model_connection._get_series(application, entity)
