@@ -784,7 +784,7 @@ def get_users_controller(controller):
 
 def get_users_model(data):
     if data['m_access'] in ['admin', 'write']:
-        return datastore.get_users_model(data['model']['_key'])
+        return [u for u in datastore.get_users_model(data['model']['_key'])]
     elif data['m_access'] == 'read':
         return [{'name': data['user']['name'], 'access': data['m_access']}]
     else:

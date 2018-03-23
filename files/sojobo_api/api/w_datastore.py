@@ -616,7 +616,7 @@ def get_users_model(m_key):
     m_id = "models/" + m_key
     aql = ('FOR u, mEdge IN 1..1 OUTBOUND @m_id modelAccess '
                'RETURN {name: u.name, access: mEdge.access}')
-    return execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
+    return execute_aql_query(aql, rawResults=True, m_id=m_id)
 
 ################################################################################
 #                          CONNECTION FUNCTIONS                                #
