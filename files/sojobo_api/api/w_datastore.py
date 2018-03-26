@@ -321,6 +321,28 @@ def get_ready_controllers():
     return execute_aql_query(aql, rawResults=True)
 
 
+def get_ready_controllers_with_access(username):
+    """Returns a list with ready controllers that the given user has access to."""
+    u_id = get_user_id(username)
+    aql = ('FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
+                'FILTER c.state == "ready" '
+                'RETURN c')
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)
+
+
+def get_ready_controllers_no_access(username):
+    """Returns a list with ready controllers that the given user has no access to."""
+    u_id = get_user_id(username)
+    aql = ('LET controllers_with_access = '
+               '(FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
+                    'RETURN c) '
+               'FOR c in controllers '
+                    'FILTER c.state == "ready" '
+                    'FILTER c NOT IN controllers_with_access '
+                    'RETURN c')
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)
+
+
 def get_cloud_controllers(c_type):
     aql = 'FOR c IN controllers FILTER c.type == @cloud RETURN c'
     return execute_aql_query(aql, rawResults=True, cloud=c_type)

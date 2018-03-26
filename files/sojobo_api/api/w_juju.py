@@ -116,17 +116,26 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
             if auth_data['c_access']:
                 if controller and not model:
                     controller_connection = Controller()
-                    await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
+                    await controller_connection.connect(auth_data['controller']['endpoints'][0],
+                                                        auth_data['user']['juju_username'],
+                                                        authorization.password,
+                                                        auth_data['controller']['ca_cert'])
                     return controller_connection
                 elif model:
                     check_model_state(auth_data)
                     model_connection = Model()
-                    await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
+                    await model_connection.connect(auth_data['controller']['endpoints'][0],
+                                                   auth_data['model']['uuid'],
+                                                   auth_data['user']['juju_username'],
+                                                   authorization.password,
+                                                   auth_data['controller']['ca_cert'])
                     return model_connection
             elif auth_data['controller']['state'] == 'ready':
-                await connect_to_random_controller(authorization)
-                add_user_to_controllers(auth_data, authorization.username, authorization.password)
-                abort(409, 'User {} is being added to the {} environment'.format(auth_data['controller']['name'], auth_data['user']['name']))
+                await connect_to_random_controller(authorization, auth_data)
+                add_user_to_controllers(authorization.username,
+                                        auth_data['user']['juju_username'],
+                                        authorization.password)
+                abort(409, 'User {} is being added to the {} environment'.format(auth_data['user']['name'], auth_data['controller']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
     else:
@@ -140,14 +149,16 @@ def check_if_admin(auth_data):
 async def connect_to_random_controller(authorization, auth_data):
     error = errors.unauthorized()
     try:
-        ready_controllers = datastore.get_all_ready_controllers()
+        ready_controllers = datastore.get_ready_controllers_with_access(authorization.username)
         if len(ready_controllers) == 0:
             abort(400,'Please wait untill your first environment is set up!')
         else:
             con = ready_controllers[randint(0, len(ready_controllers) - 1)]
             controller_connection = Controller()
-            await controller_connection.connect(endpoint=con['endpoints'][0], username=auth_data['user']['juju_username'],
-                                                password=authorization.password, cacert=con['ca_cert'])
+            await controller_connection.connect(endpoint=con['endpoints'][0],
+                                                username=auth_data['user']['juju_username'],
+                                                password=authorization.password,
+                                                cacert=con['ca_cert'])
             await controller_connection.disconnect()
     except JujuAPIError:
         abort(error[0], error[1])
@@ -708,16 +719,8 @@ def create_user(username, password):
     # and then try to add a user that is also named 'bob', therefore we add a timestamp.
     juju_username = 'u{}{}'.format(hashlib.md5(username.encode('utf')).hexdigest(), give_timestamp())
     datastore.create_user(username, juju_username)
-    controllers = datastore.get_ready_controllers()
+    add_user_to_controllers(username, juju_username, password)
 
-    for controller in controllers:
-        c_name = controller['name']
-        endpoint = controller["endpoints"][0]
-        cacert = controller["ca_cert"]
-        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR),
-        username, password, juju_username, c_name, endpoint, cacert])
-    if len(controllers) == 0:
-        datastore.set_user_state(username, 'ready')
 
 
 def delete_user(username):
@@ -728,8 +731,17 @@ def delete_user(username):
         username, controller['name']])
 
 
-def add_user_to_controllers(data, username, password):
-    Popen(["python3", "{}/scripts/add_user_to_controllers.py".format(settings.SOJOBO_API_DIR),data, username, password])
+def add_user_to_controllers(username, juju_username, password):
+    controllers = datastore.get_ready_controllers_no_access(username)
+
+    for controller in controllers:
+        c_name = controller['name']
+        endpoint = controller["endpoints"][0]
+        cacert = controller["ca_cert"]
+        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR),
+        username, password, juju_username, c_name, endpoint, cacert])
+    if len(controllers) == 0:
+        datastore.set_user_state(username, 'ready')
 
 
 def change_user_password(username, password):
