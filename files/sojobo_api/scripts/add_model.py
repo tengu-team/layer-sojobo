@@ -28,7 +28,6 @@ from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
 
-
 async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
     try:
         # Get required information from database
@@ -38,7 +37,9 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         # Controller_Connection
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller_connection = Controller()
-        await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], pwd, auth_data['controller']['ca_cert'])
+        await controller_connection.connect(auth_data['controller']['endpoints'][0],
+                                            auth_data['user']['juju_username'], pwd,
+                                            auth_data['controller']['ca_cert'])
         owner = tag.user(auth_data['user']['juju_username'])
 
         # Generate Tag for Credential
@@ -55,7 +56,10 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
 
         # Create A Model
         model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
-        model_info = await model_facade.CreateModel(tag.cloud(auth_data['controller']['type']),config,credential, m_name, owner,auth_data['controller']['region'])
+        model_info = await model_facade.CreateModel(tag.cloud(auth_data['controller']['type']),
+                                                              config, credential,
+                                                              m_name, owner,
+                                                              auth_data['controller']['region'])
         logger.info('%s -> Connected to model', m_name)
         # Connect to created Model
 
@@ -132,5 +136,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[3],sys.argv[4], sys.argv[5], sys.argv[6]))
+    loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[3],
+                                         sys.argv[4], sys.argv[5], sys.argv[6]))
     loop.close()

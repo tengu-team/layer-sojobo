@@ -105,7 +105,7 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
         if not controller and not model:
             if check_if_admin(authorization):
                 return True
-            elif len(datastore.get_all_controllers()) == 0:
+            if len(datastore.get_all_controllers()) == 0:
                 abort(error[0], error[1])
             else:
                 await connect_to_random_controller(authorization, auth_data)
@@ -116,17 +116,26 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
             if auth_data['c_access']:
                 if controller and not model:
                     controller_connection = Controller()
-                    await controller_connection.connect(auth_data['controller']['endpoints'][0], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
+                    await controller_connection.connect(auth_data['controller']['endpoints'][0],
+                                                        auth_data['user']['juju_username'],
+                                                        authorization.password,
+                                                        auth_data['controller']['ca_cert'])
                     return controller_connection
                 elif model:
                     check_model_state(auth_data)
                     model_connection = Model()
-                    await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
+                    await model_connection.connect(auth_data['controller']['endpoints'][0],
+                                                   auth_data['model']['uuid'],
+                                                   auth_data['user']['juju_username'],
+                                                   authorization.password,
+                                                   auth_data['controller']['ca_cert'])
                     return model_connection
             elif auth_data['controller']['state'] == 'ready':
                 await connect_to_random_controller(authorization, auth_data)
-                add_user_to_controllers(auth_data, authorization.username, authorization.password)
-                abort(409, 'User {} is being added to the {} environment'.format(auth_data['controller']['name'], auth_data['user']['name']))
+                add_user_to_controllers(authorization.username,
+                                        auth_data['user']['juju_username'],
+                                        authorization.password)
+                abort(409, 'User {} is being added to the {} environment'.format(auth_data['user']['name'], auth_data['controller']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
     else:
@@ -151,14 +160,16 @@ def check_if_company_admin(authz, company):
 async def connect_to_random_controller(authorization, auth_data):
     error = errors.unauthorized()
     try:
-        ready_controllers = datastore.get_all_ready_controllers()
+        ready_controllers = datastore.get_ready_controllers_with_access(authorization.username)
         if len(ready_controllers) == 0:
             abort(400,'Please wait untill your first environment is set up!')
         else:
             con = ready_controllers[randint(0, len(ready_controllers) - 1)]
             controller_connection = Controller()
-            await controller_connection.connect(endpoint=con['endpoints'][0], username=auth_data['user']['juju_username'],
-                                                password=authorization.password, cacert=con['ca_cert'])
+            await controller_connection.connect(endpoint=con['endpoints'][0],
+                                                username=auth_data['user']['juju_username'],
+                                                password=authorization.password,
+                                                cacert=con['ca_cert'])
             await controller_connection.disconnect()
     except JujuAPIError:
         abort(error[0], error[1])
@@ -253,9 +264,12 @@ def get_connection_info(authorization, c_name=None, m_name=None):
 
 
 async def disconnect(connection):
-    if connection.connection and connection.connection.is_open:
-        await connection.connection.close()
-        connection.connection = None
+    if connection is not True:
+        if connection.connection and connection.connection.is_open:
+            await connection.connection.close()
+            connection.connection = None
+
+
 ###############################################################################
 # CONTROLLER FUNCTIONS
 ###############################################################################
@@ -386,14 +400,15 @@ def get_applications_info(connection):
     for data in connection.state.state.get('application', {}).values():
         res = {'name': data[0]['name'], 'relations': [], 'charm': data[0]['charm-url'], 'exposed': data[0]['exposed'],
                'state': data[0]['status']}
-        for rels in connection.state.state['relation'].values():
-            keys = rels[0]['key'].split(" ")
-            if len(keys) == 1 and data[0]['name'] == keys[0].split(":")[0]:
-                res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
-            elif len(keys) == 2 and data[0]['name'] == keys[0].split(":")[0]:
-                res['relations'].extend([{'interface': keys[1].split(":")[1], 'with': keys[1].split(":")[0]}])
-            elif len(keys) == 2 and data[0]['name'] == keys[1].split(":")[0]:
-                res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
+        if 'relation' in connection.state.state:
+            for rels in connection.state.state['relation'].values():
+                keys = rels[0]['key'].split(" ")
+                if len(keys) == 1 and data[0]['name'] == keys[0].split(":")[0]:
+                    res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
+                elif len(keys) == 2 and data[0]['name'] == keys[0].split(":")[0]:
+                    res['relations'].extend([{'interface': keys[1].split(":")[1], 'with': keys[1].split(":")[0]}])
+                elif len(keys) == 2 and data[0]['name'] == keys[1].split(":")[0]:
+                    res['relations'].extend([{'interface': keys[0].split(":")[1], 'with': keys[0].split(":")[0]}])
         res['units'] = get_units_info(connection, data[0]['name'])
         result.append(res)
     return result
@@ -465,13 +480,6 @@ def create_model(authorization, m_name, cred_name, c_name):
 #     state = datastore.get_model_state(m_key)
 #     if state in required_states:
 #         return state
-
-
-# TODO: Functie die bij iedere POST die iets verandert aan een model checkt
-# of het model er klaar voor is en een gepast bericht teruggeeft. Maak gebruik van
-# abort zoals in authorize. Bundle deployment, applicatie toevoegen, user access
-# veranderen, machines. "Model access aangepast voor dit, dit en dit model maar voor dit
-# model nog niet"
 
 
 def delete_model(username, password, controller, model, m_key):
@@ -696,24 +704,6 @@ def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, pass
            app1, app2])
 
 
-async def tion(token, model, app1, app2):
-    async with model.connect(token) as juju:
-        data = juju.state.state
-        application = await get_application_entity(token, model, app1)
-        if app1 == app2:
-            for relation in data['relation'].items():
-                keys = relation[1][0]['key'].split(':')
-                await application.destroy_relation(keys[1], '{}:{}'.format(keys[0], keys[1]))
-        else:
-            for relation in data['relation'].items():
-                keys = relation[1][0]['key'].split(' ')
-                if len(keys) > 1:
-                    if keys[0].startswith(app1):
-                        await application.destroy_relation(keys[0].split(':')[1], keys[1])
-                    elif keys[1].startswith(app1):
-                        await application.destroy_relation(keys[1].split(':')[1], keys[0])
-
-
 def set_application_config(connection, username, password, controller_name, model_key, application, config):
     if not app_exists(connection, application):
         abort(404, 'The application does not exist!')
@@ -740,16 +730,8 @@ def create_user(username, password):
     # and then try to add a user that is also named 'bob', therefore we add a timestamp.
     juju_username = 'u{}{}'.format(hashlib.md5(username.encode('utf')).hexdigest(), give_timestamp())
     datastore.create_user(username, juju_username)
-    controllers = datastore.get_ready_controllers()
+    add_user_to_controllers(username, juju_username, password)
 
-    for controller in controllers:
-        c_name = controller['name']
-        endpoint = controller["endpoints"][0]
-        cacert = controller["ca_cert"]
-        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR),
-        username, password, juju_username, c_name, endpoint, cacert])
-    if len(controllers) == 0:
-        datastore.set_user_state(username, 'ready')
 
 
 def delete_user(username):
@@ -760,8 +742,17 @@ def delete_user(username):
         username, controller['name']])
 
 
-def add_user_to_controllers(data, username, password):
-    Popen(["python3", "{}/scripts/add_user_to_controllers.py".format(settings.SOJOBO_API_DIR),data, username, password])
+def add_user_to_controllers(username, juju_username, password):
+    controllers = datastore.get_ready_controllers_no_access(username)
+
+    for controller in controllers:
+        c_name = controller['name']
+        endpoint = controller["endpoints"][0]
+        cacert = controller["ca_cert"]
+        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR),
+        username, password, juju_username, c_name, endpoint, cacert])
+    if len(controllers) == 0:
+        datastore.set_user_state(username, 'ready')
 
 
 def change_user_password(username, password):
@@ -816,7 +807,7 @@ def get_users_controller(controller):
 
 def get_users_model(data):
     if data['m_access'] in ['admin', 'write']:
-        return datastore.get_users_model(data['model']['_key'])
+        return [u for u in datastore.get_users_model(data['model']['_key'])]
     elif data['m_access'] == 'read':
         return [{'name': data['user']['name'], 'access': data['m_access']}]
     else:
@@ -832,20 +823,20 @@ def get_credential(user, credential):
 
 
 
-def add_credential(user, data):
+def add_credential(username, juju_username, credential):
     try:
-        return get_controller_types()[data['type']].add_credential(user, data)
+        return get_controller_types()[credential['type']].add_credential(username, juju_username, credential)
     except NotImplementedError as e:
         return 400, "This type of controller does not need credentials."
 
 
-async def update_cloud(controller, cloud, credential, username):
-    credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
+async def update_cloud(controller, cloud, credential, juju_username):
+    credential_name = 't{}'.format(hashlib.md5(credential["name"].encode('utf')).hexdigest())
     cloud_facade = client.CloudFacade.from_connection(controller.connection)
-    cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential)
+    cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential["credential"])
     cloud_cred = client.UpdateCloudCredential(
         client.CloudCredential(cred['key'], cred['type']),
-        tag.credential(cloud, username, credential_name)
+        tag.credential(cloud, juju_username, credential_name)
     )
     await cloud_facade.UpdateCredentials([cloud_cred])
 

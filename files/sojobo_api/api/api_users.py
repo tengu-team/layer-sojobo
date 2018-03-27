@@ -342,15 +342,16 @@ def get_credentials(user):
 def add_credential(user):
     try:
         LOGGER.info('/USERS/%s/credentials [POST] => receiving call', user)
-        data = request.json
+        credential = request.json
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials [POST] => Authenticated!', user)
         if juju.authorize(auth_data, '/users/credentials', 'post', self_user=user, resource_user=user):
             if juju.user_exists(user):
-                if not juju.credential_exists(user, data['name']):
+                if not juju.credential_exists(user, credential['name']):
                     LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
-                    code, response = juju.add_credential(user, data)
+                    juju_username = juju.get_user_info(user)["juju_username"]
+                    code, response = juju.add_credential(user, juju_username, credential)
                     return juju.create_response(code, response)
                 else:
                     code, response = errors.already_exists('credential')
@@ -548,7 +549,8 @@ def grant_to_controller(user, controller):
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
     finally:
-        execute_task(juju.disconnect, connection)
+        if 'connection' in locals():
+            execute_task(juju.disconnect, connection)
 
 
 @USERS.route('/<user>/controllers/<controller>/models', methods=['GET'])
