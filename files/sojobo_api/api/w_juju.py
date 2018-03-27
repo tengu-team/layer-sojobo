@@ -124,7 +124,7 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
                     await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], authorization.password, auth_data['controller']['ca_cert'])
                     return model_connection
             elif auth_data['controller']['state'] == 'ready':
-                await connect_to_random_controller(authorization)
+                await connect_to_random_controller(authorization, auth_data)
                 add_user_to_controllers(auth_data, authorization.username, authorization.password)
                 abort(409, 'User {} is being added to the {} environment'.format(auth_data['controller']['name'], auth_data['user']['name']))
         except JujuAPIError:
