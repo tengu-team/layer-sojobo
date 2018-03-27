@@ -17,8 +17,10 @@
 from base64 import b64encode
 from hashlib import sha256
 import os
+import ast
 import shutil
 import sys
+import json
 import subprocess
 from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
@@ -98,7 +100,7 @@ def set_secrets_local():
 
 
 @when('api.configured', 'arango.available')
-@when_not('api.running')
+@when_not('api.setup')
 def connect_to_arango(arango):
     api_key = db.get('api-key')
     password = db.get('password')
@@ -116,14 +118,67 @@ def connect_to_arango(arango):
         'ARANGO_PASS': arango.password(),
         'ARANGO_DB': 'sojobo',
         'REPO_NAME': config()['github-repo'],
-        'SOJOBO_API_PORT' : config()['port']
+        'SOJOBO_API_PORT': config()['port']
     })
-    con = get_arangodb_connection(arango.host(), arango.port(), arango.username(), arango.password())
-    sojobo_db = create_arangodb_database(con)
-    create_arangodb_collections(sojobo_db)
     service_restart('nginx')
     status_set('active', 'admin-password: {} api-key: {}'.format(password, api_key))
-    set_state('api.running')
+    set_state('api.setup')
+
+
+@when('api.setup')
+@when_not('api.cloud_provided')
+def check_cloud():
+    if config()['cloud-type'] == "":
+        status_set('blocked', 'Please provide a cloud-type (e.g. cloud-type= "google") to setup your environment')
+    elif not os.path.isfile("{}/controllers/controller_{}.py".format(API_DIR, config()['cloud-type'] )):
+        status_set('blocked', 'Please provide the right subordinate charm to setup your environment')
+    else:
+        set_state('api.cloud_provided')
+
+
+@when('api.cloud_provided')
+@when_not('api.region_provided')
+def check_region():
+    sys.path.append('/opt')
+    from sojobo_api.api import w_juju as juju
+    supported_regions = juju.get_controller_types()[config()['cloud-type']].get_supported_regions()
+    if config()['cloud-region'] == "":
+        status_set('blocked', 'Please provide one of the following regions for your environment: {}'.format(supported_regions))
+    elif not config()['cloud-region'] in supported_regions:
+        status_set('blocked', 'Please provide one of the following regions for your environment: {}'.format(supported_regions))
+    else:
+        set_state('api.region_provided')
+
+
+@when('api.region_provided')
+@when_not('api.credential_provided')
+def check_cred():
+    if config()['cloud-credential'] == "":
+        status_set('blocked', 'Please provide a valid cloud-credential for your environment')
+    invalid_creds = invalid_credential(config()['cloud-credential'], config()['cloud-type'])
+    if not invalid_creds:
+        set_state('api.credential_provided')
+    else:
+        status_set('blocked', 'Please provide a valid cloud-credential for your environment. wrong keys were found: {}'.format(invalid_creds))
+
+
+@when('api.credential_provided')
+@when_not('api.login-setup')
+def setup():
+    status_set('maintenance', 'Setting up Login Environment!')
+    setup_environment()
+    set_state('api.login-setup')
+
+
+@when('api.login-setup')
+@when_not('api.running')
+def check_if_env_ready():
+    sys.path.append('/opt')
+    from sojobo_api.api import w_datastore as datastore
+    if 'login' in [con['name'] for con in datastore.get_ready_controllers()]:
+        set_state('api.running')
+    else:
+        status_set('maintenance', 'Please wait while we are setting up your environment')
 
 
 @when('leadership.is_leader', 'api.running')
@@ -132,7 +187,6 @@ def create_admin():
     if leader_get().get('admin') != 'Created':
         sys.path.append('/opt')
         from sojobo_api.api import w_datastore as datastore
-        datastore.create_user('admin', 'admin')
         leader_set({'admin': 'Created'})
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
         set_state('admin.created')
@@ -157,10 +211,11 @@ def arango_db_removed():
     status_set('blocked', 'Waiting for a connection with ArangoDB')
 
 
-@when('sojobo.available', 'api.running')
+@when('sojobo.available', 'api.configured')
 def configure(sojobo):
     api_key = db.get('api-key')
     sojobo.configure('http://{}:{}'.format(config()['host'], config()['port']), API_DIR, api_key, db.get('password'), USER)
+    check_cloud()
 
 
 @when('proxy.available', 'api.running')
@@ -224,37 +279,24 @@ def install_api():
     application_version_set('1.0.0')
 
 
-def get_arangodb_connection(host, port, username, password):
-    """Creates entry point (connection) to work with ArangoDB."""
-    url = 'http://' + host + ':' + port
-    connection = pyArango.Connection(arangoURL=url,
-                                     username=username,
-                                     password=password)
-    return connection
+def invalid_credential(credential, cloud):
+    sys.path.append('/opt')
+    from sojobo_api.api import w_juju as juju
+    valid_keys = juju.get_controller_types()[cloud].get_cred_keys()
+    cred = ast.literal_eval(credential)
+    wrong_keys = []
+    if len(valid_keys) == len(list(cred.keys())):
+        for cred_value in valid_keys:
+            if cred_value not in list(cred.keys()):
+                wrong_keys.append(cred)
+    return wrong_keys
 
 
-def create_arangodb_database(connection):
-    if connection.hasDatabase("sojobo"):
-        return connection["sojobo"]
-    return connection.createDatabase(name="sojobo")
-
-
-def create_arangodb_collection(sojobo_db, collection_name, edges=False):
-    if not has_collection(sojobo_db, collection_name):
-        if edges:
-            sojobo_db.createCollection(className="Edges", name=collection_name)
-        else:
-            sojobo_db.createCollection(name=collection_name)
-
-
-def create_arangodb_collections(sojobo_db):
-    create_arangodb_collection(sojobo_db, "users")
-    create_arangodb_collection(sojobo_db, "credentials")
-    create_arangodb_collection(sojobo_db, "controllers")
-    create_arangodb_collection(sojobo_db, "models")
-    create_arangodb_collection(sojobo_db, "controllerAccess", edges=True)
-    create_arangodb_collection(sojobo_db, "modelAccess", edges=True)
-
-
-def has_collection(sojobo_db, collection_name):
-    return collection_name in sojobo_db.collections
+def setup_environment():
+    sys.path.append('/opt')
+    from sojobo_api import settings
+    subprocess.check_call(['python3', '{}/scripts/setup.py'.format(API_DIR),
+                           config()['cloud-credential'],
+                           config()['cloud-type'], config()['cloud-region'],
+                           settings.ARANGO_HOST, settings.ARANGO_PORT,
+                           settings.ARANGO_USER, settings.ARANGO_PASS])

@@ -42,3 +42,24 @@ options:
     type: int
     default: 80
     description: listen port.
+  cloud-type:
+    type: string
+    default: ""
+    description: |
+      Type of cloud that will be used to setup the Login Server, Make sure that
+      the required subordinate charm is available. Options are [google, aws,
+      azure, LXD, Manual]
+  cloud-credential:
+    type: string
+    default: ""
+    description: |
+      Credential used to setup the Login server for the sojobo-api. This setting
+      is required and has to be a valid cloud credential for the provided
+      login-cloud option.
+  cloud-region:
+    type: string
+    default: ""
+    description: |
+      Region used to setup the Login server for the sojobo-api in the specified
+      region. This setting is required and has to be a valid cloud region for
+      the provided cloud-type option.
