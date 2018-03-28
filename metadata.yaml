@@ -8,6 +8,8 @@ subordinate: false
 provides:
   sojobo:
     interface: sojobo
+  trial:
+    interface: sojobo
   proxy:
     interface: http
   nginx_stats:

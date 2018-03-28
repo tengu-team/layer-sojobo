@@ -214,8 +214,16 @@ def arango_db_removed():
 @when('sojobo.available', 'api.configured')
 def configure(sojobo):
     api_key = db.get('api-key')
-    sojobo.configure('http://{}:{}'.format(config()['host'], config()['port']), API_DIR, api_key, db.get('password'), USER)
+    sojobo.configure('http://{}:{}'.format(config()['host'], config()['port']),
+                     API_DIR, api_key, db.get('password'), USER)
     check_cloud()
+
+
+@when('trial.available', 'api.running')
+def trial_config(trial):
+    api_key = db.get('api-key')
+    trial.configure('http://{}:{}'.format(config()['host'], config()['port']),
+                    API_DIR, api_key, db.get('password'), USER)
 
 
 @when('proxy.available', 'api.running')
