@@ -17,12 +17,11 @@
 # USER FUNCTIONS
 ###############################################################################
 import logging
-import re
 import sys
-import time
+
 import traceback
-import time
-import base64, hashlib
+import base64
+import hashlib
 from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju
@@ -35,8 +34,10 @@ LOGGER.setLevel(logging.DEBUG)
 WS_LOGGER = logging.getLogger('websockets.protocol')
 WS_LOGGER.setLevel(logging.DEBUG)
 
+
 def get():
     return USERS
+
 
 @USERS.before_app_first_request
 def initialize():
@@ -104,12 +105,12 @@ def create_user():
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS [POST] => Authenticated!')
-        if juju.check_if_admin(request.authorization):
+        if juju.check_if_admin(request.authorization, auth_data):
             if juju.user_exists(data['username']):
                 code, response = errors.already_exists('user')
                 LOGGER.error('/USERS [POST] => Username %s already exists!', data['username'])
             elif data['password']:
-                juju.create_user(data['username'], data['password'])
+                juju.create_user(data['username'], data['password'], auth_data['company']['name'])
                 code, response = 202, 'User {} is being created'.format(data['username'])
                 LOGGER.info('/USERS [POST] => Creating user %s, check add_user_to_controller.log for more information!',
                             data['username'])

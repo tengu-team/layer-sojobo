@@ -22,8 +22,9 @@ from sojobo_api import settings
 
 
 BUNDLES = Blueprint('bundles', __name__)
-
 REPO = settings.REPO_NAME
+
+
 def get():
     return BUNDLES
 
@@ -64,7 +65,7 @@ def get_bundles():
 @BUNDLES.route('/<bundle>', methods=['GET'])
 @authenticate
 def get_bundle(bundle):
-    res = requests.get('https://api.github.com/repos/{}/{}'.format(REPO, bundle))
+    res = requests.get('https://api.github.com/orgs/{}/repos?per_page=1000'.format(REPO))
     if res.status_code == 200:
         data = {
             'name': res.json()['name'],

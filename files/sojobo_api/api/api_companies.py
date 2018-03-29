@@ -20,7 +20,7 @@ import logging
 from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint, abort
 from sojobo_api.api.w_juju import create_response
-from sojobo_api.api import w_juju as juju, w_datastore as ds, w_errors as errors
+from sojobo_api.api import w_juju as juju, w_errors as errors
 from sojobo_api import settings
 
 
@@ -54,7 +54,8 @@ def authenticate(func):
             else:
                 return func(*args, **kwargs)
         except KeyError:
-            abort(400, 'The request does not have all the required data or the data is not in the right format.')
+            abort(400, 'The request does not have all the required data or '
+                  'the data is not in the right format.')
     return function
 
 
@@ -63,8 +64,7 @@ def authenticate(func):
 def get_companies():
     try:
         if juju.check_if_admin(request.authorization):
-            data = [com for com in ds.get_companies()]
-            return create_response(200, data)
+            return create_response(200, juju.get_companies())
         else:
             code, response = errors.no_permission()
             return create_response(code, response)
@@ -80,7 +80,8 @@ def Create_company():
     try:
         data = request.json
         if juju.check_if_admin(request.authorization):
-            code, response = 202, juju.create_company(data.get('admin'), data.get('name'), data.get('uri'))
+            code, response = 202, juju.create_company(data.get('name'),
+                                                      data.get('uri'))
             return create_response(code, response)
         else:
             code, response = errors.no_permission()
@@ -103,8 +104,44 @@ def get_company(company):
     try:
         auth_data = juju.get_connection_info(request.authorization)
         if juju.check_if_admin(auth_data, company):
-            data = ds.get_companies()
-            return create_response(200, data)
+            code, response = 200, juju.get_company(company)
+            return create_response(code, response)
+        else:
+            code, response = errors.no_permission()
+            return create_response(code, response)
+    except Exception:
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
+        return juju.create_response(code, response)
+
+
+@COMPANIES.route('/<company>/admins', methods=['GET'])
+@authenticate
+def get_company_admins(company):
+    try:
+        auth_data = juju.get_connection_info(request.authorization)
+        if juju.check_if_admin(auth_data, company):
+            code, response = 200, juju.get_company_admins(company)
+            return create_response(code, response)
+        else:
+            code, response = errors.no_permission()
+            return create_response(code, response)
+    except Exception:
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
+        return juju.create_response(code, response)
+
+
+@COMPANIES.route('/<company>/admins', methods=['POST'])
+@authenticate
+def create_company_admin(company):
+    try:
+        auth_data = juju.get_connection_info(request.authorization)
+        data = request.json()
+        if juju.check_if_admin(auth_data, company):
+            code, response = 200, juju.create_company_admin(company,
+                                                            data['user'])
+            return create_response(code, response)
         else:
             code, response = errors.no_permission()
             return create_response(code, response)

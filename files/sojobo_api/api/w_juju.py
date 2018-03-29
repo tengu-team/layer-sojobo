@@ -105,7 +105,7 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
         if not controller and not model:
             if check_if_admin(authorization):
                 return True
-            if len(datastore.get_all_controllers()) == 0:
+            if len(get_all_controllers(company=auth_data['company']['name'])) == 0:
                 abort(error[0], error[1])
             else:
                 await connect_to_random_controller(authorization, auth_data)
@@ -134,7 +134,8 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
                 await connect_to_random_controller(authorization, auth_data)
                 add_user_to_controllers(authorization.username,
                                         auth_data['user']['juju_username'],
-                                        authorization.password)
+                                        authorization.password,
+                                        auth_data['company']['name'])
                 abort(409, 'User {} is being added to the {} environment'.format(auth_data['user']['name'], auth_data['controller']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
@@ -160,7 +161,7 @@ def check_if_company_admin(authz, company):
 async def connect_to_random_controller(authorization, auth_data):
     error = errors.unauthorized()
     try:
-        ready_controllers = datastore.get_ready_controllers_with_access(authorization.username)
+        ready_controllers = datastore.get_ready_controllers_with_access(authorization.username, company=auth_data['company']['name'])
         if len(ready_controllers) == 0:
             abort(400,'Please wait untill your first environment is set up!')
         else:
@@ -288,7 +289,7 @@ def check_c_type(c_type):
         abort(error[0], error[1])
 
 
-def create_controller(token, data):
+def create_controller(auth_data, data):
     c_type = check_c_type(data['type'])
     valid, name = check_input(data['controller'], 'controller')
     if not valid:
@@ -299,18 +300,19 @@ def create_controller(token, data):
     for controller in get_all_controllers():
         if controller['state'] == 'accepted':
             return 503, 'An environment is already being created'
-    credential = get_credential(token['user']['name'], data['credential'])
+    credential = get_credential(auth_data['user']['name'], data['credential'])
     if not credential['state'] == 'ready':
         abort(503, 'The Credential {} is not ready yet.'.format(credential['name']))
-    regions= get_controller_types()[c_type].get_supported_regions()
+    regions = get_controller_types()[c_type].get_supported_regions()
     if not data['region'] in regions:
         code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(data['type'], regions)
         abort(code, response)
     datastore.create_controller(name, c_type, data['region'], data['credential'])
-    if token['user']['name'] == settings.JUJU_ADMIN_USER:
-        datastore.add_user_to_controller(name, token['user']['name'], 'admin')
+    if auth_data['user']['name'] == settings.JUJU_ADMIN_USER:
+        datastore.add_user_to_controller(name, auth_data['user']['name'], 'admin')
     else:
-        datastore.add_user_to_controller(name, token['user']['name'], 'company_admin')
+        datastore.add_user_to_controller(name, auth_data['user']['name'], 'company_admin')
+        datastore.add_controller_to_company(name, auth_data['company']['name'])
     return get_controller_types()[c_type].create_controller(name, data)
 
 
@@ -323,8 +325,8 @@ def get_supported_regions(c_type):
     return get_controller_types()[c_type].get_supported_regions()
 
 
-def get_all_controllers():
-    return datastore.get_all_controllers()
+def get_all_controllers(company=company):
+    return datastore.get_all_controllers(company=company)
 
 
 def get_keys_controllers():
@@ -723,14 +725,14 @@ async def get_application_config(connection, application):
 ###############################################################################
 
 
-def create_user(username, password):
+def create_user(username, password, company):
     # We create a seperate name with a timestamp that will be used in Juju.
     # This is because Juju doesn't allow a username that has been used before.
     # F.e. Juju does not allow you create a user 'bob', then delete him
     # and then try to add a user that is also named 'bob', therefore we add a timestamp.
     juju_username = 'u{}{}'.format(hashlib.md5(username.encode('utf')).hexdigest(), give_timestamp())
-    datastore.create_user(username, juju_username)
-    add_user_to_controllers(username, juju_username, password)
+    datastore.create_user(username, juju_username, company)
+    add_user_to_controllers(username, juju_username, password, company)
 
 
 
@@ -742,9 +744,8 @@ def delete_user(username):
         username, controller['name']])
 
 
-def add_user_to_controllers(username, juju_username, password):
-    controllers = datastore.get_ready_controllers_no_access(username)
-
+def add_user_to_controllers(username, juju_username, password, company):
+    controllers = datastore.get_ready_controllers_no_access(username, company)
     for controller in controllers:
         c_name = controller['name']
         endpoint = controller["endpoints"][0]
@@ -975,15 +976,28 @@ def check_models_access(token, controller, user):
 ##############################################################################
 # Company functionality
 ##############################################################################
-def create_company(admin, name, uri):
-    if not admin or not name or not uri:
+def create_company(name, uri):
+    if not name or not uri:
         abort(400, "Please provide a Company-Name('name'), "
-                   "a company-admin('admin') and a valid Hubspot-uri('uri')")
-    elif not user_exists(admin):
-        abort(404, 'User does not exist!')
-    return 'Company is being created!'
+                   "and a valid Hubspot-uri('uri')")
+    return 200, 'Company is being created!'
 
 
+def get_companies():
+    return [com for com in datastore.get_companies()]
+
+
+def get_company(company):
+    return datastore.get_company(company)
+
+
+def get_company_admins(company):
+    return datastore.get_company_admins(company)
+
+
+def create_company_admin(company, username):
+    datastore.create_company_admin(company, username)
+    for
 #########################
 # extra Acces checks
 #########################
