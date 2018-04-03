@@ -110,7 +110,11 @@ def create_user():
                 code, response = errors.already_exists('user')
                 LOGGER.error('/USERS [POST] => Username %s already exists!', data['username'])
             elif data['password']:
-                juju.create_user(data['username'], data['password'], auth_data['company']['name'])
+                if 'company' in auth_data:
+                    company = auth_data['company']['name']
+                else:
+                    company = None
+                juju.create_user(data['username'], data['password'], company)
                 code, response = 202, 'User {} is being created'.format(data['username'])
                 LOGGER.info('/USERS [POST] => Creating user %s, check add_user_to_controller.log for more information!',
                             data['username'])

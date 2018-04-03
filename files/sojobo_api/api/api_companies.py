@@ -80,8 +80,8 @@ def Create_company():
     try:
         data = request.json
         if juju.check_if_admin(request.authorization):
-            code, response = 202, juju.create_company(data.get('name'),
-                                                      data.get('uri'))
+            code, response = juju.create_company(data.get('name'),
+                                                 data.get('uri'))
             return create_response(code, response)
         else:
             code, response = errors.no_permission()
@@ -102,8 +102,7 @@ def Create_company():
 @authenticate
 def get_company(company):
     try:
-        auth_data = juju.get_connection_info(request.authorization)
-        if juju.check_if_admin(auth_data, company):
+        if juju.check_if_admin(request.authorization, company):
             code, response = 200, juju.get_company(company)
             return create_response(code, response)
         else:
@@ -119,8 +118,7 @@ def get_company(company):
 @authenticate
 def get_company_admins(company):
     try:
-        auth_data = juju.get_connection_info(request.authorization)
-        if juju.check_if_admin(auth_data, company):
+        if juju.check_if_admin(request.authorization, company):
             code, response = 200, juju.get_company_admins(company)
             return create_response(code, response)
         else:
@@ -136,9 +134,8 @@ def get_company_admins(company):
 @authenticate
 def create_company_admin(company):
     try:
-        auth_data = juju.get_connection_info(request.authorization)
-        data = request.json()
-        if juju.check_if_admin(auth_data, company):
+        data = request.json
+        if juju.check_if_admin(request.authorization, company):
             code, response = 200, juju.create_company_admin(company,
                                                             data['user'])
             return create_response(code, response)

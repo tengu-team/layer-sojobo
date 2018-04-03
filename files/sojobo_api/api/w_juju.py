@@ -103,7 +103,7 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
         if not controller and not model:
-            if check_if_admin(authorization):
+            if check_if_admin(authorization, company=auth_data['company']):
                 return True
             if len(get_all_controllers(company=auth_data['company']['name'])) == 0:
                 abort(error[0], error[1])
@@ -144,17 +144,17 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
 
 
 def check_if_admin(authz, company=None):
-    if check_if_company_admin(authz, company):
+    if authz.username == settings.JUJU_ADMIN_USER and authz.password == settings.JUJU_ADMIN_PASSWORD:
         return True
     else:
-        return authz.username == settings.JUJU_ADMIN_USER and authz.password == settings.JUJU_ADMIN_PASSWORD
+        return check_if_company_admin(authz.username, company)
 
 
-def check_if_company_admin(authz, company):
+def check_if_company_admin(username, company):
+    print(company)
     if not company:
         return False
-    datastore.get_company(authz.username)
-    if datastore.get_company(authz.username)['company_access']['is_admin']:
+    if datastore.get_company_user(username)['company']['name'] == company['name'] and datastore.get_company_user(username)['company_access']['is_admin']:
         return True
 
 
@@ -241,6 +241,8 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
         return True
     elif self_user == connection_info["user"]["name"]:
         return True
+    elif 'company' in connection_info:
+        return check_if_company_admin(connection_info["user"]["name"], connection_info["company"])
     elif "m_access" in connection_info:
         return permissions.m_authorize(connection_info, resource, method)
     elif "c_access" in connection_info:
@@ -259,7 +261,7 @@ def get_connection_info(authorization, c_name=None, m_name=None):
         elif c_name and not m_name:
             return datastore.get_controller_connection_info(authorization.username, c_name)
         else:
-            return {'user': datastore.get_user_info(authorization.username)}
+            return datastore.get_user_connection_info(authorization.username)
     else:
         abort(errors.unauthorized)
 
@@ -289,7 +291,7 @@ def check_c_type(c_type):
         abort(error[0], error[1])
 
 
-def create_controller(auth_data, data):
+def create_controller(auth_data, data, username, password):
     c_type = check_c_type(data['type'])
     valid, name = check_input(data['controller'], 'controller')
     if not valid:
@@ -313,7 +315,7 @@ def create_controller(auth_data, data):
     else:
         datastore.add_user_to_controller(name, auth_data['user']['name'], 'company_admin')
         datastore.add_controller_to_company(name, auth_data['company']['name'])
-    return get_controller_types()[c_type].create_controller(name, data)
+    return get_controller_types()[c_type].create_controller(name, data['region'], data['credential'], username, password)
 
 
 def delete_controller(controller_name, controller_type):
@@ -325,7 +327,7 @@ def get_supported_regions(c_type):
     return get_controller_types()[c_type].get_supported_regions()
 
 
-def get_all_controllers(company=company):
+def get_all_controllers(company=None):
     return datastore.get_all_controllers(company=company)
 
 
@@ -980,6 +982,7 @@ def create_company(name, uri):
     if not name or not uri:
         abort(400, "Please provide a Company-Name('name'), "
                    "and a valid Hubspot-uri('uri')")
+    datastore.create_company(name, uri)
     return 200, 'Company is being created!'
 
 
@@ -992,12 +995,18 @@ def get_company(company):
 
 
 def get_company_admins(company):
-    return datastore.get_company_admins(company)
+    return [adm for adm in datastore.get_company_admins(company)]
 
 
 def create_company_admin(company, username):
-    datastore.create_company_admin(company, username)
-    for
+    if_comp = datastore.get_company_user(username)
+    if not if_comp:
+        datastore.add_user_to_company(username, company, admin=True)
+    else:
+        datastore.upgrade_to_company_admin(company, username)
+    return [usr for usr in datastore.get_company_user(username)]
+
+
 #########################
 # extra Acces checks
 #########################
