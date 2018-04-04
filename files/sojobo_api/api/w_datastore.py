@@ -170,9 +170,10 @@ def remove_user_m_access(username):
 ################################################################################
 def get_credentials(username):
     u_id = get_user_id(username)
-    result = []
-    aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
-    output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    aql = ('LET u = DOCUMENT(@u_id) '
+           'FOR c in u.credentials '
+               'RETURN DOCUMENT(CONCAT("credentials/", c.key))')
+    output = execute_aql_query(aql, rawResults=True, u_id=u_id)
     return output
 
 def get_credential_keys(username):

@@ -804,7 +804,7 @@ def get_users_model(data):
 
 
 def get_credentials(user):
-    return datastore.get_credentials(user)
+    return [cred for cred in datastore.get_credentials(user)]
 
 
 def get_credential(user, credential):
