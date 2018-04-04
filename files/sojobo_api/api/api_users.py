@@ -52,7 +52,9 @@ def initialize():
 def login():
     try:
         LOGGER.info('/USERS/login [POST] => receiving call')
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization)
+        print(request.headers, request.authorization)
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         code, response = 200, 'Success'
         LOGGER.info('/USERS/login [POST] => Succesfully logged in!')
     except KeyError:
