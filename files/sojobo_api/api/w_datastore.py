@@ -34,7 +34,7 @@ def execute_aql_query(aql, rawResults=False, **bindings):
         bind[key] = bindings[key]
     results = db.AQLQuery(aql, rawResults=rawResults, bindVars=bind)
     connection.disconnectSession()
-    return results
+    return list(results)
 
 
 ###############################################################################
@@ -107,7 +107,7 @@ def get_user_info(username):
            'LET com = '
            'FIRST((FOR comEdge IN companyAccess '
                   "FILTER comEdge._to == u._id "
-                  "RETURN {company: DOCUMENT(comEdge._from), company_access: {admin: comEdge.is_admin}}))"
+                  "RETURN {company: DOCUMENT(comEdge._from).name, company_access: {admin: comEdge.is_admin}}))"
            'LET controllers = '
                 '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
                     'LET models = '
@@ -115,8 +115,9 @@ def get_user_info(username):
                             'FILTER model._key in controller.models '
                             'RETURN MERGE(model, {access: mEdge.access})) '
                     'RETURN MERGE(controller, { access: cEdge.access, models: models})) '
-            'RETURN MERGE(u, {controllers: controllers}, com)')
-    return execute_aql_query(aql, rawResults=True, user=u_id)[0]
+            'RETURN MERGE(u, {controllers: controllers}, {company: com})')
+    result = execute_aql_query(aql, rawResults=True, user=u_id)
+    return result[0]
 
 
 def get_user_state(username):
@@ -133,7 +134,7 @@ def set_user_state(username, state):
 def get_ssh_keys(username):
     u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.ssh_keys'
-    return  execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    return  execute_aql_query(aql, rawResults=True, u_id=u_id)
 
 
 def update_ssh_keys(username, ssh_keys):
@@ -177,7 +178,6 @@ def remove_user_m_access(username):
 ################################################################################
 def get_credentials(username):
     u_id = get_user_id(username)
-    result = []
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
     output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
     return output
@@ -185,7 +185,7 @@ def get_credentials(username):
 def get_credential_keys(username):
     u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
-    output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    output = execute_aql_query(aql, rawResults=True, u_id=u_id)
     return [i['name'] for i in output]
 
 
@@ -208,7 +208,7 @@ def get_credential_id(username, cred_name):
 def add_credential(username, cred):
     cred['state'] = 'accepted'
     aql = 'INSERT @credential INTO credentials LET newCredential = NEW RETURN newCredential '
-    output = execute_aql_query(aql, credential=cred)[0]
+    output = execute_aql_query(aql, credential=cred)
     update_user_credential(username, {'name': cred['name'], 'key': output['_key']})
 
 
@@ -305,7 +305,7 @@ def get_controller_info(c_name):
                     'RETURN {name: u.name, access: cEdge.access}) '
             'RETURN {name: c.name, state: c.state, type: c.type, '
                     'models: models, users: users}' )
-    return execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
+    return execute_aql_query(aql, rawResults=True, c_id=c_id)
 
 
 def get_all_controllers(company=None):
@@ -326,7 +326,7 @@ def get_ready_controllers(company=None):
     else:
         c_id = 'companies/{}'.format(company)
         aql = ('LET com = DOCUMENT(@c_id) '
-               'FOR controller in controllers '
+               'FOR controller.name in controllers '
                'FILTER controller in com.controllers and controller.state == "ready" '
                'RETURN controller')
         return execute_aql_query(aql, rawResults=True, c_id=c_id)
@@ -345,7 +345,7 @@ def get_ready_controllers_with_access(username, company=None):
     aql = ('LET com = DOCUMENT(@c_id) '
            'FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
                 'FILTER c.state == "ready" '
-                'FILTER c._id in com.controllers '
+                'FILTER c.name IN com.controllers '
                 'RETURN c')
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id)
 
@@ -358,12 +358,13 @@ def get_ready_controllers_no_access(username, company):
     """Returns a list with ready controllers that the given user has no access to."""
     u_id = get_user_id(username)
     c_id = 'companies/{}'.format(company)
-    aql = ('LET controllers_with_access = '
+    aql = ('LET com = DOCUMENT(@c_id) '
+           'LET controllers_with_access = '
                '(FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
                     'RETURN c) '
-               'FOR c, company IN controllers c_id'
+               'FOR c IN controllers '
                     'FILTER c.state == "ready" '
-                    'FILTER c in company.controllers '
+                    'FILTER c.name IN com.controllers '
                     'FILTER c NOT IN controllers_with_access '
                     'RETURN c')
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id)
@@ -543,13 +544,13 @@ def create_model(m_key, m_name, state, uuid=''):
         "state": state,
         "uuid": uuid}
     aql = "INSERT @model INTO models LET newModel = NEW RETURN newModel"
-    return execute_aql_query(aql, rawResults=True, model=model)[0]
+    return execute_aql_query(aql, rawResults=True, model=model)
 
 
 def model_exists(m_key):
     m_id = "models/" + m_key
     aql = 'RETURN DOCUMENT("models", @m_id)'
-    model = execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
+    model = execute_aql_query(aql, rawResults=True, m_id=m_id)
     if model is None:
         return False
     return True
@@ -640,9 +641,9 @@ def get_model_access(c_name, m_name, username):
                 'FILTER model._key in c.models '
                 'FILTER model.name == @model '
                 'RETURN mEdge.access ')
-    result = execute_aql_query(aql, rawResults=True, controller=c_id, model=m_name, user=u_id)
+    result = execute_aql_query(aql, rawResults=True, controller=c_id, model=m_name, user=u_id)[0]
     if bool(result):
-        return result[0]
+        return result
 
 
 def get_model_and_access(m_key, username):
@@ -667,7 +668,7 @@ def get_models_access(c_name, username):
            'RETURN {name: model.name, access: mEdge.access}) '
            'RETURN models')
     return execute_aql_query(aql, rawResults=True,
-                             controller=c_id, user=u_id)[0]
+                             controller=c_id, user=u_id)
 
 
 def set_model_access(m_key, username, access):
@@ -683,7 +684,7 @@ def get_users_model(m_key):
     m_id = "models/" + m_key
     aql = ('FOR u, mEdge IN 1..1 OUTBOUND @m_id modelAccess '
            'RETURN {name: u.name, access: mEdge.access}')
-    return execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
+    return execute_aql_query(aql, rawResults=True, m_id=m_id)
 
 
 ###############################################################################
@@ -702,9 +703,8 @@ def get_company_user(user):
     u_id = get_user_id(user)
     aql = ("FOR user, comEdge in 1..1 INBOUND @u_id companyAccess "
            "FILTER comEdge._to == @u_id "
-           "RETURN {company: DOCUMENT(comEdge._from), company_access: {is_admin: comEdge.is_admin}}")
-    result = execute_aql_query(aql, rawResults=True, u_id=u_id)
-    return result[0]
+           "RETURN {company: DOCUMENT(comEdge._from).name, company_access: {is_admin: comEdge.is_admin}}")
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 
 def get_company(company):
@@ -715,10 +715,9 @@ def get_company(company):
 
 def get_company_admins(company):
     com_id = "companies/" + company
-    aql = ("FOR user, comEdge in 1..1 INBOUND users companyAccess "
+    aql = ("FOR company, comEdge in 1..1 OUTBOUND @com_id companyAccess "
            "FILTER comEdge.is_admin == @is_admin "
-           "FILTER comEdge._from == @com_id "
-           "RETURN user")
+           "RETURN DOCUMENT(comEdge._to)")
     return execute_aql_query(aql, rawResults=True, is_admin=True, com_id=com_id)
 
 

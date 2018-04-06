@@ -85,6 +85,7 @@ def setup(cred, c_type, region, host, port, arango_username, arango_password):
     r = requests.post('http://127.0.0.1/tengu/controllers',
                       auth=(username, settings.JUJU_ADMIN_PASSWORD),
                       json=mydata, headers={'api-key': settings.API_KEY})
+    print(r.status_code, r.text)
     if not r.status_code == 202:
         sys.exit('Wrong Request sent sojobo!')
 

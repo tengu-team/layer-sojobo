@@ -68,6 +68,9 @@ def get_companies():
         else:
             code, response = errors.no_permission()
             return create_response(code, response)
+    except HTTPException:
+        error_log()
+        raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
@@ -108,6 +111,9 @@ def get_company(company):
         else:
             code, response = errors.no_permission()
             return create_response(code, response)
+    except HTTPException:
+        error_log()
+        raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
@@ -124,6 +130,9 @@ def get_company_admins(company):
         else:
             code, response = errors.no_permission()
             return create_response(code, response)
+    except HTTPException:
+        error_log()
+        raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
@@ -142,6 +151,9 @@ def create_company_admin(company):
         else:
             code, response = errors.no_permission()
             return create_response(code, response)
+    except HTTPException:
+        error_log()
+        raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)

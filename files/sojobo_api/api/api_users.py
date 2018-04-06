@@ -105,15 +105,15 @@ def create_user():
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS [POST] => Authenticated!')
-        if juju.check_if_admin(request.authorization, auth_data):
+        if auth_data['company']:
+            company = auth_data['company']['name']
+        else:
+            company = None
+        if juju.check_if_admin(request.authorization, company=company):
             if juju.user_exists(data['username']):
                 code, response = errors.already_exists('user')
                 LOGGER.error('/USERS [POST] => Username %s already exists!', data['username'])
             elif data['password']:
-                if 'company' in auth_data:
-                    company = auth_data['company']['name']
-                else:
-                    company = None
                 juju.create_user(data['username'], data['password'], company)
                 code, response = 202, 'User {} is being created'.format(data['username'])
                 LOGGER.info('/USERS [POST] => Creating user %s, check add_user_to_controller.log for more information!',
@@ -213,10 +213,14 @@ def delete_user(user):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [DELETE] => Authenticated!', user)
-        if juju.check_if_admin(request.authorization):
+        if auth_data['company']:
+            company = auth_data['company']['name']
+        else:
+            company = None
+        if juju.check_if_admin(request.authorization, company=company):
             if juju.user_exists(user):
                 if user != 'admin':
-                    juju.delete_user(user)
+                    juju.delete_user(user, company)
                     code, response = 202, 'User {} is being removed'.format(user)
                     LOGGER.info('/USERS/%s [DELETE] => User %s is being removed!', user, user)
                 else:

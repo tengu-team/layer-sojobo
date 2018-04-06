@@ -84,9 +84,13 @@ def create_controller():
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('%s [POST] => Authenticated', url)
-        if juju.check_if_admin(request.authorization, company=auth_data['company']):
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        else:
+            comp = None
+        if juju.check_if_admin(request.authorization, company=comp):
             if juju.credential_exists(auth_data['user']['name'], data['credential']):
-                code, response = juju.create_controller(auth_data, data)
+                code, response = juju.create_controller(auth_data, data, request.authorization.username, request.authorization.password)
                 LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, data['controller'])
                 return juju.create_response(code, response)
             else:
@@ -148,7 +152,11 @@ def delete_controller(controller):
         auth_data = juju.get_connection_info(request.authorization, c_name=controller)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller)
         LOGGER.info('/TENGU/controllers/%s [DELETE] => Authenticated!', controller)
-        if juju.check_if_admin(request.authorization, company=auth_data['company']):
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        else:
+            comp = None
+        if juju.check_if_admin(request.authorization, company=comp):
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Authorized!', controller)
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Deleting Controller!', controller)
             juju.delete_controller(controller, auth_data['controller']['type'])

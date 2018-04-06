@@ -103,7 +103,8 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
         if not controller and not model:
-            if check_if_admin(authorization, company=auth_data['company']):
+            print(auth_data)
+            if check_if_admin(authorization, company=auth_data['company']['name']):
                 return True
             if len(get_all_controllers(company=auth_data['company']['name'])) == 0:
                 abort(error[0], error[1])
@@ -151,10 +152,9 @@ def check_if_admin(authz, company=None):
 
 
 def check_if_company_admin(username, company):
-    print(company)
     if not company:
         return False
-    if datastore.get_company_user(username)['company']['name'] == company['name'] and datastore.get_company_user(username)['company_access']['is_admin']:
+    if datastore.get_company_user(username)['company'] == company and datastore.get_company_user(username)['company_access']['is_admin']:
         return True
 
 
@@ -738,9 +738,9 @@ def create_user(username, password, company):
 
 
 
-def delete_user(username):
+def delete_user(username, company=None):
     datastore.set_user_state(username, 'deleting')
-    controllers = datastore.get_ready_controllers()
+    controllers = datastore.get_ready_controllers(company)
     for controller in controllers:
         Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR),
         username, controller['name']])
@@ -828,7 +828,10 @@ def get_credential(user, credential):
 
 def add_credential(username, juju_username, credential):
     try:
-        return get_controller_types()[credential['type']].add_credential(username, juju_username, credential)
+        if credential['type'] in get_controller_types():
+            return get_controller_types()[credential['type']].add_credential(username, juju_username, credential)
+        else:
+            return 400, "Please provide the right subordinate charm for this cloud"
     except NotImplementedError as e:
         return 400, "This type of controller does not need credentials."
 
@@ -990,21 +993,36 @@ def get_companies():
     return [com for com in datastore.get_companies()]
 
 
+def check_if_company_exists(company):
+    if company in [com['name'] for com in datastore.get_companies()]:
+        return True
+    return False
+
+
 def get_company(company):
-    return datastore.get_company(company)
+    if check_if_company_exists(company):
+        return datastore.get_company(company)
+    else:
+        abort(404, "Company does not exist!")
 
 
 def get_company_admins(company):
-    return [adm for adm in datastore.get_company_admins(company)]
+    if check_if_company_exists(company):
+        return [adm for adm in datastore.get_company_admins(company)]
+    else:
+        abort(404, "Company does not exist!")
 
 
 def create_company_admin(company, username):
-    if_comp = datastore.get_company_user(username)
-    if not if_comp:
-        datastore.add_user_to_company(username, company, admin=True)
+    if check_if_company_exists(company):
+        if_comp = datastore.get_company_user(username)
+        if not if_comp:
+            datastore.add_user_to_company(username, company, admin=True)
+        else:
+            datastore.upgrade_to_company_admin(company, username)
+        return datastore.get_company_user(username)
     else:
-        datastore.upgrade_to_company_admin(company, username)
-    return [usr for usr in datastore.get_company_user(username)]
+        abort(404, "Company does not exist!")
 
 
 #########################
