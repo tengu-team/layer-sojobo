@@ -448,28 +448,34 @@ def get_gui_url(data):
     return 'https://{}/gui/{}'.format(data['controller']['endpoints'][0], data['model']['uuid'])
 
 
-def create_model(authorization, m_name, cred_name, c_name):
+def create_model(authorization, m_name, cred_name, c_name, workspace_type=None):
     """Creates model in database and then in JuJu (background script)."""
-    # Construct a key for the model using the controller name and model name.
-    m_key = construct_model_key(c_name, m_name)
-    if not datastore.model_exists(m_key):
-        if cred_name in datastore.get_credential_keys(authorization.username):
-            # Create the model in ArangoDB. Add model key to controller and
-            # set the model access level of the user.
-            new_model = datastore.create_model(m_key, m_name, state='deploying')
-            # TODO: Maybe put these 3 datastore methods in one so you do not have
-            # to create a connection with ArangoDB each time.
-            datastore.add_model_to_controller(c_name, m_key)
-            datastore.set_model_state(m_key, 'accepted')
-            datastore.set_model_access(m_key, authorization.username, 'admin')
-            # Run the background script, this creates the model in JuJu.
-            Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
-                    c_name, m_key, m_name, authorization.username, authorization.password, cred_name])
-            return 202, "Model is being deployed."
+    if datastore.workspace_type_exists(workspace_type):
+        # Construct a key for the model using the controller name and model name.
+        m_key = construct_model_key(c_name, m_name)
+        if not datastore.model_exists(m_key):
+            if cred_name in datastore.get_credential_keys(authorization.username):
+                # Create the model in ArangoDB. Add model key to controller and
+                # set the model access level of the user.
+                new_model = datastore.create_model(m_key, m_name, state='deploying')
+                # TODO: Maybe put these 4 datastore methods in one so you do not have
+                # to create a connection with ArangoDB each time.
+                if workspace_type:
+                    datastore.add_edge_between_model_and_workspace_type(new_model["_key"], workspace_type)
+                datastore.add_model_to_controller(c_name, m_key)
+                datastore.set_model_state(m_key, 'accepted')
+                datastore.set_model_access(m_key, authorization.username, 'admin')
+                # Run the background script, this creates the model in JuJu.
+                Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
+                        c_name, m_key, m_name, authorization.username,
+                        authorization.password, cred_name])
+                return 202, "Model is being deployed."
+            else:
+                return 404, "Credentials {} not found!".format(cred_name)
         else:
-            return 404, "Credentials {} not found!".format(cred_name)
+            return errors.already_exists('model')
     else:
-        return errors.already_exists('model')
+        return errors.does_not_exist("workspace type \'%s\' ".format(workspace_type))
 
 
 # def check_model_state(m_key, required_states):
@@ -830,10 +836,11 @@ def add_credential(username, juju_username, credential):
         return 400, "This type of controller does not need credentials."
 
 
-async def update_cloud(controller, cloud, credential, juju_username):
-    credential_name = 't{}'.format(hashlib.md5(credential["name"].encode('utf')).hexdigest())
+async def update_cloud(controller, cloud, credential, juju_username, username):
+    credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
     cloud_facade = client.CloudFacade.from_connection(controller.connection)
-    cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential["credential"])
+    cred_data = datastore.get_credential(username, credential)
+    cred = get_controller_types()[cloud].generate_cred_file(credential_name, cred_data)
     cloud_cred = client.UpdateCloudCredential(
         client.CloudCredential(cred['key'], cred['type']),
         tag.credential(cloud, juju_username, credential_name)

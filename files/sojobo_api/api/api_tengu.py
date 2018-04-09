@@ -180,6 +180,7 @@ def create_model(controller):
         LOGGER.info('/TENGU/controllers/%s/models [POST] => receiving call', controller)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization, c_name=controller)
+        print(auth_data)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller)
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
         if juju.authorize(auth_data, '/controllers/controller/models', 'post'):
@@ -189,7 +190,11 @@ def create_model(controller):
                 credential_name = data['credential']
                 if valid:
                     LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
-                    code, response = juju.create_model(request.authorization, model_name, credential_name, controller)
+                    code, response = juju.create_model(request.authorization,
+                                                       model_name,
+                                                       credential_name,
+                                                       controller,
+                                                       data['workspace_type'])
                     return juju.create_response(code, response)
                 else:
                     return juju.create_response(400, model_name)
