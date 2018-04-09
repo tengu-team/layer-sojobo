@@ -52,7 +52,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         # model_info = await controller_connection.add_model(m_name)
         config = {}
         config['authorized-keys'] = await utils.read_ssh_key(loop=controller_connection.loop)
-        logger.info(config)
+        logger.info(config, auth_data, credential, owner)
 
         # Create A Model
         model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)

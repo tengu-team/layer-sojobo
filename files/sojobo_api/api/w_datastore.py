@@ -55,7 +55,7 @@ def create_user(username, juju_username, company=None):
 
 def user_exists(username):
     u_id = get_user_id(username)
-    aql = 'RETURN DOCUMENT("users", @u_id)'
+    aql = 'RETURN DOCUMENT(@u_id)'
     user = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
     return user is not None
 
@@ -179,14 +179,12 @@ def remove_user_m_access(username):
 def get_credentials(username):
     u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
-    output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
-    return output
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
 def get_credential_keys(username):
     u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
-    output = execute_aql_query(aql, rawResults=True, u_id=u_id)
-    return [i['name'] for i in output]
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)
 
 
 def get_credential(username, cred_name):
@@ -208,7 +206,8 @@ def get_credential_id(username, cred_name):
 def add_credential(username, cred):
     cred['state'] = 'accepted'
     aql = 'INSERT @credential INTO credentials LET newCredential = NEW RETURN newCredential '
-    output = execute_aql_query(aql, credential=cred)
+    output = execute_aql_query(aql, rawResults=True, credential=cred)[0]
+    print(output)
     update_user_credential(username, {'name': cred['name'], 'key': output['_key']})
 
 
@@ -550,7 +549,7 @@ def create_model(m_key, m_name, state, uuid=''):
 def model_exists(m_key):
     m_id = "models/" + m_key
     aql = 'RETURN DOCUMENT("models", @m_id)'
-    model = execute_aql_query(aql, rawResults=True, m_id=m_id)
+    model = execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
     if model is None:
         return False
     return True
@@ -668,7 +667,7 @@ def get_models_access(c_name, username):
            'RETURN {name: model.name, access: mEdge.access}) '
            'RETURN models')
     return execute_aql_query(aql, rawResults=True,
-                             controller=c_id, user=u_id)
+                             controller=c_id, user=u_id)[0]
 
 
 def set_model_access(m_key, username, access):
@@ -704,7 +703,10 @@ def get_company_user(user):
     aql = ("FOR user, comEdge in 1..1 INBOUND @u_id companyAccess "
            "FILTER comEdge._to == @u_id "
            "RETURN {company: DOCUMENT(comEdge._from).name, company_access: {is_admin: comEdge.is_admin}}")
-    return execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    output = execute_aql_query(aql, rawResults=True, u_id=u_id)
+    if len(output) > 0:
+        return output[0]
+    return []
 
 
 def get_company(company):
@@ -764,9 +766,9 @@ def get_controller_connection_info(username, c_name):
            "FILTER cEdge._from == @c_id "
            "RETURN cEdge.access)) "
            "LET company = "
-           "FIRST((FOR user, comEdge in 1..1 INBOUND @u_id companyAccess "
+           "FIRST((FOR usr, comEdge in 1..1 INBOUND @u_id companyAccess "
            "FILTER comEdge._to == @u_id "
-           "RETURN {name: comEdge._from, is_admin: comEdge.is_admin}))"
+           "RETURN {name: DOCUMENT(comEdge._from).name, is_admin: comEdge.is_admin}))"
            "RETURN {user, controller, c_access, company}")
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id)[0]
 
@@ -789,7 +791,7 @@ def get_model_connection_info(username, c_name, m_key):
            "LET company = "
            "FIRST ((FOR comp, comEdge in 1..1 INBOUND @u_id companyAccess "
            "FILTER comEdge._to == @u_id "
-           "RETURN {name: comp.name, is_admin: comEdge.is_admin}))"
+           "RETURN {name: DOCUMENT(comEdge._from).name, is_admin: comEdge.is_admin}))"
            "RETURN {user, controller, model, c_access, m_access, company}")
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id, m_id=m_id)[0]
 

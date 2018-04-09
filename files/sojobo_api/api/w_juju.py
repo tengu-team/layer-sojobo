@@ -104,9 +104,13 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
     if api_key == settings.API_KEY:
         if not controller and not model:
             print(auth_data)
-            if check_if_admin(authorization, company=auth_data['company']['name']):
+            if auth_data['company']:
+                comp = auth_data['company']['name']
+            else:
+                comp = None
+            if check_if_admin(authorization, company=comp):
                 return True
-            if len(get_all_controllers(company=auth_data['company']['name'])) == 0:
+            if len(get_all_controllers(company=comp)) == 0:
                 abort(error[0], error[1])
             else:
                 await connect_to_random_controller(authorization, auth_data)
@@ -161,7 +165,10 @@ def check_if_company_admin(username, company):
 async def connect_to_random_controller(authorization, auth_data):
     error = errors.unauthorized()
     try:
-        ready_controllers = datastore.get_ready_controllers_with_access(authorization.username, company=auth_data['company']['name'])
+        comp = None
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        ready_controllers = datastore.get_ready_controllers_with_access(authorization.username, company=comp)
         if len(ready_controllers) == 0:
             abort(400,'Please wait untill your first environment is set up!')
         else:
@@ -238,11 +245,12 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
 
     # Admin has authorization in every situation.
     if connection_info["user"]["name"] == settings.JUJU_ADMIN_USER:
+        print('Authzd')
         return True
     elif self_user == connection_info["user"]["name"]:
         return True
-    elif 'company' in connection_info:
-        return check_if_company_admin(connection_info["user"]["name"], connection_info["company"])
+    elif connection_info['company']:
+        return connection_info['company']['is_admin']
     elif "m_access" in connection_info:
         return permissions.m_authorize(connection_info, resource, method)
     elif "c_access" in connection_info:
@@ -457,21 +465,18 @@ def create_model(authorization, m_name, cred_name, c_name):
     # Construct a key for the model using the controller name and model name.
     m_key = construct_model_key(c_name, m_name)
     if not datastore.model_exists(m_key):
-        if cred_name in datastore.get_credential_keys(authorization.username):
-            # Create the model in ArangoDB. Add model key to controller and
-            # set the model access level of the user.
-            new_model = datastore.create_model(m_key, m_name, state='deploying')
-            # TODO: Maybe put these 3 datastore methods in one so you do not have
-            # to create a connection with ArangoDB each time.
-            datastore.add_model_to_controller(c_name, m_key)
-            datastore.set_model_state(m_key, 'accepted')
-            datastore.set_model_access(m_key, authorization.username, 'admin')
-            # Run the background script, this creates the model in JuJu.
-            Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
-                    c_name, m_key, m_name, authorization.username, authorization.password, cred_name])
-            return 202, "Model is being deployed."
-        else:
-            return 404, "Credentials {} not found!".format(cred_name)
+        # Create the model in ArangoDB. Add model key to controller and
+        # set the model access level of the user.
+        new_model = datastore.create_model(m_key, m_name, state='deploying')
+        # TODO: Maybe put these 3 datastore methods in one so you do not have
+        # to create a connection with ArangoDB each time.
+        datastore.add_model_to_controller(c_name, m_key)
+        datastore.set_model_state(m_key, 'accepted')
+        datastore.set_model_access(m_key, authorization.username, 'admin')
+        # Run the background script, this creates the model in JuJu.
+        Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
+                c_name, m_key, m_name, authorization.username, authorization.password, cred_name])
+        return 202, "Model is being deployed."
     else:
         return errors.already_exists('model')
 
@@ -748,6 +753,7 @@ def delete_user(username, company=None):
 
 def add_user_to_controllers(username, juju_username, password, company):
     controllers = datastore.get_ready_controllers_no_access(username, company)
+    print(controllers)
     for controller in controllers:
         c_name = controller['name']
         endpoint = controller["endpoints"][0]
@@ -836,10 +842,11 @@ def add_credential(username, juju_username, credential):
         return 400, "This type of controller does not need credentials."
 
 
-async def update_cloud(controller, cloud, credential, juju_username):
-    credential_name = 't{}'.format(hashlib.md5(credential["name"].encode('utf')).hexdigest())
+async def update_cloud(controller, cloud, credential, juju_username, username):
+    credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
     cloud_facade = client.CloudFacade.from_connection(controller.connection)
-    cred = get_controller_types()[cloud].generate_cred_file(credential_name, credential["credential"])
+    cred_data = datastore.get_credential(username, credential)
+    cred = get_controller_types()[cloud].generate_cred_file(credential_name, cred_data)
     cloud_cred = client.UpdateCloudCredential(
         client.CloudCredential(cred['key'], cred['type']),
         tag.credential(cloud, juju_username, credential_name)
@@ -853,11 +860,10 @@ def remove_credential(user, cred_name):
 
 
 def credential_exists(user, credential):
-   for cred in get_credentials(user):
-       if cred:
-           if cred['name'] == credential:
-               return True
-   return False
+    for cred in get_credentials(user):
+        if cred['name'] == credential:
+            return True
+    return False
 
 
 def grant_user_to_controller(c_name, username, access):
