@@ -177,6 +177,7 @@ def get_credentials(username):
     output = execute_aql_query(aql, rawResults=True, u_id=u_id)
     return output
 
+
 def get_credential_keys(username):
     u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
@@ -640,6 +641,13 @@ def get_users_model(m_key):
     aql = ('FOR u, mEdge IN 1..1 OUTBOUND @m_id modelAccess '
            'RETURN {name: u.name, access: mEdge.access}')
     return execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
+
+
+def create_workspace_type(workspace_type, price_per_second):
+    ws_type = {"_key": workspace_type,
+               "price_per_second": price_per_second}
+    aql = "INSERT @ws_type INTO workspace_types"
+    return execute_aql_query(aql, ws_type=ws_type)
 
 
 def workspace_type_exists(ws_type):

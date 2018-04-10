@@ -933,6 +933,10 @@ def add_relation(controller, model):
             if ':' in app2:
                 app2 = app2.split(':')[0]
 
+            print("======DEBUGGING=====")
+            print(app1)
+            print(app2)
+
             if juju.app_exists(model_connection, app1) and juju.app_exists(model_connection, app2):
 
                 # TODO: Check if relation is ambiguous.
