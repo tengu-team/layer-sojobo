@@ -1,4 +1,3 @@
-
 # !/usr/bin/env python3
 # Copyright (C) 2017  Qrama
 #
@@ -55,9 +54,11 @@ def create_arangodb_collections(sojobo_db):
     create_arangodb_collection(sojobo_db, "controllers")
     create_arangodb_collection(sojobo_db, "models")
     create_arangodb_collection(sojobo_db, "companies")
+    create_arangodb_collection(sojobo_db, "workspace_types")
     create_arangodb_collection(sojobo_db, "companyAccess", edges=True)
     create_arangodb_collection(sojobo_db, "controllerAccess", edges=True)
     create_arangodb_collection(sojobo_db, "modelAccess", edges=True)
+    create_arangodb_collection(sojobo_db, "modelType", edges=True)
 
 
 def has_collection(sojobo_db, collection_name):
@@ -69,6 +70,9 @@ def setup(cred, c_type, region, host, port, arango_username, arango_password):
     username = settings.JUJU_ADMIN_USER
     db = create_arangodb_database(con)
     create_arangodb_collections(db)
+    datastore.create_workspace_type("A", 0.0010995)
+    datastore.create_workspace_type("B", 0.0022569)
+    datastore.create_workspace_type("C", 0.0068866)
     credential = {'name': 'default',
                   'type': c_type,
                   'credential': ast.literal_eval(cred)}
@@ -85,6 +89,7 @@ def setup(cred, c_type, region, host, port, arango_username, arango_password):
     r = requests.post('http://127.0.0.1/tengu/controllers',
                       auth=(username, settings.JUJU_ADMIN_PASSWORD),
                       json=mydata, headers={'api-key': settings.API_KEY})
+    print(r.status_code, r.text)
     if not r.status_code == 202:
         sys.exit('Wrong Request sent sojobo!')
 

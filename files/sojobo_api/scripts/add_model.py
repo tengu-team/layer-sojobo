@@ -28,7 +28,7 @@ from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
 
-async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
+async def create_model(c_name, m_key, m_name, usr, pwd, cred_name, workspace_type):
     try:
         # Get required information from database
         auth_data = datastore.get_controller_connection_info(usr, c_name)
@@ -104,9 +104,18 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
                         key_facade.AddKeys([key], u['name'])
                     except (JujuAPIError, JujuError):
                         pass
-        juju.log_event('model.create',
-                       {'uuid': model_info.uuid,
-                        'name': m_name})
+        # TODO: Default created models ("default" and "controller") should not
+        # be logged.
+        # TODO: Company should be logged.
+        if workspace_type == "None":
+            juju.log_event('model.create',
+                           {'uuid': model_info.uuid,
+                            'name': m_name})
+        else:
+            juju.log_event('model.create',
+                           {'uuid': model_info.uuid,
+                            'name': m_name,
+                            'type': workspace_type})
         logger.info('%s -> succesfully deployed model', m_name)
         await model.disconnect()
         await controller_connection.disconnect()
@@ -137,5 +146,6 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
     loop.run_until_complete(create_model(sys.argv[1], sys.argv[2], sys.argv[3],
-                                         sys.argv[4], sys.argv[5], sys.argv[6]))
+                                         sys.argv[4], sys.argv[5], sys.argv[6],
+                                         sys.argv[7]))
     loop.close()

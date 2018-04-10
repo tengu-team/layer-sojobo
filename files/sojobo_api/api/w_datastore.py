@@ -177,6 +177,7 @@ def get_credentials(username):
     output = execute_aql_query(aql, rawResults=True, u_id=u_id)
     return output
 
+
 def get_credential_keys(username):
     u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
@@ -320,6 +321,28 @@ def get_keys_controllers():
 def get_ready_controllers():
     aql = "FOR c in controllers FILTER c.state == 'ready' RETURN c"
     return execute_aql_query(aql, rawResults=True)
+
+
+def get_ready_controllers_with_access(username):
+    """Returns a list with ready controllers that the given user has access to."""
+    u_id = get_user_id(username)
+    aql = ('FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
+                'FILTER c.state == "ready" '
+                'RETURN c')
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)
+
+
+def get_ready_controllers_no_access(username):
+    """Returns a list with ready controllers that the given user has no access to."""
+    u_id = get_user_id(username)
+    aql = ('LET controllers_with_access = '
+               '(FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
+                    'RETURN c) '
+               'FOR c in controllers '
+                    'FILTER c.state == "ready" '
+                    'FILTER c NOT IN controllers_with_access '
+                    'RETURN c')
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)
 
 
 def get_cloud_controllers(c_type):
@@ -620,6 +643,28 @@ def get_users_model(m_key):
     return execute_aql_query(aql, rawResults=True, m_id=m_id)[0]
 
 
+def create_workspace_type(workspace_type, price_per_second):
+    ws_type = {"_key": workspace_type,
+               "price_per_second": price_per_second}
+    aql = "INSERT @ws_type INTO workspace_types"
+    return execute_aql_query(aql, ws_type=ws_type)
+
+
+def workspace_type_exists(ws_type):
+    ws_type_id = get_workspace_type_id(ws_type)
+    aql = 'RETURN DOCUMENT("workspace_types", @ws_type_id)'
+    workspace_type = execute_aql_query(aql, rawResults=True, ws_type_id=ws_type_id)[0]
+    return workspace_type is not None
+
+
+def add_edge_between_model_and_workspace_type(m_key, ws_type):
+    """Creates an Edge between a model and a workspace type."""
+    m_id = get_model_id(m_key)
+    ws_type_id = get_workspace_type_id(ws_type)
+    aql = ("INSERT { _from: @m_id, _to: @ws_type_id} in modelType")
+    execute_aql_query(aql, m_id=m_id, ws_type_id=ws_type_id)
+
+
 ###############################################################################
 #                          COMPANY FUNCTIONS                                  #
 ###############################################################################
@@ -673,7 +718,7 @@ def get_controller_connection_info(username, c_name):
                     "FILTER cEdge._from == @c_id "
                     "RETURN cEdge.access)) "
            "LET company = "
-           "FIRST((FOR user, comEdge in 1..1 INBOUND @u_id companyAccess "
+           "FIRST((FOR u, comEdge in 1..1 INBOUND @u_id companyAccess "
                 "FILTER comEdge._to == @u_id "
                 "RETURN {name: comEdge._from, is_admin: comEdge.is_admin}))"
            "RETURN {user, controller, c_access, company}")
@@ -696,7 +741,7 @@ def get_model_connection_info(username, c_name, m_key):
                     "FILTER mEdge._from == @m_id "
                     "RETURN mEdge.access)) "
            "LET company = "
-           "FIRST((FOR user, comEdge in 1..1 INBOUND @u_id companyAccess "
+           "FIRST((FOR u, comEdge in 1..1 INBOUND @u_id companyAccess "
                 "FILTER comEdge._to == @u_id "
                 "RETURN {name: comEdge.name, is_admin: comEdge.is_admin}))"
             "RETURN {user, controller, model, c_access, m_access, company}")
@@ -709,3 +754,11 @@ def hash_username(username):
 
 def get_user_id(username):
     return "users/" + hash_username(username)
+
+
+def get_model_id(m_key):
+    return "models/" + m_key
+
+
+def get_workspace_type_id(ws_type):
+    return "workspace_types/" + ws_type
