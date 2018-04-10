@@ -309,10 +309,10 @@ def create_controller(auth_data, data, username, password):
         abort(ers[0], ers[1])
     for controller in get_all_controllers():
         if controller['state'] == 'accepted':
-            return 503, 'An environment is already being created'
+            return 400, 'An environment is already being created'
     credential = get_credential(auth_data['user']['name'], data['credential'])
     if not credential['state'] == 'ready':
-        abort(503, 'The Credential {} is not ready yet.'.format(credential['name']))
+        abort(400, 'The Credential {} is not ready yet.'.format(credential['name']))
     regions = get_controller_types()[c_type].get_supported_regions()
     if not data['region'] in regions:
         code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(data['type'], regions)

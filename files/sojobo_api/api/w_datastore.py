@@ -383,13 +383,17 @@ def get_keys_controllers(company=None):
 
 def get_cloud_controllers(c_type, company=None):
     if not company:
-        aql = 'FOR c IN controllers FILTER c.type == @cloud RETURN c'
+        aql = ('FOR c IN controllers '
+               'FILTER c.type == @cloud '
+               'FILTER c.state == "ready" '
+               'RETURN c')
         return execute_aql_query(aql, rawResults=True, cloud=c_type)
     else:
         c_id = 'companies/{}'.format(company)
-        aql = ('FOR com, controller in 1..1 INBOUND @c_id controllers '
-               'FILTER controller in com.controllers and controller.type == @cloud '
-               'RETURN controller._key')
+        aql = ('LET com = DOCUMENT(@c_id) '
+               'FOR  controller in controllers '
+               'FILTER controller.name in com.controllers and controller.type == @cloud '
+               'RETURN controller._key ')
         return execute_aql_query(aql, rawResults=True, cloud=c_type, c_id=c_id)
 
 
