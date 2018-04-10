@@ -450,32 +450,29 @@ def get_gui_url(data):
 
 def create_model(authorization, m_name, cred_name, c_name, workspace_type=None):
     """Creates model in database and then in JuJu (background script)."""
-    if datastore.workspace_type_exists(workspace_type):
-        # Construct a key for the model using the controller name and model name.
-        m_key = construct_model_key(c_name, m_name)
-        if not datastore.model_exists(m_key):
-            if cred_name in datastore.get_credential_keys(authorization.username):
-                # Create the model in ArangoDB. Add model key to controller and
-                # set the model access level of the user.
-                new_model = datastore.create_model(m_key, m_name, state='deploying')
-                # TODO: Maybe put these 4 datastore methods in one so you do not have
-                # to create a connection with ArangoDB each time.
-                if workspace_type:
-                    datastore.add_edge_between_model_and_workspace_type(new_model["_key"], workspace_type)
-                datastore.add_model_to_controller(c_name, m_key)
-                datastore.set_model_state(m_key, 'accepted')
-                datastore.set_model_access(m_key, authorization.username, 'admin')
-                # Run the background script, this creates the model in JuJu.
-                Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
-                        c_name, m_key, m_name, authorization.username,
-                        authorization.password, cred_name])
-                return 202, "Model is being deployed."
-            else:
-                return 404, "Credentials {} not found!".format(cred_name)
+    # Construct a key for the model using the controller name and model name.
+    m_key = construct_model_key(c_name, m_name)
+    if not datastore.model_exists(m_key):
+        if cred_name in datastore.get_credential_keys(authorization.username):
+            # Create the model in ArangoDB. Add model key to controller and
+            # set the model access level of the user.
+            new_model = datastore.create_model(m_key, m_name, state='deploying')
+            # TODO: Maybe put these 4 datastore methods in one so you do not have
+            # to create a connection with ArangoDB each time.
+            datastore.add_model_to_controller(c_name, m_key)
+            datastore.set_model_state(m_key, 'accepted')
+            datastore.set_model_access(m_key, authorization.username, 'admin')
+            if workspace_type:
+                datastore.add_edge_between_model_and_workspace_type(new_model["_key"], workspace_type)
+            # Run the background script, this creates the model in JuJu.
+            Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
+                    c_name, m_key, m_name, authorization.username,
+                    authorization.password, cred_name, str(workspace_type)])
+            return 202, "Model is being deployed."
         else:
-            return errors.already_exists('model')
+            return 404, "Credentials {} not found!".format(cred_name)
     else:
-        return errors.does_not_exist("workspace type \'%s\' ".format(workspace_type))
+        return errors.already_exists('model')
 
 
 # def check_model_state(m_key, required_states):

@@ -644,7 +644,7 @@ def get_users_model(m_key):
 
 def workspace_type_exists(ws_type):
     ws_type_id = get_workspace_type_id(ws_type)
-    aql = 'RETURN DOCUMENT("workspace_types", @ws_id)'
+    aql = 'RETURN DOCUMENT("workspace_types", @ws_type_id)'
     workspace_type = execute_aql_query(aql, rawResults=True, ws_type_id=ws_type_id)[0]
     return workspace_type is not None
 
@@ -733,7 +733,7 @@ def get_model_connection_info(username, c_name, m_key):
                     "FILTER mEdge._from == @m_id "
                     "RETURN mEdge.access)) "
            "LET company = "
-           "FIRST((FOR user, comEdge in 1..1 INBOUND @u_id companyAccess "
+           "FIRST((FOR u, comEdge in 1..1 INBOUND @u_id companyAccess "
                 "FILTER comEdge._to == @u_id "
                 "RETURN {name: comEdge.name, is_admin: comEdge.is_admin}))"
             "RETURN {user, controller, model, c_access, m_access, company}")
