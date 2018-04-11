@@ -31,6 +31,7 @@ from juju.errors import JujuAPIError, JujuError
 async def set_model_acc(username, c_name, endpoint, cacert, m_key, uuid, access):
     try:
         user_info = datastore.get_user_info(username)
+        print(user_info)
         juju_username = user_info["juju_username"]
         ssh_keys = user_info["ssh_keys"]
 

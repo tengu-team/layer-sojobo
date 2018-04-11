@@ -23,6 +23,7 @@ import base64
 import datetime
 from subprocess import Popen
 import json
+import tempfile
 import hashlib
 from flask import abort, Response
 from juju import tag
@@ -832,10 +833,10 @@ def get_credential(user, credential):
 
 
 
-def add_credential(username, juju_username, credential):
+def add_credential(username, juju_username, juju_password, credential):
     try:
         if credential['type'] in get_controller_types():
-            return get_controller_types()[credential['type']].add_credential(username, juju_username, credential)
+            return get_controller_types()[credential['type']].add_credential(username, juju_username, juju_password, credential)
         else:
             return 400, "Please provide the right subordinate charm for this cloud"
     except NotImplementedError as e:
@@ -843,12 +844,18 @@ def add_credential(username, juju_username, credential):
 
 
 async def update_cloud(controller, cloud, credential, juju_username, username):
+    dirpath = tempfile.mkdtemp()
     credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
     cloud_facade = client.CloudFacade.from_connection(controller.connection)
     cred_data = datastore.get_credential(username, credential)
+    with open('{}/creds.json'.format(dirpath), 'w+') as outfile:
+        json.dump(cred_data['credential'], outfile)
+        outfile.write("\n")
     cred = get_controller_types()[cloud].generate_cred_file(credential_name, cred_data)
+    # cred_entity = client.CloudCredential(get_controller_types()[cloud].generate_update_cred_file(cred_data['credential']), 'oauth2')
+    cred_entity = client.CloudCredential(get_controller_types()[cloud].generate_update_cred_file('{}/creds.json'.format(dirpath)), cred['type'])
     cloud_cred = client.UpdateCloudCredential(
-        client.CloudCredential(cred['key'], cred['type']),
+        cred_entity,
         tag.credential(cloud, juju_username, credential_name)
     )
     await cloud_facade.UpdateCredentials([cloud_cred])
@@ -872,7 +879,6 @@ def grant_user_to_controller(c_name, username, access):
     endpoint = controller_ds['endpoints'][0]
     cacert= controller_ds['ca_cert']
     juju_username = user_ds["juju_username"]
-
     Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
            c_name, username, access, endpoint, cacert, juju_username])
 

@@ -360,7 +360,7 @@ def add_credential(user):
                 if not juju.credential_exists(user, credential['name']):
                     LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
                     juju_username = juju.get_user_info(user)["juju_username"]
-                    code, response = juju.add_credential(user, juju_username, credential)
+                    code, response = juju.add_credential(user, juju_username, request.authorization.password, credential)
                     return juju.create_response(code, response)
                 else:
                     code, response = errors.already_exists('credential')

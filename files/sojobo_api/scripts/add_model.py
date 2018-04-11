@@ -38,8 +38,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         logger.info('Setting up Controllerconnection for %s', c_name)
         controller_connection = Controller()
         await controller_connection.connect(auth_data['controller']['endpoints'][0],
-                                            auth_data['user']['juju_username'], pwd,
-                                            auth_data['controller']['ca_cert'])
+                                            auth_data['user']['juju_username'], pwd)
         owner = tag.user(auth_data['user']['juju_username'])
 
         # Generate Tag for Credential
@@ -50,16 +49,29 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name):
         )
 
         # model_info = await controller_connection.add_model(m_name)
+        cloud = tag.cloud(auth_data['controller']['type'])
+        region = auth_data['controller']['region']
+        # model_info = await controller_connection.add_model(m_name)
         config = {}
-        config['authorized-keys'] = await utils.read_ssh_key(loop=controller_connection.loop)
-        logger.info(config, auth_data, credential, owner)
+        #config['authorized-keys'] = await utils.read_ssh_key(loop=controller_connection.loop)
+        logger.info('========================================================')
+        logger.info('config = %s', config)
+        logger.info('========================================================')
+        logger.info('credential = %s', credential)
+        logger.info('========================================================')
+        logger.info('owner = %s', owner)
+        logger.info('========================================================')
+        logger.info('cloud = %s', cloud)
+        logger.info('========================================================')
+        logger.info('region = %s', region)
+        logger.info('========================================================')
+        logger.info('m_name = %s', m_name)
 
         # Create A Model
         model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
-        model_info = await model_facade.CreateModel(tag.cloud(auth_data['controller']['type']),
-                                                              config, credential,
-                                                              m_name, owner,
-                                                              auth_data['controller']['region'])
+        model_info = await model_facade.CreateModel(cloud, config, credential,
+                                                    m_name, owner,
+                                                    region)
         logger.info('%s -> Connected to model', m_name)
         # Connect to created Model
 
