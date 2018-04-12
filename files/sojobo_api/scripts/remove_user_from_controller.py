@@ -54,7 +54,8 @@ async def remove_user_from_controller(username, c_name):
         for l in lines:
             logger.error(l)
     finally:
-        await juju.disconnect(controller_connection)
+        if controller_connection in locals():
+            await juju.disconnect(controller_connection)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)

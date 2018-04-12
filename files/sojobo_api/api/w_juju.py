@@ -396,11 +396,11 @@ async def get_model_info(connection, data):
     state = data['model']['state']
     users = get_users_model(data)
     applications = get_applications_info(connection)
-    machines = get_machines_info(connection)
+    # machines = get_machines_info(connection)
     gui = get_gui_url(data)
     credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
     return {'name': data['model']['name'], 'users': users,
-            'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
+            'applications': applications, 'machines': 'machines', 'juju-gui-url' : gui,
             'state': state, 'credentials' : credentials}
 
 
@@ -943,13 +943,10 @@ def get_all_users():
     return datastore.get_all_users()
 
 
-def get_users_info(data):
+def get_users_info(company):
     """An admin user is allowed to access info of all other users. Users who
     have no admin rights have only access to info about themselves."""
-    if data['name'] == settings.JUJU_ADMIN_USER:
-        return datastore.get_users_info()
-    else:
-        return datastore.get_user_info(data['name'])
+    return datastore.get_users_info(company=company)
 
 
 def get_user_info(username):

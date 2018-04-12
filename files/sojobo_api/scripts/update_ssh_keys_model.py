@@ -80,6 +80,9 @@ async def update_ssh_keys_model(ssh_keys, username, c_name, m_key):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+    finally:
+        if 'model_connection' in locals():
+            await juju.disconnect(model_connection)
 
 
 if __name__ == '__main__':

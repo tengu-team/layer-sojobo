@@ -80,19 +80,33 @@ def get_user_doc(username):
     return execute_aql_query(aql, username=hash_username(username))[0]
 
 
-def get_users_info():
+def get_users_info(company=None):
     """Returns info of all the users, including which controllers and models
     that the users have access to."""
-    aql = ('FOR u in users '
-               'LET controllers = '
-                   '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
-                       'LET models = '
-                           '(FOR model, mEdge in 1..1 INBOUND u._id modelAccess '
-                               'FILTER model._key in controller.models '
-                               'RETURN MERGE(model, {access: mEdge.access})) '
-                       'RETURN MERGE(controller, { access: cEdge.access, models: models})) '
-               'RETURN MERGE(u, {controllers: controllers})')
-    users = execute_aql_query(aql, rawResults=True)
+    if not company:
+        aql = ('FOR u in users '
+                   'LET controllers = '
+                       '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
+                           'LET models = '
+                               '(FOR model, mEdge in 1..1 INBOUND u._id modelAccess '
+                                   'FILTER model._key in controller.models '
+                                   'RETURN MERGE(model, {access: mEdge.access})) '
+                           'RETURN MERGE(controller, { access: cEdge.access, models: models})) '
+                   'RETURN MERGE(u, {controllers: controllers})')
+        users = execute_aql_query(aql, rawResults=True)
+    else:
+        com_id = 'companies/{}'.format(company)
+        aql = ('FOR company, comEdge IN 1..1 OUTBOUND @com_id companyAccess '
+                   'LET u = DOCUMENT(comEdge._to) '
+                   'LET controllers = '
+                       '(FOR controller, cEdge IN 1..1 INBOUND u._id controllerAccess '
+                           'LET models = '
+                               '(FOR model, mEdge in 1..1 INBOUND u._id modelAccess '
+                                   'FILTER model._key in controller.models '
+                                   'RETURN MERGE(model, {access: mEdge.access})) '
+                           'RETURN MERGE(controller, { access: cEdge.access, models: models})) '
+                   'RETURN MERGE(u, {controllers: controllers})')
+        users = execute_aql_query(aql, rawResults=True, com_id=com_id)
     results = []
     for u in users:
         results.append(u)

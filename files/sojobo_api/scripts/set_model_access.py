@@ -74,7 +74,8 @@ async def set_model_acc(username, c_name, endpoint, cacert, m_key, uuid, access)
         for l in lines:
             logger.error(l)
     finally:
-        await juju.disconnect(controller_connection)
+        if 'controller_connection' in locals():
+            await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':
