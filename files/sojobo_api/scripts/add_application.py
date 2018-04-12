@@ -29,7 +29,6 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 async def add_application(c_name, m_key, username, password, units, machine, config, application, series):
     try:
-
         auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         model_connection = Model()
         logger.info('Setting up Model connection for %s:%s', c_name, auth_data['model']['name'])
@@ -70,6 +69,11 @@ async def add_application(c_name, m_key, username, password, units, machine, con
             conf = {}
         config = yaml.dump({application: conf}, default_flow_style=False)
 
+        placement = client.Placement(
+            scope="#",
+            directive=machine
+        )
+
         app = client.ApplicationDeploy(
             charm_url=entity_id,
             application=application,
@@ -81,7 +85,7 @@ async def add_application(c_name, m_key, username, password, units, machine, con
             num_units=int(units),
             resources=None,
             storage=None,
-            placement=machine
+            placement=[placement]
         )
 
         await app_facade.Deploy([app])
