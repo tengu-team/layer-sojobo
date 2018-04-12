@@ -74,7 +74,6 @@ async def update_ssh_keys_all_models(ssh_keys, username):
         logger.info('Updating ssh keys in database...')
         datastore.update_ssh_keys(username, new_keys)
         logger.info('Updated SSH keys!')
-
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
