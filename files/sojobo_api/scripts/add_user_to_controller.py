@@ -53,7 +53,8 @@ async def add_user_to_controller(username, password, juju_username, c_name, endp
         for l in lines:
             logger.error(l)
     finally:
-        await controller_connection.disconnect()
+        if 'controller_connection' in locals():
+            await controller_connection.disconnect()
 
 
 if __name__ == '__main__':
