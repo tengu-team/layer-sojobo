@@ -160,6 +160,27 @@ def create_company_admin(company):
         return juju.create_response(code, response)
 
 
+@COMPANIES.route('/<company>/users', methods=['POST'])
+@authenticate
+def add_user_to_company(company):
+    try:
+        data = request.json
+        if juju.check_if_admin(request.authorization, company):
+            code, response = 200, juju.add_user_to_company(company,
+                                                            data['user'])
+            return create_response(code, response)
+        else:
+            code, response = errors.no_permission()
+            return create_response(code, response)
+    except HTTPException:
+        error_log()
+        raise
+    except Exception:
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
+        return juju.create_response(code, response)
+
+
 def error_log():
     exc_type, exc_value, exc_traceback = sys.exc_info()
     lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
