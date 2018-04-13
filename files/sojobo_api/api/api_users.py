@@ -81,6 +81,7 @@ def get_users_info():
             company = auth_data['company']['name']
         else:
             company = None
+        print(company)
         if juju.check_if_admin(request.authorization, company=company):
             code, response = 200, juju.get_users_info(company)
             LOGGER.info('/USERS [GET] => Succesfully retieved all users!')

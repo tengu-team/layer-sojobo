@@ -339,8 +339,8 @@ def get_ready_controllers(company=None):
     else:
         c_id = 'companies/{}'.format(company)
         aql = ('LET com = DOCUMENT(@c_id) '
-               'FOR controller.name in controllers '
-               'FILTER controller in com.controllers and controller.state == "ready" '
+               'FOR controller in controllers '
+               'FILTER controller.name in com.controllers and controller.state == "ready" '
                'RETURN controller')
         return execute_aql_query(aql, rawResults=True, c_id=c_id)
 
@@ -389,10 +389,9 @@ def get_keys_controllers(company=None):
         return execute_aql_query(aql, rawResults=True)
     else:
         c_id = 'companies/{}'.format(company)
-        aql = ('FOR com, controller in 1..1 INBOUND @c_id controllers '
-               'FILTER controller in com.controllers '
-               'RETURN controller._key')
-        return execute_aql_query(aql, rawResults=True, c_id=c_id)
+        aql = ('LET com = DOCUMENT(@c_id) '
+               'RETURN com.controllers')
+        return execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
 
 
 def get_cloud_controllers(c_type, company=None):
@@ -407,7 +406,7 @@ def get_cloud_controllers(c_type, company=None):
         aql = ('LET com = DOCUMENT(@c_id) '
                'FOR  controller in controllers '
                'FILTER controller.name in com.controllers and controller.type == @cloud '
-               'RETURN controller._key ')
+               'RETURN controller ')
         return execute_aql_query(aql, rawResults=True, cloud=c_type, c_id=c_id)
 
 

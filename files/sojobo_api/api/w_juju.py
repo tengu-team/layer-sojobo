@@ -340,8 +340,8 @@ def get_all_controllers(company=None):
     return datastore.get_all_controllers(company=company)
 
 
-def get_keys_controllers():
-    return [key for key in datastore.get_keys_controllers()]
+def get_keys_controllers(company):
+    return [key for key in datastore.get_keys_controllers(company)]
 
 
 def controller_exists(c_name):
@@ -396,7 +396,7 @@ async def get_model_info(connection, data):
     state = data['model']['state']
     users = get_users_model(data)
     applications = get_applications_info(connection)
-    # machines = get_machines_info(connection)
+    machines = get_machines_info(connection)
     gui = get_gui_url(data)
     credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
     return {'name': data['model']['name'], 'users': users,

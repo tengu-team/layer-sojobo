@@ -55,9 +55,13 @@ def get_all_controllers():
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
-        if juju.check_if_admin(request.authorization):
+        if auth_data['company']:
+            company = auth_data['company']['name']
+        else:
+            company = None
+        if juju.check_if_admin(request.authorization, company):
             LOGGER.info('/TENGU/controllers [GET] => Succesfully retrieved all controllers!')
-            return juju.create_response(200, juju.get_keys_controllers())
+            return juju.create_response(200, juju.get_keys_controllers(company))
         else:
             code, response = errors.no_permission()
             LOGGER.info('/TENGU/controllers/ [GET] => No Permission to perform this action!')
