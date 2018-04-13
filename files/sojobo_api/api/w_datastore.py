@@ -195,6 +195,7 @@ def get_credentials(username):
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
     return execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
 
+
 def get_credential_keys(username):
     u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
@@ -703,6 +704,28 @@ def get_users_model(m_key):
     return execute_aql_query(aql, rawResults=True, m_id=m_id)
 
 
+def create_workspace_type(workspace_type, price_per_second):
+    ws_type = {"_key": workspace_type,
+               "price_per_second": price_per_second}
+    aql = "INSERT @ws_type INTO workspace_types"
+    return execute_aql_query(aql, ws_type=ws_type)
+
+
+def workspace_type_exists(ws_type):
+    ws_type_id = get_workspace_type_id(ws_type)
+    aql = 'RETURN DOCUMENT("workspace_types", @ws_type_id)'
+    workspace_type = execute_aql_query(aql, rawResults=True, ws_type_id=ws_type_id)[0]
+    return workspace_type is not None
+
+
+def add_edge_between_model_and_workspace_type(m_key, ws_type):
+    """Creates an Edge between a model and a workspace type."""
+    m_id = get_model_id(m_key)
+    ws_type_id = get_workspace_type_id(ws_type)
+    aql = ("INSERT { _from: @m_id, _to: @ws_type_id} in modelType")
+    execute_aql_query(aql, m_id=m_id, ws_type_id=ws_type_id)
+
+
 ###############################################################################
 #                          COMPANY FUNCTIONS                                  #
 ###############################################################################
@@ -830,3 +853,11 @@ def hash_username(username):
 
 def get_user_id(username):
     return "users/" + hash_username(username)
+
+
+def get_model_id(m_key):
+    return "models/" + m_key
+
+
+def get_workspace_type_id(ws_type):
+    return "workspace_types/" + ws_type

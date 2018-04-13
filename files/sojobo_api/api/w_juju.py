@@ -461,7 +461,7 @@ def get_gui_url(data):
     return 'https://{}/gui/{}'.format(data['controller']['endpoints'][0], data['model']['uuid'])
 
 
-def create_model(authorization, m_name, cred_name, c_name):
+def create_model(authorization, m_name, cred_name, c_name, workspace_type=None):
     """Creates model in database and then in JuJu (background script)."""
     # Construct a key for the model using the controller name and model name.
     m_key = construct_model_key(c_name, m_name)
@@ -825,7 +825,7 @@ def get_users_model(data):
 
 
 def get_credentials(user):
-    return datastore.get_credentials(user)
+    return [cred for cred in datastore.get_credentials(user)]
 
 
 def get_credential(user, credential):
