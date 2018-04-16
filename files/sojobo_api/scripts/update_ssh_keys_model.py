@@ -34,7 +34,7 @@ async def update_ssh_keys_model(ssh_keys, username, c_name, m_key):
     or write access to."""
     try:
         logger.info('Updating SSH keys for model {}...'.format(m_key))
-        user_info = datastore.get_user_info(username)
+        user_info = datastore.get_user(username)
         juju_username = user_info["juju_username"]
         current_keys = user_info["ssh_keys"]
         new_keys = ast.literal_eval(ssh_keys)
@@ -80,12 +80,15 @@ async def update_ssh_keys_model(ssh_keys, username, c_name, m_key):
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+    finally:
+        if 'model_connection' in locals():
+            await juju.disconnect(model_connection)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('remove_ssh_keys')
+    logger = logging.getLogger('update_ssh_keys_model')
     hdlr = logging.FileHandler('{}/log/update_ssh_keys_model.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)

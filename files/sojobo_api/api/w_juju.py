@@ -23,6 +23,7 @@ import base64
 import datetime
 from subprocess import Popen
 import json
+import tempfile
 import hashlib
 from flask import abort, Response
 from juju import tag
@@ -103,9 +104,14 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
         if not controller and not model:
-            if check_if_admin(authorization):
+            print(auth_data)
+            if auth_data['company']:
+                comp = auth_data['company']['name']
+            else:
+                comp = None
+            if check_if_admin(authorization, company=comp):
                 return True
-            if len(datastore.get_all_controllers()) == 0:
+            if len(get_all_controllers(company=comp)) == 0:
                 abort(error[0], error[1])
             else:
                 await connect_to_random_controller(authorization, auth_data)
@@ -134,7 +140,8 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
                 await connect_to_random_controller(authorization, auth_data)
                 add_user_to_controllers(authorization.username,
                                         auth_data['user']['juju_username'],
-                                        authorization.password)
+                                        authorization.password,
+                                        auth_data['company']['name'])
                 abort(409, 'User {} is being added to the {} environment'.format(auth_data['user']['name'], auth_data['controller']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
@@ -143,24 +150,26 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
 
 
 def check_if_admin(authz, company=None):
-    if check_if_company_admin(authz, company):
+    if authz.username == settings.JUJU_ADMIN_USER and authz.password == settings.JUJU_ADMIN_PASSWORD:
         return True
     else:
-        return authz.username == settings.JUJU_ADMIN_USER and authz.password == settings.JUJU_ADMIN_PASSWORD
+        return check_if_company_admin(authz.username, company)
 
 
-def check_if_company_admin(authz, company):
+def check_if_company_admin(username, company):
     if not company:
         return False
-    datastore.get_company(authz.username)
-    if datastore.get_company(authz.username)['company_access']['is_admin']:
+    if datastore.get_company_user(username)['company'] == company and datastore.get_company_user(username)['company_access']['is_admin']:
         return True
 
 
 async def connect_to_random_controller(authorization, auth_data):
     error = errors.unauthorized()
     try:
-        ready_controllers = datastore.get_ready_controllers_with_access(authorization.username)
+        comp = None
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        ready_controllers = datastore.get_ready_controllers_with_access(authorization.username, company=comp)
         if len(ready_controllers) == 0:
             abort(400,'Please wait untill your first environment is set up!')
         else:
@@ -237,9 +246,12 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
 
     # Admin has authorization in every situation.
     if connection_info["user"]["name"] == settings.JUJU_ADMIN_USER:
+        print('Authzd')
         return True
     elif self_user == connection_info["user"]["name"]:
         return True
+    elif connection_info['company']:
+        return connection_info['company']['is_admin']
     elif "m_access" in connection_info:
         return permissions.m_authorize(connection_info, resource, method)
     elif "c_access" in connection_info:
@@ -258,7 +270,7 @@ def get_connection_info(authorization, c_name=None, m_name=None):
         elif c_name and not m_name:
             return datastore.get_controller_connection_info(authorization.username, c_name)
         else:
-            return {'user': datastore.get_user_info(authorization.username)}
+            return datastore.get_user_connection_info(authorization.username)
     else:
         abort(errors.unauthorized)
 
@@ -288,7 +300,7 @@ def check_c_type(c_type):
         abort(error[0], error[1])
 
 
-def create_controller(token, data):
+def create_controller(auth_data, data, username, password):
     c_type = check_c_type(data['type'])
     valid, name = check_input(data['controller'], 'controller')
     if not valid:
@@ -298,20 +310,21 @@ def create_controller(token, data):
         abort(ers[0], ers[1])
     for controller in get_all_controllers():
         if controller['state'] == 'accepted':
-            return 503, 'An environment is already being created'
-    credential = get_credential(token['user']['name'], data['credential'])
+            return 400, 'An environment is already being created'
+    credential = get_credential(auth_data['user']['name'], data['credential'])
     if not credential['state'] == 'ready':
-        abort(503, 'The Credential {} is not ready yet.'.format(credential['name']))
-    regions= get_controller_types()[c_type].get_supported_regions()
+        abort(400, 'The Credential {} is not ready yet.'.format(credential['name']))
+    regions = get_controller_types()[c_type].get_supported_regions()
     if not data['region'] in regions:
         code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(data['type'], regions)
         abort(code, response)
     datastore.create_controller(name, c_type, data['region'], data['credential'])
-    if token['user']['name'] == settings.JUJU_ADMIN_USER:
-        datastore.add_user_to_controller(name, token['user']['name'], 'admin')
+    if auth_data['user']['name'] == settings.JUJU_ADMIN_USER:
+        datastore.add_user_to_controller(name, auth_data['user']['name'], 'admin')
     else:
-        datastore.add_user_to_controller(name, token['user']['name'], 'company_admin')
-    return get_controller_types()[c_type].create_controller(name, data)
+        datastore.add_user_to_controller(name, auth_data['user']['name'], 'company_admin')
+        datastore.add_controller_to_company(name, auth_data['company']['name'])
+    return get_controller_types()[c_type].create_controller(name, data['region'], data['credential'], username, password)
 
 
 def delete_controller(controller_name, controller_type):
@@ -323,12 +336,12 @@ def get_supported_regions(c_type):
     return get_controller_types()[c_type].get_supported_regions()
 
 
-def get_all_controllers():
-    return datastore.get_all_controllers()
+def get_all_controllers(company=None):
+    return datastore.get_all_controllers(company=company)
 
 
-def get_keys_controllers():
-    return [key for key in datastore.get_keys_controllers()]
+def get_keys_controllers(company):
+    return [key for key in datastore.get_keys_controllers(company)]
 
 
 def controller_exists(c_name):
@@ -385,16 +398,10 @@ async def get_model_info(connection, data):
     applications = get_applications_info(connection)
     machines = get_machines_info(connection)
     gui = get_gui_url(data)
-    credentials = {'cloud': data['controller']['type'],
-                   'credential-name': data['model']['credential']}
-    return {'name': data['model']['name'],
-            'users': users,
-            'applications': applications,
-            'machines': machines,
-            'juju-gui-url': gui,
-            'state': state,
-            'credentials': credentials,
-            'monitoring_enabled': data['model']['monitoring_enabled']}
+    credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
+    return {'name': data['model']['name'], 'users': users,
+            'applications': applications, 'machines': 'machines', 'juju-gui-url' : gui,
+            'state': state, 'credentials' : credentials}
 
 
 def get_ssh_keys_user(username):
@@ -459,24 +466,18 @@ def create_model(authorization, m_name, cred_name, c_name, workspace_type=None):
     # Construct a key for the model using the controller name and model name.
     m_key = construct_model_key(c_name, m_name)
     if not datastore.model_exists(m_key):
-        if cred_name in datastore.get_credential_keys(authorization.username):
-            # Create the model in ArangoDB. Add model key to controller and
-            # set the model access level of the user.
-            new_model = datastore.create_model(m_key, m_name, state='deploying')
-            # TODO: Maybe put these 4 datastore methods in one so you do not have
-            # to create a connection with ArangoDB each time.
-            datastore.add_model_to_controller(c_name, m_key)
-            datastore.set_model_state(m_key, 'accepted')
-            datastore.set_model_access(m_key, authorization.username, 'admin')
-            if workspace_type:
-                datastore.add_edge_between_model_and_workspace_type(new_model["_key"], workspace_type)
-            # Run the background script, this creates the model in JuJu.
-            Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
-                    c_name, m_key, m_name, authorization.username,
-                    authorization.password, cred_name, str(workspace_type)])
-            return 202, "Model is being deployed."
-        else:
-            return 404, "Credentials {} not found!".format(cred_name)
+        # Create the model in ArangoDB. Add model key to controller and
+        # set the model access level of the user.
+        new_model = datastore.create_model(m_key, m_name, state='deploying')
+        # TODO: Maybe put these 3 datastore methods in one so you do not have
+        # to create a connection with ArangoDB each time.
+        datastore.add_model_to_controller(c_name, m_key)
+        datastore.set_model_state(m_key, 'accepted')
+        datastore.set_model_access(m_key, authorization.username, 'admin')
+        # Run the background script, this creates the model in JuJu.
+        Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
+                c_name, m_key, m_name, authorization.username, authorization.password, cred_name])
+        return 202, "Model is being deployed."
     else:
         return errors.already_exists('model')
 
@@ -732,28 +733,28 @@ async def get_application_config(connection, application):
 ###############################################################################
 
 
-def create_user(username, password):
+def create_user(username, password, company):
     # We create a seperate name with a timestamp that will be used in Juju.
     # This is because Juju doesn't allow a username that has been used before.
     # F.e. Juju does not allow you create a user 'bob', then delete him
     # and then try to add a user that is also named 'bob', therefore we add a timestamp.
     juju_username = 'u{}{}'.format(hashlib.md5(username.encode('utf')).hexdigest(), give_timestamp())
-    datastore.create_user(username, juju_username)
-    add_user_to_controllers(username, juju_username, password)
+    datastore.create_user(username, juju_username, company)
+    add_user_to_controllers(username, juju_username, password, company)
 
 
 
-def delete_user(username):
+def delete_user(username, company=None):
     datastore.set_user_state(username, 'deleting')
-    controllers = datastore.get_ready_controllers()
+    controllers = datastore.get_ready_controllers(company)
     for controller in controllers:
         Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR),
         username, controller['name']])
 
 
-def add_user_to_controllers(username, juju_username, password):
-    controllers = datastore.get_ready_controllers_no_access(username)
-
+def add_user_to_controllers(username, juju_username, password, company):
+    controllers = datastore.get_ready_controllers_no_access(username, company)
+    print(controllers)
     for controller in controllers:
         c_name = controller['name']
         endpoint = controller["endpoints"][0]
@@ -832,20 +833,29 @@ def get_credential(user, credential):
 
 
 
-def add_credential(username, juju_username, credential):
+def add_credential(username, juju_username, juju_password, credential):
     try:
-        return get_controller_types()[credential['type']].add_credential(username, juju_username, credential)
+        if credential['type'] in get_controller_types():
+            return get_controller_types()[credential['type']].add_credential(username, juju_username, juju_password, credential)
+        else:
+            return 400, "Please provide the right subordinate charm for this cloud"
     except NotImplementedError as e:
         return 400, "This type of controller does not need credentials."
 
 
 async def update_cloud(controller, cloud, credential, juju_username, username):
+    dirpath = tempfile.mkdtemp()
     credential_name = 't{}'.format(hashlib.md5(credential.encode('utf')).hexdigest())
     cloud_facade = client.CloudFacade.from_connection(controller.connection)
     cred_data = datastore.get_credential(username, credential)
+    with open('{}/creds.json'.format(dirpath), 'w+') as outfile:
+        json.dump(cred_data['credential'], outfile)
+        outfile.write("\n")
     cred = get_controller_types()[cloud].generate_cred_file(credential_name, cred_data)
+    # cred_entity = client.CloudCredential(get_controller_types()[cloud].generate_update_cred_file(cred_data['credential']), 'oauth2')
+    cred_entity = client.CloudCredential(get_controller_types()[cloud].generate_update_cred_file('{}/creds.json'.format(dirpath)), cred['type'])
     cloud_cred = client.UpdateCloudCredential(
-        client.CloudCredential(cred['key'], cred['type']),
+        cred_entity,
         tag.credential(cloud, juju_username, credential_name)
     )
     await cloud_facade.UpdateCredentials([cloud_cred])
@@ -857,11 +867,10 @@ def remove_credential(user, cred_name):
 
 
 def credential_exists(user, credential):
-   for cred in get_credentials(user):
-       if cred:
-           if cred['name'] == credential:
-               return True
-   return False
+    for cred in get_credentials(user):
+        if cred['name'] == credential:
+            return True
+    return False
 
 
 def grant_user_to_controller(c_name, username, access):
@@ -870,7 +879,6 @@ def grant_user_to_controller(c_name, username, access):
     endpoint = controller_ds['endpoints'][0]
     cacert= controller_ds['ca_cert']
     juju_username = user_ds["juju_username"]
-
     Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
            c_name, username, access, endpoint, cacert, juju_username])
 
@@ -935,13 +943,10 @@ def get_all_users():
     return datastore.get_all_users()
 
 
-def get_users_info(data):
+def get_users_info(company):
     """An admin user is allowed to access info of all other users. Users who
     have no admin rights have only access to info about themselves."""
-    if data['name'] == settings.JUJU_ADMIN_USER:
-        return datastore.get_users_info()
-    else:
-        return datastore.get_user_info(data['name'])
+    return datastore.get_users_info(company=company)
 
 
 def get_user_info(username):
@@ -985,15 +990,64 @@ def check_models_access(token, controller, user):
 ##############################################################################
 # Company functionality
 ##############################################################################
-def create_company(admin, name, uri):
-    if not admin or not name or not uri:
+def create_company(name, uri):
+    if not name or not uri:
         abort(400, "Please provide a Company-Name('name'), "
-                   "a company-admin('admin') and a valid Hubspot-uri('uri')")
-    elif not user_exists(admin):
-        abort(404, 'User does not exist!')
-    return 'Company is being created!'
+                   "and a valid Hubspot-uri('uri')")
+    datastore.create_company(name, uri)
+    return 200, 'Company is being created!'
 
 
+def get_companies():
+    return [com for com in datastore.get_companies()]
+
+
+def check_if_company_exists(company):
+    if company in [com['name'] for com in datastore.get_companies()]:
+        return True
+    return False
+
+
+def get_company(company):
+    if check_if_company_exists(company):
+        return datastore.get_company(company)
+    else:
+        abort(404, "Company does not exist!")
+
+
+def get_company_admins(company):
+    if check_if_company_exists(company):
+        return [adm for adm in datastore.get_company_admins(company)]
+    else:
+        abort(404, "Company does not exist!")
+
+
+def create_company_admin(company, username):
+    if check_if_company_exists(company):
+        if user_exists(username):
+            if_comp = datastore.get_company_user(username)
+            if not if_comp:
+                datastore.add_user_to_company(username, company, admin=True)
+            else:
+                datastore.upgrade_to_company_admin(company, username)
+            return datastore.get_company_user(username)
+        else:
+            abort(404, "User does not exist!")
+    else:
+        abort(404, "Company does not exist!")
+
+
+def add_user_to_company(company, username):
+    if check_if_company_exists(company):
+        if user_exists(username):
+            if_comp = datastore.get_company_user(username)
+            if not if_comp:
+                datastore.add_user_to_company(username, company, admin=False)
+            return datastore.get_company_user(username)
+        else:
+            abort(404, "User does not exist!")
+    else:
+        abort(404, "Company does not exist!")
 #########################
 # extra Acces checks
 #########################

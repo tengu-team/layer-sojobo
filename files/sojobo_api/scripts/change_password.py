@@ -50,7 +50,8 @@ async def change_password(c_name, endpoint, ca_cert, juju_username, password):
         for l in lines:
             logger.error(l)
     finally:
-        await juju.disconnect(controller_connection)
+        if 'controller_connection' in locals():
+            await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':

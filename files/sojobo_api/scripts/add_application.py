@@ -29,7 +29,6 @@ from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 async def add_application(c_name, m_key, username, password, units, machine, config, application, series):
     try:
-
         auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         model_connection = Model()
         logger.info('Setting up Model connection for %s:%s', c_name, auth_data['model']['name'])
