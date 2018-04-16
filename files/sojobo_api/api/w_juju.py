@@ -1024,22 +1024,28 @@ def get_company_admins(company):
 
 def create_company_admin(company, username):
     if check_if_company_exists(company):
-        if_comp = datastore.get_company_user(username)
-        if not if_comp:
-            datastore.add_user_to_company(username, company, admin=True)
+        if user_exists(username):
+            if_comp = datastore.get_company_user(username)
+            if not if_comp:
+                datastore.add_user_to_company(username, company, admin=True)
+            else:
+                datastore.upgrade_to_company_admin(company, username)
+            return datastore.get_company_user(username)
         else:
-            datastore.upgrade_to_company_admin(company, username)
-        return datastore.get_company_user(username)
+            abort(404, "User does not exist!")
     else:
         abort(404, "Company does not exist!")
 
 
 def add_user_to_company(company, username):
     if check_if_company_exists(company):
-        if_comp = datastore.get_company_user(username)
-        if not if_comp:
-            datastore.add_user_to_company(username, company, admin=False)
-        return datastore.get_company_user(username)
+        if user_exists(username):
+            if_comp = datastore.get_company_user(username)
+            if not if_comp:
+                datastore.add_user_to_company(username, company, admin=False)
+            return datastore.get_company_user(username)
+        else:
+            abort(404, "User does not exist!")
     else:
         abort(404, "Company does not exist!")
 #########################
