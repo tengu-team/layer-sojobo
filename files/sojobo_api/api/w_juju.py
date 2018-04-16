@@ -385,10 +385,16 @@ async def get_model_info(connection, data):
     applications = get_applications_info(connection)
     machines = get_machines_info(connection)
     gui = get_gui_url(data)
-    credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
-    return {'name': data['model']['name'], 'users': users,
-            'applications': applications, 'machines': machines, 'juju-gui-url' : gui,
-            'state': state, 'credentials' : credentials}
+    credentials = {'cloud': data['controller']['type'],
+                   'credential-name': data['model']['credential']}
+    return {'name': data['model']['name'],
+            'users': users,
+            'applications': applications,
+            'machines': machines,
+            'juju-gui-url': gui,
+            'state': state,
+            'credentials': credentials,
+            'monitoring_enabled': data['model']['monitoring_enabled']}
 
 
 def get_ssh_keys_user(username):
