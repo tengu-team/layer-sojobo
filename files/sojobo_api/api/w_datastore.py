@@ -872,3 +872,13 @@ def get_model_id(m_key):
 
 def get_workspace_type_id(ws_type):
     return "workspace_types/" + ws_type
+
+
+###############################################################################
+#                                 MONITORING                                  #
+###############################################################################
+
+def enable_monitoring(m_key):
+    """Insert or updates the field of a model that indicates if monitoring is enabled."""
+    aql = "UPDATE {_key: @m_key, monitoring_enabled: @enabled} IN models"
+    execute_aql_query(aql, m_key=m_key, enabled=True)
