@@ -861,3 +861,21 @@ def get_model_id(m_key):
 
 def get_workspace_type_id(ws_type):
     return "workspace_types/" + ws_type
+
+###############################################################################
+#                               BUNDLE FUNCTIONS                              #
+###############################################################################
+def create_bundle_type(name, summary, description, logo, bundle, tags):
+    bundle = {"name": name,
+              "summary": summary,
+              "description": description,
+              "logo": logo,
+              "bundle": bundle,
+              "tags": tags}
+    aql = "INSERT @bundle INTO bundleTypes"
+    execute_aql_query(aql, bundle=bundle)
+
+
+def get_all_bundle_types():
+    aql = "FOR b IN bundleTypes RETURN b"
+    return execute_aql_query(aql, rawResults=True)

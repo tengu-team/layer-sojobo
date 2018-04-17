@@ -10,6 +10,17 @@ It is used to check if a user has the rights to perform certain actions.
 
 
 permissions = {
+	"/bundles/types": {
+		"get": {
+			"c_access": ["admin", "company_admin", "superuser", "add-model", "login"]
+		},
+		"post": {
+			"c_access": ["admin", "company_admin", "superuser", "add-model", "login"]
+		},
+		"put": {
+			"c_access": ["admin"] #TODO change to allow for company_admin, when functionality is included
+		}
+	},
 	"/controllers/controller": {
 		"get": {
 			"c_access": ["admin", "company_admin", "superuser"]
