@@ -92,6 +92,18 @@ async def add_application(c_name, m_key, username, password, units, machine, con
         )
 
         await app_facade.Deploy([app])
+
+        # If monitoring is enabled for the workspace then we need to add a
+        # relation between the application and the tengu monitoring telegraf.
+        if "monitoring_enabled" in auth_data["model"] and auth_data["model"]["monitoring_enabled"]:
+            endpoint = auth_data["controller"]["endpoints"][0]
+            cacert = auth_data["controller"]["ca_cert"]
+            m_name = auth_data["model"]["name"]
+            uuid = auth_data["model"]["uuid"]
+            juju_username = auth_data["user"]["juju_username"]
+            juju.add_monitoring(c_name, endpoint, cacert, m_name, uuid,
+                                juju_username, password, application)
+
         await model_connection.disconnect()
         logger.info('Application %s succesfully added!', application)
     except Exception as e:
