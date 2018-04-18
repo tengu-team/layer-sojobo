@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
-import ast
+import json
 import sys
 import traceback
 import logging
@@ -36,7 +36,9 @@ async def update_ssh_keys_all_models(ssh_keys, username):
         user_info = datastore.get_user_info(username)
         juju_username = user_info["juju_username"]
         current_keys = user_info["ssh_keys"]
-        new_keys = ast.literal_eval(ssh_keys)
+        json_acceptable_string = ssh_keys.replace("'", "\"")
+        new_keys = json.loads(json_acceptable_string)
+
 
         for controller in user_info["controllers"]:
             endpoint = controller["endpoints"][0]

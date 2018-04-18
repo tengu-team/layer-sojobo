@@ -17,7 +17,6 @@
 from base64 import b64encode
 from hashlib import sha256
 import os
-import ast
 import shutil
 import sys
 import json
@@ -291,7 +290,8 @@ def invalid_credential(credential, cloud):
     sys.path.append('/opt')
     from sojobo_api.api import w_juju as juju
     valid_keys = juju.get_controller_types()[cloud].get_cred_keys()
-    cred = ast.literal_eval(credential)
+    valid_cred = credential.replace("'", "\"")
+    cred = json.loads(valid_cred)
     wrong_keys = []
     if len(valid_keys) == len(list(cred.keys())):
         for cred_value in valid_keys:
