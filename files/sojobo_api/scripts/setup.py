@@ -78,6 +78,7 @@ def setup(cred, c_type, region, host, port, arango_username, arango_password):
                   'credential': ast.literal_eval(cred)}
     if not datastore.user_exists(username):
         datastore.create_user(username, username)
+        datastore.set_user_state(username, 'ready')
     datastore.add_credential(username, credential)
     datastore.set_credential_ready(username, 'default')
     mydata = {
