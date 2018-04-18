@@ -878,7 +878,6 @@ def get_workspace_type_id(ws_type):
 #                                 MONITORING                                  #
 ###############################################################################
 
-def toggle_monitoring(m_key, enabled):
-    """Insert or updates the field of a model that indicates if monitoring is enabled."""
-    aql = "UPDATE {_key: @m_key, monitoring_enabled: @enabled} IN models"
-    execute_aql_query(aql, m_key=m_key, enabled=enabled)
+def set_monitoring_state(m_key, state):
+    aql = "UPDATE {_key: @m_key, monitoring_state: @state} IN models"
+    execute_aql_query(aql, m_key=m_key, state=state)
