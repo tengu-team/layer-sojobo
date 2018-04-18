@@ -16,6 +16,11 @@
 from functools import wraps
 import requests
 import yaml
+import logging
+import sys
+import traceback
+from werkzeug.exceptions import HTTPException
+from sojobo_api.api.w_juju import execute_task
 from flask import request, Blueprint, abort
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore, w_permissions, w_bundles as bundles
 from sojobo_api import settings
@@ -78,14 +83,14 @@ def determine_closest_type():
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/BUNDLES/types [POST] => Authenticated!')
         if juju.authorize(auth_data, '/bundles/types', 'post'):
-            LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
+            LOGGER.info('/BUNDLES/types [POST] => Authorized!')
             if 'applications' in data:
-                type = bundles.determine_closest_type(data['applications'])
-                if type:
-                    LOGGER.info('/BUNDLES/types [POST] => determined type: %s', type['name'])
-                    return juju.create_response(200, type)
+                b_type = bundles.determine_closest_type(data['applications'])
+                if b_type:
+                    LOGGER.info('/BUNDLES/types [POST] => determined type: %s', b_type['name'])
+                    return juju.create_response(200, b_type)
                 else:
-                    LOGGER.info('/BUNDLES/types [POST] => no matching type found)
+                    LOGGER.info('/BUNDLES/types [POST] => no matching type found')
                     return juju.create_response(404, 'Could not find a matching type.')
             else:
                 return juju.create_response(400, 'The Body should contain an applications property.')
@@ -101,9 +106,6 @@ def determine_closest_type():
     except Exception:
         ers = error_log()
         return juju.create_response(errors.cmd_error(ers)[0], errors.cmd_error(ers)[1])
-    finally:
-        if 'connection' in locals():
-            execute_task(juju.disconnect, connection)
 
 @BUNDLES.route('/types', methods=['PUT'])
 def upload_types():
@@ -122,7 +124,7 @@ def upload_types():
         if juju.check_if_admin(request.authorization): #, company):
             if 'repositories' in data:
                 LOGGER.info('/BUNDLES/types [PUT] => Start uploading repositories')
-                types = bundle.upload_types(data['repositories'], company)
+                types = bundles.upload_types(data['repositories'], company)
                 LOGGER.info('/BUNDLES/types [PUT] => Succesfully uploaded %s repositories', len(types))
                 return juju.create_response(200, types)
             else:
@@ -141,3 +143,11 @@ def upload_types():
         ers = error_log()
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
+
+
+def error_log():
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    for l in lines:
+        LOGGER.error(l)
+    return lines

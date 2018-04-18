@@ -879,3 +879,7 @@ def create_bundle_type(name, summary, description, logo, bundle, tags):
 def get_all_bundle_types():
     aql = "FOR b IN bundleTypes RETURN b"
     return execute_aql_query(aql, rawResults=True)
+
+def clear_bundle_types():
+    aql = "FOR b IN bundleTypes REMOVE b IN bundleTypes"
+    execute_aql_query(aql, rawResults=True)
