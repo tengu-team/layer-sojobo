@@ -442,7 +442,9 @@ def get_units_info(connection, application):
                            'public-ip': u['public-address'],
                            'private-ip': u['private-address'],
                            'series': u['series'],
-                           'ports': ports})
+                           'ports': ports,
+                           'state': u['workload-status']['current'],
+                           'message': u['workload-status']['message']})
         return result
     except KeyError:
         return []
@@ -474,9 +476,11 @@ def create_model(authorization, m_name, cred_name, c_name, workspace_type=None):
         datastore.add_model_to_controller(c_name, m_key)
         datastore.set_model_state(m_key, 'accepted')
         datastore.set_model_access(m_key, authorization.username, 'admin')
+        if workspace_type:
+            datastore.add_edge_between_model_and_workspace_type(new_model["_key"], workspace_type)
         # Run the background script, this creates the model in JuJu.
         Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
-                c_name, m_key, m_name, authorization.username, authorization.password, cred_name])
+                c_name, m_key, m_name, authorization.username, authorization.password, cred_name, str(workspace_type)])
         return 202, "Model is being deployed."
     else:
         return errors.already_exists('model')

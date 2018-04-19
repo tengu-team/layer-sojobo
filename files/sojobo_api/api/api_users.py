@@ -81,7 +81,6 @@ def get_users_info():
             company = auth_data['company']['name']
         else:
             company = None
-        print(company)
         if juju.check_if_admin(request.authorization, company=company):
             code, response = 200, juju.get_users_info(company)
             LOGGER.info('/USERS [GET] => Succesfully retieved all users!')
@@ -160,6 +159,17 @@ def get_user_info(user):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s [GET] => No Permission to perform action!', user)
+        if 'controllers' in response:
+            new_controllers = []
+            for con in response['controllers']:
+                new_models = []
+                for mod in con['models']:
+                    if mod['name'] != 'controller' and mod['name'] != 'default':
+                        new_models.append(mod)
+                con['models'] = new_models
+                if con['name'] != 'login':
+                    new_controllers.append(con)
+            response['controllers'] = new_controllers
         return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()

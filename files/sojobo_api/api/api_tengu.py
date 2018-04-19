@@ -201,19 +201,18 @@ def create_model(controller):
             if juju.credential_exists(auth_data['user']['name'], data['credential']):
                 credential_name = data['credential']
                 if valid:
-                    LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
+                    ws_type = None
                     if "workspace_type" in data:
                         ws_type = data['workspace_type']
                         if not datastore.workspace_type_exists(ws_type):
                             code, response = errors.does_not_exist("workspace type {}".format(ws_type))
                             return juju.create_response(code, response)
-                    else:
-                        ws_type = None
                     code, response = juju.create_model(request.authorization,
                                                        model_name,
                                                        credential_name,
                                                        controller,
                                                        ws_type)
+                    LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
                     return juju.create_response(code, response)
                 else:
                     return juju.create_response(400, model_name)

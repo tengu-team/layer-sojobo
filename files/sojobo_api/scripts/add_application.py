@@ -71,10 +71,13 @@ async def add_application(c_name, m_key, username, password, units, machine, con
             conf = {}
         config = yaml.dump({application: conf}, default_flow_style=False)
 
-        placement = client.Placement(
-            scope="#",
-            directive=machine
-        )
+        if machine:
+            placement = [client.Placement(
+                scope="#",
+                directive=machine
+            )]
+        else:
+            placement = None
 
         app = client.ApplicationDeploy(
             charm_url=entity_id,
@@ -87,7 +90,7 @@ async def add_application(c_name, m_key, username, password, units, machine, con
             num_units=int(units),
             resources=None,
             storage=None,
-            placement=[placement]
+            placement=placement
         )
 
         await app_facade.Deploy([app])
