@@ -66,6 +66,7 @@ def get_all_controllers():
             code, response = errors.no_permission()
             LOGGER.info('/TENGU/controllers/ [GET] => No Permission to perform this action!')
             return juju.create_response(code, response)
+
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -245,6 +246,11 @@ def get_models_info(controller):
             LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
             code, response = 200, [m['name'] for m in juju.get_models_access(auth_data["user"]["name"], controller)]
             LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
+            new_models = []
+            for mod in response:
+                if mod != 'controller' and mod != 'default':
+                    new_models.append(mod)
+            response = new_models
             return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()

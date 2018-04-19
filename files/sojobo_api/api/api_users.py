@@ -87,6 +87,18 @@ def get_users_info():
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS [GET] => No Permission to perform this action!')
+            for user in response:
+                if 'controllers' in user:
+                    new_controllers = []
+                    for con in user['controllers']:
+                        new_models = []
+                        for mod in con['models']:
+                            if mod['name'] != 'controller' and mod['name'] != 'default':
+                                new_models.append(mod)
+                        con['models'] = new_models
+                        if con['name'] != 'login':
+                            new_controllers.append(con)
+                    user['controllers'] = new_controllers
         return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
@@ -491,6 +503,16 @@ def get_controllers_access(user):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/controllers [GET] => No Permission to perform this action!', user)
+        new_controllers = []
+        for con in response:
+            new_models = []
+            for mod in con['models']:
+                if mod['name'] != 'controller' and mod['name'] != 'default':
+                    new_models.append(mod)
+            con['models'] = new_models
+            if con['name'] != 'login':
+                new_controllers.append(con)
+        response = new_controllers
         return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
@@ -523,6 +545,11 @@ def get_ucontroller_access(user, controller):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/controllers/%s [GET] => No Permission to perform this action', user, controller)
+        new_models = []
+        for mod in response['models']:
+            if mod['name'] != 'controller' and mod['name'] != 'default':
+                new_models.append(mod)
+        response['models'] = new_models
         return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
@@ -598,6 +625,11 @@ def get_models_access(user, controller):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/controllers/%s/models [GET] => No Permission to perform this action!', user, controller)
+        new_models = []
+        for mod in response:
+            if mod['name'] != 'controller' and mod['name'] != 'default':
+                new_models.append(mod)
+        response = new_models
         return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
