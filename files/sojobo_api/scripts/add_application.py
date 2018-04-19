@@ -19,7 +19,7 @@ import sys
 import traceback
 import logging
 import yaml
-import ast
+import json
 from juju.client import client
 from juju.model import Model
 sys.path.append('/opt')
@@ -64,7 +64,9 @@ async def add_application(c_name, m_key, username, password, units, machine, con
             application = application.split("/")[1]
 
         if not config == '':
-            conf = {k: str(v) for k, v in ast.literal_eval(config).items()}
+            valid_conf = config.replace("'", "\"")
+            conf_dict = json.loads(valid_conf)
+            conf = {k: str(v) for k, v in conf_dict.items()}
         else:
             conf = {}
         config = yaml.dump({application: conf}, default_flow_style=False)

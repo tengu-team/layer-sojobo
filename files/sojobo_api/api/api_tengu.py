@@ -66,6 +66,7 @@ def get_all_controllers():
             code, response = errors.no_permission()
             LOGGER.info('/TENGU/controllers/ [GET] => No Permission to perform this action!')
             return juju.create_response(code, response)
+
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -201,19 +202,18 @@ def create_model(controller):
             if juju.credential_exists(auth_data['user']['name'], data['credential']):
                 credential_name = data['credential']
                 if valid:
-                    LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
+                    ws_type = None
                     if "workspace_type" in data:
                         ws_type = data['workspace_type']
                         if not datastore.workspace_type_exists(ws_type):
                             code, response = errors.does_not_exist("workspace type {}".format(ws_type))
                             return juju.create_response(code, response)
-                    else:
-                        ws_type = None
                     code, response = juju.create_model(request.authorization,
                                                        model_name,
                                                        credential_name,
                                                        controller,
                                                        ws_type)
+                    LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
                     return juju.create_response(code, response)
                 else:
                     return juju.create_response(400, model_name)
@@ -246,6 +246,11 @@ def get_models_info(controller):
             LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
             code, response = 200, [m['name'] for m in juju.get_models_access(auth_data["user"]["name"], controller)]
             LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
+            new_models = []
+            for mod in response:
+                if mod != 'controller' and mod != 'default':
+                    new_models.append(mod)
+            response = new_models
             return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()

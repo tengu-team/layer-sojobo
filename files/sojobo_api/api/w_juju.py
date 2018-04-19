@@ -103,12 +103,11 @@ def check_constraints(data):
 async def authenticate(api_key, authorization, auth_data, controller=None, model=None):
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        else:
+            comp = None
         if not controller and not model:
-            print(auth_data)
-            if auth_data['company']:
-                comp = auth_data['company']['name']
-            else:
-                comp = None
             if check_if_admin(authorization, company=comp):
                 return True
             if len(get_all_controllers(company=comp)) == 0:
@@ -136,12 +135,14 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
                                                    authorization.password,
                                                    auth_data['controller']['ca_cert'])
                     return model_connection
+            elif check_if_admin(authorization, company=comp):
+                return True
             elif auth_data['controller']['state'] == 'ready':
                 await connect_to_random_controller(authorization, auth_data)
                 add_user_to_controllers(authorization.username,
                                         auth_data['user']['juju_username'],
                                         authorization.password,
-                                        auth_data['company']['name'])
+                                        comp)
                 abort(409, 'User {} is being added to the {} environment'.format(auth_data['user']['name'], auth_data['controller']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
@@ -442,7 +443,9 @@ def get_units_info(connection, application):
                            'public-ip': u['public-address'],
                            'private-ip': u['private-address'],
                            'series': u['series'],
-                           'ports': ports})
+                           'ports': ports,
+                           'state': u['workload-status']['current'],
+                           'message': u['workload-status']['message']})
         return result
     except KeyError:
         return []

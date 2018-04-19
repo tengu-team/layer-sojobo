@@ -20,7 +20,7 @@ import shutil
 import os
 import sys
 import traceback
-import ast
+import json
 import logging
 import yaml
 from juju.model import Model, BundleHandler
@@ -44,7 +44,8 @@ async def deploy_bundle(username, password, c_name, m_name, bundle):
 
         logger.info('Create the bundle in tmp dir')
         os.mkdir('{}/bundle'.format(dirpath))
-        bundle_dict = ast.literal_eval(bundle)
+        valid_bundle = bundle.replace("'", "\"")
+        bundle_dict = json.loads(valid_bundle)
         yaml.add_representer(str, quoted_presenter)
         with open('{}/bundle/bundle.yaml'.format(dirpath), 'w+') as outfile:
             yaml.dump(bundle_dict, outfile, default_flow_style=False)
