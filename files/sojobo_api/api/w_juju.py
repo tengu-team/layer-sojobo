@@ -103,12 +103,11 @@ def check_constraints(data):
 async def authenticate(api_key, authorization, auth_data, controller=None, model=None):
     error = errors.unauthorized()
     if api_key == settings.API_KEY:
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        else:
+            comp = None
         if not controller and not model:
-            print(auth_data)
-            if auth_data['company']:
-                comp = auth_data['company']['name']
-            else:
-                comp = None
             if check_if_admin(authorization, company=comp):
                 return True
             if len(get_all_controllers(company=comp)) == 0:
@@ -136,12 +135,14 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
                                                    authorization.password,
                                                    auth_data['controller']['ca_cert'])
                     return model_connection
+            elif check_if_admin(authorization, company=comp):
+                return True
             elif auth_data['controller']['state'] == 'ready':
                 await connect_to_random_controller(authorization, auth_data)
                 add_user_to_controllers(authorization.username,
                                         auth_data['user']['juju_username'],
                                         authorization.password,
-                                        auth_data['company']['name'])
+                                        comp)
                 abort(409, 'User {} is being added to the {} environment'.format(auth_data['user']['name'], auth_data['controller']['name']))
         except JujuAPIError:
             abort(error[0], error[1])
@@ -442,7 +443,9 @@ def get_units_info(connection, application):
                            'public-ip': u['public-address'],
                            'private-ip': u['private-address'],
                            'series': u['series'],
-                           'ports': ports})
+                           'ports': ports,
+                           'state': u['workload-status']['current'],
+                           'message': u['workload-status']['message']})
         return result
     except KeyError:
         return []
@@ -474,9 +477,11 @@ def create_model(authorization, m_name, cred_name, c_name, workspace_type=None):
         datastore.add_model_to_controller(c_name, m_key)
         datastore.set_model_state(m_key, 'accepted')
         datastore.set_model_access(m_key, authorization.username, 'admin')
+        if workspace_type:
+            datastore.add_edge_between_model_and_workspace_type(new_model["_key"], workspace_type)
         # Run the background script, this creates the model in JuJu.
         Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
-                c_name, m_key, m_name, authorization.username, authorization.password, cred_name])
+                c_name, m_key, m_name, authorization.username, authorization.password, cred_name, str(workspace_type)])
         return 202, "Model is being deployed."
     else:
         return errors.already_exists('model')

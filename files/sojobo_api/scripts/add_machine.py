@@ -45,7 +45,8 @@ async def add_machine(username, password, controller_name, model_key, series, co
                 params.placement = placement[0]
 
         if constraints != '':
-            cons = ast.literal_eval(constraints)
+            json_acceptable_string = constraints.replace("'", "\"")
+            cons = json.loads(json_acceptable_string)
             params.constraints = client.Value.from_json(cons)
 
         client_facade = client.ClientFacade.from_connection(model_connection.connection)
