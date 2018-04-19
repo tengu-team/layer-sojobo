@@ -1086,9 +1086,26 @@ def log_event(event_type, tags):
 ###############################################################################
 
 
-def add_monitoring(c_name, endpoint, cacert, m_name, uuid, juju_username, password, application):
+def add_monitoring_to_app(c_name, endpoint, cacert, m_name, uuid, juju_username, password, application):
     if os.path.isfile("{}/monitoring_settings.py".format(settings.SOJOBO_API_DIR)):
         from sojobo_api.api import w_monitoring_logic
         w_monitoring_logic.add_monitoring_to_app(c_name, endpoint, cacert,
                                                  m_name, uuid, juju_username,
                                                  password, application)
+
+
+def monitoring_enabled(model_info):
+    if os.path.isfile("{}/monitoring_settings.py".format(settings.SOJOBO_API_DIR)):
+        from sojobo_api.api import w_monitoring_logic
+        return w_monitoring_logic.monitoring_enabled(model_info)
+    else:
+        return False
+
+
+def update_monitoring_relations(c_name, endpoint, cacert, m_name, uuid,
+                                juju_username, password, applications_info):
+    if os.path.isfile("{}/monitoring_settings.py".format(settings.SOJOBO_API_DIR)):
+        from sojobo_api.api import w_monitoring_logic
+        w_monitoring_logic.update_monitoring_relations(c_name, endpoint, cacert,
+                                                       m_name, uuid, juju_username,
+                                                       password, applications_info)
