@@ -20,7 +20,7 @@ import zipfile
 import sys
 import traceback
 import logging
-import json
+from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 from flask import send_file, request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore, w_permissions
@@ -198,25 +198,21 @@ def create_model(controller):
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
         if juju.authorize(auth_data, '/controllers/controller/models', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
-            valid, model_name = juju.check_input(data['model'], "model")
             if juju.credential_exists(auth_data['user']['name'], data['credential']):
                 credential_name = data['credential']
-                if valid:
-                    ws_type = None
-                    if "workspace_type" in data:
-                        ws_type = data['workspace_type']
-                        if not datastore.workspace_type_exists(ws_type):
-                            code, response = errors.does_not_exist("workspace type {}".format(ws_type))
-                            return juju.create_response(code, response)
-                    code, response = juju.create_model(request.authorization,
-                                                       model_name,
-                                                       credential_name,
-                                                       controller,
-                                                       ws_type)
-                    LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
-                    return juju.create_response(code, response)
-                else:
-                    return juju.create_response(400, model_name)
+                ws_type = None
+                if "workspace_type" in data:
+                    ws_type = data['workspace_type']
+                    if not datastore.workspace_type_exists(ws_type):
+                        code, response = errors.does_not_exist("workspace type {}".format(ws_type))
+                        return juju.create_response(code, response)
+                code, response = juju.create_model(request.authorization,
+                                                   data['model'],
+                                                   credential_name,
+                                                   controller,
+                                                   ws_type)
+                LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
+                return juju.create_response(code, response)
             else:
                 return juju.create_response(400, 'Credential {} not found for user {}'.format(data['credential'], auth_data['user']['name']))
         else:
@@ -273,6 +269,7 @@ def get_models_info(controller):
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_info(controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => receiving call', controller, model)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [GET] => got connection info', controller, model)
@@ -305,6 +302,7 @@ def get_model_info(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['POST'])
 def add_bundle(controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => receiving call', controller, model)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
@@ -343,6 +341,7 @@ def add_bundle(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['DELETE'])
 def delete_model(controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => receiving call', controller, model)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -375,6 +374,7 @@ def delete_model(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['GET'])
 def get_applications_info(controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [GET] => receiving call', controller, model)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -408,6 +408,7 @@ def get_applications_info(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['POST'])
 def add_application(controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => receiving call', controller, model)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
@@ -448,6 +449,7 @@ def add_application(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['GET'])
 def get_application_info(controller, model, application):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [GET] => receiving call', controller, model, application)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -481,6 +483,7 @@ def get_application_info(controller, model, application):
 def expose_application(controller, model, application):
     data = request.json
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [PUT] => receiving call', controller, model, application)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -518,6 +521,7 @@ def expose_application(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>', methods=['DELETE'])
 def remove_app(controller, model, application):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s [DELETE] => receiving call', controller, model, application)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -550,6 +554,7 @@ def remove_app(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/config', methods=['GET'])
 def get_application_config(controller, model, application):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [GET] => receiving call', controller, model, application)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -582,6 +587,7 @@ def get_application_config(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/config', methods=['PUT'])
 def set_application_config(controller, model, application):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/config [PUT] => receiving call', controller, model, application)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
@@ -619,6 +625,7 @@ def set_application_config(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/machines', methods=['GET'])
 def get_machines_info(controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => receiving call', controller, model)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -647,6 +654,7 @@ def get_machines_info(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/machines', methods=['POST'])
 def add_machine(controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => receiving call', controller, model)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
@@ -693,6 +701,7 @@ def add_machine(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['GET'])
 def get_machine_info(controller, model, machine):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => receiving call', controller, model, machine)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -722,6 +731,7 @@ def get_machine_info(controller, model, machine):
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['DELETE'])
 def remove_machine(controller, model, machine):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => receiving call', controller, model, machine)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -755,6 +765,7 @@ def remove_machine(controller, model, machine):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['GET'])
 def get_units_info(controller, model, application):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [GET] => receiving call', controller, model, application)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -790,6 +801,7 @@ def get_units_info(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units', methods=['POST'])
 def add_unit(controller, model, application):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units [POST] => receiving call', controller, model, application)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
@@ -827,6 +839,7 @@ def add_unit(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['GET'])
 def get_unit_info(controller, model, application, unitnumber):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [GET] => receiving call', controller, model, application, unitnumber)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -867,6 +880,7 @@ def get_unit_info(controller, model, application, unitnumber):
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/units/<unitnumber>', methods=['DELETE'])
 def remove_unit(controller, model, application, unitnumber):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications/%s/units/%s [DELETE] => receiving call', controller, model, application, unitnumber)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
@@ -909,6 +923,7 @@ def remove_unit(controller, model, application, unitnumber):
 @TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['GET'])
 def get_relations_info(controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations [GET] => receiving call', controller, model)
         auth_data = juju.get_connection_info(request.authorization, controller, model)
         model_connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller, model)
@@ -935,6 +950,7 @@ def get_relations_info(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['PUT'])
 def add_relation(controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => receiving call', controller, model)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization, controller, model)
@@ -990,6 +1006,7 @@ def add_relation(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/relations/<application>', methods=['GET'])
 def get_relations(controller, model, application):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s [GET] => receiving call', controller, model, application)
         auth_data = juju.get_connection_info(request.authorization, controller, model)
         model_connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller, model)
@@ -1020,6 +1037,7 @@ def get_relations(controller, model, application):
 @TENGU.route('/controllers/<controller>/models/<model>/relations/<app1>/<app2>', methods=['DELETE'])
 def remove_relation(controller, model, app1, app2):
     try:
+        model = unquote(model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/relations/%s/%s [DELETE] => receiving call', controller, model, app1, app2)
         auth_data = juju.get_connection_info(request.authorization, controller, model)
         model_connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller, model)

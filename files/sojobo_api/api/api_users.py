@@ -18,10 +18,10 @@
 ###############################################################################
 import logging
 import sys
-
 import traceback
 import base64
 import hashlib
+from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint
 from sojobo_api.api import w_errors as errors, w_juju as juju
@@ -681,6 +681,7 @@ def grant_to_model(user, controller):
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_access(user, controller, model):
     try:
+        model = unquote(model)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => receiving call!', user, controller, model)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
