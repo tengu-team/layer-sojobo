@@ -193,7 +193,12 @@ def remove_user_m_access(username):
 def get_credentials(username):
     u_id = get_user_id(username)
     aql = 'LET u = DOCUMENT(@u_id) RETURN u.credentials'
-    return execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    output = execute_aql_query(aql, rawResults=True, u_id=u_id)[0]
+    creds_list = [o['key'] for o in output]
+    aql2 = ('FOR cred IN credentials '
+            'FILTER cred._key IN @creds_list '
+            'RETURN cred')
+    return execute_aql_query(aql2, rawResults=True, creds_list=creds_list)
 
 
 def get_credential_keys(username):
@@ -204,7 +209,7 @@ def get_credential_keys(username):
 
 def get_credential(username, cred_name):
     c_id = "credentials/{}".format(get_credential_id(username, cred_name))
-    aql ='LET u = DOCUMENT(@c_id) RETURN u'
+    aql = 'LET u = DOCUMENT(@c_id) RETURN u'
     return execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
 
 
@@ -234,7 +239,7 @@ def add_credential(username, cred):
     aql = 'INSERT @credential INTO credentials LET newCredential = NEW RETURN newCredential '
     output = execute_aql_query(aql, rawResults=True, credential=cred)[0]
     print(output)
-    update_user_credential(username, {'name': cred['name'], 'key': output['_key']})
+    update_user_credential(username, {'name': cred['name'], 'key': output['_key'], 'type': output['type']})
 
 
 def update_user_credential(username, cred):
