@@ -59,6 +59,7 @@ def create_arangodb_collections(sojobo_db):
     create_arangodb_collection(sojobo_db, "controllerAccess", edges=True)
     create_arangodb_collection(sojobo_db, "modelAccess", edges=True)
     create_arangodb_collection(sojobo_db, "modelType", edges=True)
+    create_arangodb_collection(sojobo_db, "bundleTypes")
 
 
 def has_collection(sojobo_db, collection_name):

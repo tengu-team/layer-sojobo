@@ -16,72 +16,138 @@
 from functools import wraps
 import requests
 import yaml
+import logging
+import sys
+import traceback
+from werkzeug.exceptions import HTTPException
+from sojobo_api.api.w_juju import execute_task
 from flask import request, Blueprint, abort
-from sojobo_api.api.w_juju import create_response
+from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore, w_permissions, w_bundles as bundles
 from sojobo_api import settings
 
 
 BUNDLES = Blueprint('bundles', __name__)
 REPO = settings.REPO_NAME
+LOGGER = logging.getLogger('api_bundles')
+LOGGER.setLevel(logging.DEBUG)
 
+@BUNDLES.before_app_first_request
+def initialize():
+    hdlr = logging.FileHandler('/opt/sojobo_api/log/api_bundles.log')
+    hdlr.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    hdlr.setFormatter(formatter)
+    LOGGER.addHandler(hdlr)
 
 def get():
     return BUNDLES
 
+@BUNDLES.route('/types', methods=['GET'])
+def get_all_bundles():
+    try:
+        LOGGER.info('/BUNDLES/types [GET] => receiving call')
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        LOGGER.info('/BUNDLES/types [GET] => Authenticated!')
+        if auth_data['company']:
+            company = auth_data['company']['name']
+        else:
+            company = None
+        if juju.authorize(auth_data, '/bundles/types', 'get'):
+            LOGGER.info('/BUNDLES/types [GET] => Authorized!')
+            types = bundles.get_all_bundles(company)
+            LOGGER.info('/BUNDLES/types [GET] => Succesfully retrieved all bundles!')
+            return juju.create_response(200, types)
+        else:
+            code, response = errors.no_permission()
+            LOGGER.info('/BUNDLES/types [GET] => No Permission to perform this action!')
+            return juju.create_response(code, response)
+    except KeyError:
+        code, response = errors.invalid_data()
+        error_log()
+        return juju.create_response(code, response)
+    except HTTPException:
+        raise
+    except Exception:
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
+        return juju.create_response(code, response)
 
-def authenticate(func):
-    @wraps(func)
-    def function(*args, **kwargs):
-        try:
-            if request.headers['api-key'] != settings.API_KEY:
-                abort(403, 'You do not have permission to use the API')
+
+@BUNDLES.route('/types', methods=['POST'])
+def determine_closest_type():
+    try:
+        LOGGER.info('/BUNDLES/typess [POST] => receiving call')
+        data = request.json
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        LOGGER.info('/BUNDLES/types [POST] => Authenticated!')
+        if juju.authorize(auth_data, '/bundles/types', 'post'):
+            LOGGER.info('/BUNDLES/types [POST] => Authorized!')
+            if 'applications' in data:
+                b_type = bundles.determine_closest_type(data['applications'])
+                if b_type:
+                    LOGGER.info('/BUNDLES/types [POST] => determined type: %s', b_type['name'])
+                    return juju.create_response(200, b_type)
+                else:
+                    LOGGER.info('/BUNDLES/types [POST] => no matching type found')
+                    return juju.create_response(404, 'Could not find a matching type.')
             else:
-                return func(*args, **kwargs)
-        except KeyError:
-            abort(400, 'The request does not have all the required data or the data is not in the right format.')
-    return function
+                return juju.create_response(400, 'The Body should contain an applications property.')
+        else:
+            LOGGER.error('/BUNDLES/types [POST] => No Permission to perform this action!')
+            code, response = errors.no_permission()
+            return juju.create_response(code, response)
+    except KeyError:
+        error_log()
+        return juju.create_response(errors.invalid_data()[0], errors.invalid_data()[1])
+    except HTTPException:
+        raise
+    except Exception:
+        ers = error_log()
+        return juju.create_response(errors.cmd_error(ers)[0], errors.cmd_error(ers)[1])
+
+@BUNDLES.route('/types', methods=['PUT'])
+def upload_types():
+    #TODO: at the moment only Tengu admin can perform this task. Will be changed
+    #      in the future to allow company_admins to upload company specific bundles as well
+    try:
+        LOGGER.info('/BUNDLES/types [PUT] => receiving call')
+        data = request.json
+        auth_data = juju.get_connection_info(request.authorization)
+        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        LOGGER.info('/BUNDLES/types [PUT] => Authenticated!')
+        if auth_data['company']:
+            company = auth_data['company']['name']
+        else:
+            company = None
+        if juju.check_if_admin(request.authorization): #, company):
+            if 'repositories' in data:
+                LOGGER.info('/BUNDLES/types [PUT] => Start uploading repositories')
+                types = bundles.upload_types(data['repositories'], company)
+                LOGGER.info('/BUNDLES/types [PUT] => Succesfully uploaded %s repositories', len(types))
+                return juju.create_response(200, types)
+            else:
+                return juju.create_response(400, 'The Body should contain a repositories property.')
+        else:
+            code, response = errors.no_permission()
+            LOGGER.info('/BUNDLES/types [PUT] => No Permission to perform this action!')
+            return juju.create_response(code, response)
+    except KeyError:
+        code, response = errors.invalid_data()
+        error_log()
+        return juju.create_response(code, response)
+    except HTTPException:
+        raise
+    except Exception:
+        ers = error_log()
+        code, response = errors.cmd_error(ers)
+        return juju.create_response(code, response)
 
 
-@BUNDLES.route('', methods=['GET'])
-@authenticate
-def get_bundles():
-    i = 1
-    res = requests.get('https://api.github.com/orgs/{}/repos?per_page=1000'.format(REPO))
-    data = []
-    while res.json() != [] and res.status_code == 200:
-        for b in res.json():
-            if b['name'].startswith("bundle"):
-                data.append({
-                    'name': b['name'],
-                    'description': b['description'],
-                    'json': get_json(b['name']),
-                    'logo': None
-                })
-        i += 1
-        res = requests.get('https://api.github.com/orgs/{}/repos?page={}'.format(REPO, i))
-    return create_response(200, data)
-
-
-@BUNDLES.route('/<bundle>', methods=['GET'])
-@authenticate
-def get_bundle(bundle):
-    res = requests.get('https://api.github.com/orgs/{}/repos?per_page=1000'.format(REPO))
-    if res.status_code == 200:
-        data = {
-            'name': res.json()['name'],
-            'description': res.json()['description'],
-            'json': get_json(res.json()['name']),
-            'logo': None
-        }
-        return create_response(200, data)
-    else:
-        abort(404, 'The bundle {}:{} could not be found'.format(REPO, bundle))
-
-
-def get_json(bundle):
-    res = requests.get('https://raw.githubusercontent.com/{}/{}/master/bundle.yaml'.format(REPO, bundle))
-    if res.status_code == 200:
-        res_dict = yaml.load(res.text)
-        return res_dict
-    else:
-        abort(404, 'The bundle {}:{} could not be found'.format(REPO, bundle))
+def error_log():
+    exc_type, exc_value, exc_traceback = sys.exc_info()
+    lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+    for l in lines:
+        LOGGER.error(l)
+    return lines
