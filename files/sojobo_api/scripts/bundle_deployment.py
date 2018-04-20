@@ -72,6 +72,20 @@ async def deploy_bundle(username, password, c_name, m_name, bundle):
                 for app_name in pending_apps
             ], loop=model.loop)
         logger.info('Bundle successfully deployed for %s:%s', c_name, m_name)
+
+
+        if juju.monitoring_enabled(auth_data["model"]):
+            logger.info('Updating monitoring relations for %s:%s', c_name, m_name)
+            applications_info = juju.get_applications_info(model)
+            endpoint = auth_data["controller"]["endpoints"][0]
+            cacert = auth_data["controller"]["ca_cert"]
+            uuid = auth_data["model"]["uuid"]
+            juju_username = auth_data["user"]["juju_username"]
+            juju.update_monitoring_relations(c_name, endpoint, cacert, m_name,
+                                             uuid, juju_username, password,
+                                             applications_info)
+
+
         await model.disconnect()
         logger.info('Successfully disconnected %s', m_name)
         shutil.rmtree(dirpath)

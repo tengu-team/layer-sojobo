@@ -477,8 +477,6 @@ def create_model(authorization, m_name, cred_name, c_name, workspace_type=None):
         # Create the model in ArangoDB. Add model key to controller and
         # set the model access level of the user.
         new_model = datastore.create_model(m_key, m_name, state='deploying')
-        # TODO: Maybe put these 3 datastore methods in one so you do not have
-        # to create a connection with ArangoDB each time.
         datastore.add_model_to_controller(c_name, m_key)
         datastore.set_model_state(m_key, 'accepted')
         datastore.set_model_access(m_key, authorization.username, 'admin')
@@ -486,7 +484,8 @@ def create_model(authorization, m_name, cred_name, c_name, workspace_type=None):
             datastore.add_edge_between_model_and_workspace_type(new_model["_key"], workspace_type)
         # Run the background script, this creates the model in JuJu.
         Popen(["python3", "{}/scripts/add_model.py".format(settings.SOJOBO_API_DIR),
-                c_name, m_key, m_name, authorization.username, authorization.password, cred_name, str(workspace_type)])
+                c_name, m_key, m_name, authorization.username,
+                authorization.password, cred_name, str(workspace_type)])
         return 202, "Model is being deployed."
     else:
         return errors.already_exists('model')
@@ -1090,3 +1089,32 @@ def log_event(event_type, tags):
         current_time = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
         from sojobo_api.api import w_events as events
         events.log_event(event_type, current_time, tags)
+
+###############################################################################
+#                                 MONITORING                                  #
+###############################################################################
+
+
+def add_monitoring_to_app(c_name, endpoint, cacert, m_name, uuid, juju_username, password, application):
+    if os.path.isfile("{}/monitoring_settings.py".format(settings.SOJOBO_API_DIR)):
+        from sojobo_api.api import w_monitoring_logic
+        w_monitoring_logic.add_monitoring_to_app(c_name, endpoint, cacert,
+                                                 m_name, uuid, juju_username,
+                                                 password, application)
+
+
+def monitoring_enabled(model_info):
+    if os.path.isfile("{}/monitoring_settings.py".format(settings.SOJOBO_API_DIR)):
+        from sojobo_api.api import w_monitoring_logic
+        return w_monitoring_logic.monitoring_enabled(model_info)
+    else:
+        return False
+
+
+def update_monitoring_relations(c_name, endpoint, cacert, m_name, uuid,
+                                juju_username, password, applications_info):
+    if os.path.isfile("{}/monitoring_settings.py".format(settings.SOJOBO_API_DIR)):
+        from sojobo_api.api import w_monitoring_logic
+        w_monitoring_logic.update_monitoring_relations(c_name, endpoint, cacert,
+                                                       m_name, uuid, juju_username,
+                                                       password, applications_info)

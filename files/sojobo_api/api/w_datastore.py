@@ -899,3 +899,12 @@ def get_all_bundle_types():
 def clear_bundle_types():
     aql = "FOR b IN bundleTypes REMOVE b IN bundleTypes"
     execute_aql_query(aql, rawResults=True)
+
+###############################################################################
+#                                 MONITORING                                  #
+###############################################################################
+
+
+def set_monitoring_state(m_key, state):
+    aql = "UPDATE {_key: @m_key, monitoring_state: @state} IN models"
+    execute_aql_query(aql, m_key=m_key, state=state)
