@@ -70,7 +70,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name, workspace_typ
         # Create A Model
         model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
         model_info = await model_facade.CreateModel(cloud, config, credential,
-                                                    m_name, owner,
+                                                    m_key, owner,
                                                     region)
         logger.info('%s -> Connected to model', m_name)
         # Connect to created Model
