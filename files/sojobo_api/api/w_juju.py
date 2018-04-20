@@ -172,7 +172,12 @@ async def connect_to_random_controller(authorization, auth_data):
             comp = auth_data['company']['name']
         ready_controllers = datastore.get_ready_controllers_with_access(authorization.username, company=comp)
         if len(ready_controllers) == 0:
-            abort(400,'Please wait untill your first environment is set up!')
+            read_cons_no_acc = datastore.get_ready_controllers_no_access(authorization.username, comp)
+            if len(read_cons_no_acc) > 0:
+                add_user_to_controllers(authorization.username, auth_data['user']['juju_username'], authorization.password, comp)
+                abort(409, 'User {} is being added to the remaining environments'.format(auth_data['user']['name']))
+            else:
+                abort(400, 'Please wait untill your first environment is set up!')
         else:
             con = ready_controllers[randint(0, len(ready_controllers) - 1)]
             controller_connection = Controller()
@@ -369,7 +374,7 @@ def get_controller_info(data):
 def construct_model_key(c_name, m_name):
     key_string = c_name + "_" + m_name
     # Must encode 'key_string' because base64 takes 8-bit binary byte data.
-    m_key = base64.b64encode(key_string.encode())
+    m_key = 'm{}'.format(base64.b64encode(key_string.encode()))
     # To return a string you must decode the binary data.
     return m_key.decode()
 
@@ -400,9 +405,9 @@ async def get_model_info(connection, data):
     machines = get_machines_info(connection)
     gui = get_gui_url(data)
     credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
-    return {'name': data['model']['name'], 'users': users,
-            'applications': applications, 'machines': 'machines', 'juju-gui-url' : gui,
-            'state': state, 'credentials' : credentials}
+    return {'name': data['model']['name'], 'users': users, 'uuid': data['model']['uuid'],
+            'applications': applications, 'machines': machines, 'juju-gui-url': gui,
+            'state': state, 'credentials': credentials}
 
 
 def get_ssh_keys_user(username):
@@ -545,7 +550,7 @@ def get_machine_info(connection, machine):
             result = {'name': machine, 'instance-id': 'Unknown', 'ip': 'Unknown', 'series': 'Unknown', 'containers': 'Unknown', 'hardware-characteristics' : 'unknown'}
             return result
         containers = []
-        if not 'lxd' in machine:
+        if 'lxd' not in machine:
             lxd = []
             for key in data.keys():
                 if key.startswith('{}/lxd'.format(machine)):
@@ -566,7 +571,7 @@ def get_machine_info(connection, machine):
 
 
 def get_machine_ip(machine_data):
-    mach_ips = {'internal_ip' : 'unknown', 'external_ip' : 'unknown'}
+    mach_ips = {'internal_ip': 'unknown', 'external_ip': 'unknown'}
     if machine_data['addresses'] is None:
         return mach_ips
     for machine in machine_data['addresses']:
@@ -576,12 +581,14 @@ def get_machine_ip(machine_data):
             mach_ips['internal_ip'] = machine['value']
     return mach_ips
 
+
 def add_machine(username, password, controller_name, model_key, series, constraints, spec):
     cons = '' if constraints is None else str(constraints)
     specifications = '' if spec is None else str(spec)
     serie = '' if series is None else str(series)
     Popen(["python3", "{}/scripts/add_machine.py".format(settings.SOJOBO_API_DIR), username,
            password, controller_name, model_key, serie, cons, specifications])
+
 
 def machine_exists(connection, machine):
     return machine in connection.state.state.get('machine', {}).keys()
@@ -758,7 +765,6 @@ def delete_user(username, company=None):
 
 def add_user_to_controllers(username, juju_username, password, company):
     controllers = datastore.get_ready_controllers_no_access(username, company)
-    print(controllers)
     for controller in controllers:
         c_name = controller['name']
         endpoint = controller["endpoints"][0]
