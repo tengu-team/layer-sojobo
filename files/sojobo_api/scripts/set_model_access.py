@@ -31,6 +31,7 @@ from juju.errors import JujuAPIError, JujuError
 async def set_model_acc(username, c_name, endpoint, cacert, m_key, uuid, access):
     try:
         user_info = datastore.get_user_info(username)
+        print(user_info)
         juju_username = user_info["juju_username"]
         ssh_keys = user_info["ssh_keys"]
 
@@ -73,7 +74,8 @@ async def set_model_acc(username, c_name, endpoint, cacert, m_key, uuid, access)
         for l in lines:
             logger.error(l)
     finally:
-        await juju.disconnect(controller_connection)
+        if 'controller_connection' in locals():
+            await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':

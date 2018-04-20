@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
-import ast
+import json
 import sys
 import traceback
 import logging
@@ -36,7 +36,9 @@ async def update_ssh_keys_all_models(ssh_keys, username):
         user_info = datastore.get_user_info(username)
         juju_username = user_info["juju_username"]
         current_keys = user_info["ssh_keys"]
-        new_keys = ast.literal_eval(ssh_keys)
+        json_acceptable_string = ssh_keys.replace("'", "\"")
+        new_keys = json.loads(json_acceptable_string)
+
 
         for controller in user_info["controllers"]:
             endpoint = controller["endpoints"][0]
@@ -74,7 +76,6 @@ async def update_ssh_keys_all_models(ssh_keys, username):
         logger.info('Updating ssh keys in database...')
         datastore.update_ssh_keys(username, new_keys)
         logger.info('Updated SSH keys!')
-
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
@@ -85,7 +86,7 @@ async def update_ssh_keys_all_models(ssh_keys, username):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('remove_ssh_keys')
+    logger = logging.getLogger('update_ssh_keys_all_models')
     hdlr = logging.FileHandler('{}/log/update_ssh_keys_all_models.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)

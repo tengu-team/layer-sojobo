@@ -96,7 +96,8 @@ async def set_controller_acc(c_name, username, acl, endpoint, cacert, juju_usern
         for l in lines:
             logger.error(l)
     finally:
-        await juju.disconnect(controller_connection)
+        if 'controller_connection' in locals():
+            await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':

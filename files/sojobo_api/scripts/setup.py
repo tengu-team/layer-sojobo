@@ -16,7 +16,7 @@
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import logging
 import sys
-import ast
+import json
 import requests
 import subprocess as sp
 import pyArango.connection as pyArango
@@ -59,6 +59,7 @@ def create_arangodb_collections(sojobo_db):
     create_arangodb_collection(sojobo_db, "controllerAccess", edges=True)
     create_arangodb_collection(sojobo_db, "modelAccess", edges=True)
     create_arangodb_collection(sojobo_db, "modelType", edges=True)
+    create_arangodb_collection(sojobo_db, "bundleTypes")
 
 
 def has_collection(sojobo_db, collection_name):
@@ -73,11 +74,14 @@ def setup(cred, c_type, region, host, port, arango_username, arango_password):
     datastore.create_workspace_type("A", 0.0010995)
     datastore.create_workspace_type("B", 0.0022569)
     datastore.create_workspace_type("C", 0.0068866)
+    valid_cred = cred.replace("'", "\"")
+    credential = json.loads(valid_cred)
     credential = {'name': 'default',
                   'type': c_type,
-                  'credential': ast.literal_eval(cred)}
+                  'credential': credential}
     if not datastore.user_exists(username):
         datastore.create_user(username, username)
+        datastore.set_user_state(username, 'ready')
     datastore.add_credential(username, credential)
     datastore.set_credential_ready(username, 'default')
     mydata = {

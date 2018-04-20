@@ -74,3 +74,4 @@ def get_controllers():
 for api in get_apis():
     module = import_module('sojobo_api.api.{}'.format(api))
     APP.register_blueprint(getattr(module, 'get')(), url_prefix='/{}'.format(api.split('_')[1]))
+    APP.register_blueprint(getattr(module, 'get')(), url_prefix='/{}'.format(api.split('_')[1]))
