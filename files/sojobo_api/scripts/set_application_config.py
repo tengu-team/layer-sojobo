@@ -18,7 +18,7 @@ import asyncio
 import sys
 import traceback
 import logging
-import ast
+import json
 from juju.client import client
 from juju.model import Model
 sys.path.append('/opt')
@@ -31,7 +31,8 @@ async def set_application_config(username, password, c_name, m_key, app_name, co
 
         auth_data = datastore.get_model_connection_info(username, c_name, m_key)
         model_connection = Model()
-        config = ast.literal_eval(conf)
+        json_acceptable_string = conf.replace("'", "\"")
+        config = json.loads(json_acceptable_string)
         logger.info('Config : %s for application %s', config, app_name)
         logger.info('Setting up Model connection for %s:%s', c_name, auth_data['model']['name'])
         await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])

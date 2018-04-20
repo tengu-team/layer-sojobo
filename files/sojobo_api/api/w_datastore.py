@@ -218,6 +218,17 @@ def get_credential_id(username, cred_name):
     return output['key']
 
 
+def get_cloud_credentials(type, username):
+    u_id = get_user_id(username)
+    usercreds = [u['name'] for u in get_credentials(username)]
+    aql = ('LET u = DOCUMENT(@u_id) '
+           'FOR cred in credentials '
+           'FILTER cred.type == @type '
+           'FILTER cred.name IN @usercreds '
+           'return cred')
+    return execute_aql_query(aql, rawResults=True, u_id=u_id, type=type, usercreds=usercreds)
+
+
 def add_credential(username, cred):
     cred['state'] = 'accepted'
     aql = 'INSERT @credential INTO credentials LET newCredential = NEW RETURN newCredential '
