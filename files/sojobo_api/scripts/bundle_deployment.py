@@ -44,8 +44,7 @@ async def deploy_bundle(username, password, c_name, m_name, bundle):
 
         logger.info('Create the bundle in tmp dir')
         os.mkdir('{}/bundle'.format(dirpath))
-        valid_bundle = bundle.replace("'", "\"")
-        bundle_dict = json.loads(valid_bundle)
+        bundle_dict = json.loads(bundle)
         yaml.add_representer(str, quoted_presenter)
         with open('{}/bundle/bundle.yaml'.format(dirpath), 'w+') as outfile:
             yaml.dump(bundle_dict, outfile, default_flow_style=False)
@@ -54,7 +53,8 @@ async def deploy_bundle(username, password, c_name, m_name, bundle):
         logger.info('Tmp file created and ready to be deployed! %s', outfile)
         logger.info('Setting up Modelconnection for model: %s', m_name)
         model = Model()
-        await model.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], username, password, auth_data['controller']['ca_cert'])
+        juju_username = auth_data["user"]["juju_username"]
+        await model.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], juju_username, password, auth_data['controller']['ca_cert'])
         logger.info('Deploying bundle from %s/bundle', dirpath)
 
         handler = BundleHandler(model)
@@ -80,7 +80,6 @@ async def deploy_bundle(username, password, c_name, m_name, bundle):
             endpoint = auth_data["controller"]["endpoints"][0]
             cacert = auth_data["controller"]["ca_cert"]
             uuid = auth_data["model"]["uuid"]
-            juju_username = auth_data["user"]["juju_username"]
             juju.update_monitoring_relations(c_name, endpoint, cacert, m_name,
                                              uuid, juju_username, password,
                                              applications_info)

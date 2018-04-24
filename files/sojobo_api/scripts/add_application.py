@@ -64,8 +64,7 @@ async def add_application(c_name, m_key, username, password, units, machine, con
             application = application.split("/")[1]
 
         if not config == '':
-            valid_conf = config.replace("'", "\"")
-            conf_dict = json.loads(valid_conf)
+            conf_dict = json.loads(config)
             conf = {k: str(v) for k, v in conf_dict.items()}
         else:
             conf = {}

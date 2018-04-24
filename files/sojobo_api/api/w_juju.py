@@ -615,7 +615,7 @@ def app_exists(connection, app_name):
 
 def add_bundle(username, password, c_name, m_name, bundle):
     Popen(["python3", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR),
-           username, password, c_name, m_name, str(bundle)])
+           username, password, c_name, m_name, str(json.dumps(bundle))])
 
 
 def deploy_app(connection, controller, modelkey, username, password, controller_type,
@@ -630,7 +630,7 @@ def deploy_app(connection, controller, modelkey, username, password, controller_
         target = '' if machine is None else str(machine)
         Popen(["python3", "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
                controller, modelkey, username, password, units, target,
-               config, application, serie])
+               str(json.dumps(config)), application, serie])
     else:
         error = errors.invalid_option(series)
         abort(error[0], error[1])
@@ -731,7 +731,7 @@ def set_application_config(connection, username, password, controller_name, mode
     for con in config:
         config[con] = str(config[con])
     Popen(["python3", "{}/scripts/set_application_config.py".format(settings.SOJOBO_API_DIR),
-           username, password, controller_name, model_key, application, str(config)])
+           username, password, controller_name, model_key, application, str(json.dumps(config))])
 
 
 async def get_application_config(connection, application):
