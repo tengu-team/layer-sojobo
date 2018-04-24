@@ -375,7 +375,7 @@ def get_controller_info(data):
 def construct_model_key(c_name, m_name):
     key_string = c_name + "_" + m_name
     # Must encode 'key_string' because base64 takes 8-bit binary byte data.
-    m_key = 'm{}'.format(hashlib.md5(key_string.encode('utf')).hexdigest())
+    m_key = 'm{}'.format(hashlib.md5(key_string.encode('utf')).hexdigest()[:-1])
     # To return a string you must decode the binary data.
     return m_key
 
