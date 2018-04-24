@@ -278,7 +278,8 @@ def get_connection_info(authorization, c_name=None, m_name=None):
         else:
             return datastore.get_user_connection_info(authorization.username)
     else:
-        abort(errors.unauthorized)
+        error = errors.unauthorized()
+        abort(error[0], error[1])
 
 
 async def disconnect(connection):
