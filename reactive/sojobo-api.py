@@ -127,6 +127,8 @@ def connect_to_arango(arango):
 @when('api.setup')
 @when_not('api.cloud_provided')
 def check_cloud():
+    print("Cloud config")
+    print(config()['cloud-type'])
     if config()['cloud-type'] == "":
         status_set('blocked', 'Please provide a cloud-type (e.g. cloud-type= "google") to setup your environment')
     elif not os.path.isfile("{}/controllers/controller_{}.py".format(API_DIR, config()['cloud-type'] )):

@@ -62,6 +62,14 @@ def create_arangodb_collections(sojobo_db):
     create_arangodb_collection(sojobo_db, "bundleTypes")
 
 
+def create_workspace_types():
+    """Creates workspace types with their prices per second in ArangoDB."""
+    types = {"A": 0.0010995, "B": 0.0022569, "C": 0.0068866}
+    for ws_type, price in types.items():
+        if not datastore.workspace_type_exists(ws_type):
+            datastore.create_workspace_type(ws_type, price)
+
+
 def has_collection(sojobo_db, collection_name):
     return collection_name in sojobo_db.collections
 
@@ -71,9 +79,7 @@ def setup(cred, c_type, region, host, port, arango_username, arango_password):
     username = settings.JUJU_ADMIN_USER
     db = create_arangodb_database(con)
     create_arangodb_collections(db)
-    datastore.create_workspace_type("A", 0.0010995)
-    datastore.create_workspace_type("B", 0.0022569)
-    datastore.create_workspace_type("C", 0.0068866)
+    create_workspace_types()
     valid_cred = cred.replace("'", "\"")
     credential = json.loads(valid_cred)
     credential = {'name': 'default',
