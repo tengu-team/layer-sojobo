@@ -193,26 +193,29 @@ def create_model(controller):
         LOGGER.info('/TENGU/controllers/%s/models [POST] => receiving call', controller)
         data = request.json
         auth_data = juju.get_connection_info(request.authorization, c_name=controller)
-        print(auth_data)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller)
         LOGGER.info('/TENGU/controllers/%s/models [POST] => Authenticated!', controller)
         if juju.authorize(auth_data, '/controllers/controller/models', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
             if juju.credential_exists(auth_data['user']['name'], data['credential']):
-                credential_name = data['credential']
-                ws_type = None
-                if "workspace_type" in data:
-                    ws_type = data['workspace_type']
-                    if not datastore.workspace_type_exists(ws_type):
-                        code, response = errors.does_not_exist("workspace type {}".format(ws_type))
-                        return juju.create_response(code, response)
-                code, response = juju.create_model(request.authorization,
-                                                   data['model'],
-                                                   credential_name,
-                                                   controller,
-                                                   ws_type)
-                LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
-                return juju.create_response(code, response)
+                credential = juju.get_credential(auth_data['user']['name'], data['credential'])
+                if credential["type"] == auth_data['controller']["type"]:
+                    credential_name = data['credential']
+                    ws_type = None
+                    if "workspace_type" in data:
+                        ws_type = data['workspace_type']
+                        if not datastore.workspace_type_exists(ws_type):
+                            code, response = errors.does_not_exist("workspace type {}".format(ws_type))
+                            return juju.create_response(code, response)
+                    code, response = juju.create_model(request.authorization,
+                                                       data['model'],
+                                                       credential_name,
+                                                       controller,
+                                                       ws_type)
+                    LOGGER.info('/TENGU/controllers/%s/models [POST] => Creating model, check add_model.log for more details', controller)
+                    return juju.create_response(code, response)
+                else:
+                    return juju.create_response(400, 'Credential {} not compatible with controller {}'.format(data['credential'], auth_data['controller']['name']))
             else:
                 return juju.create_response(400, 'Credential {} not found for user {}'.format(data['credential'], auth_data['user']['name']))
         else:
