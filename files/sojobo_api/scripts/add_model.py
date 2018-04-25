@@ -116,18 +116,22 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name, workspace_typ
                         key_facade.AddKeys([key], u['name'])
                     except (JujuAPIError, JujuError):
                         pass
+
         # TODO: Default created models ("default" and "controller") should not
         # be logged.
-        # TODO: Company should be logged.
-        if workspace_type == "None":
+        if auth_data["company"]:
             juju.log_event('model.create',
                            {'uuid': model_info.uuid,
-                            'name': m_name})
+                            'name': m_name,
+                            'type': workspace_type,
+                            'company': auth_data["company"]["name"]})
         else:
             juju.log_event('model.create',
                            {'uuid': model_info.uuid,
                             'name': m_name,
-                            'type': workspace_type})
+                            'type': workspace_type,
+                            'company': None})
+                            
         logger.info('%s -> succesfully deployed model', m_name)
         await model.disconnect()
         await controller_connection.disconnect()

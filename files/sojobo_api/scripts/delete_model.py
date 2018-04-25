@@ -28,7 +28,6 @@ from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
 
-
 async def delete_model(c_name, m_name, m_key, usr, pwd):
     try:
         # Get required information from database
@@ -44,19 +43,27 @@ async def delete_model(c_name, m_name, m_key, usr, pwd):
         model_facade = client.ModelManagerFacade.from_connection(controller_connection.connection)
         await model_facade.DestroyModels([client.Entity(tag.model(auth_data['model']['uuid']))])
 
-        # Destroy modle from datastore
+        # Destroy model in datastore
         datastore.delete_model(c_name, m_key)
         await controller_connection.disconnect()
-        juju.log_event('model.delete',
-                       {'uuid': auth_data['model']['uuid'],
-                        'name': m_name})
+
+        if auth_data["company"]:
+            juju.log_event('model.delete',
+                           {'uuid': auth_data['model']['uuid'],
+                            'name': m_name,
+                            'company': auth_data["company"]["name"]})
+        else:
+            juju.log_event('model.delete',
+                           {'uuid': auth_data['model']['uuid'],
+                            'name': m_name,
+                            'company': None})
+
         logger.info('%s -> succesfully Destroyed model', m_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
-        #datastore.set_model_state(m_key, 'deleting with error: {}'.format(lines))
     finally:
         if 'controller_connection' in locals():
             await juju.disconnect(controller_connection)
@@ -76,5 +83,5 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
     loop.run_until_complete(delete_model(sys.argv[1], sys.argv[2], sys.argv[3],
-                                             sys.argv[4], sys.argv[5]))
+                                         sys.argv[4], sys.argv[5]))
     loop.close()

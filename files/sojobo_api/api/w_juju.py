@@ -268,6 +268,7 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
         return permissions.superuser_authorize(connection_info["user"]["name"],
                                                resource_user)
 
+
 def get_connection_info(authorization, c_name=None, m_name=None):
     if authorization:
         if c_name and m_name:
@@ -477,7 +478,7 @@ def create_model(authorization, m_name, cred_name, c_name, workspace_type=None):
     if not datastore.model_exists(m_key):
         # Create the model in ArangoDB. Add model key to controller and
         # set the model access level of the user.
-        new_model = datastore.create_model(m_key, m_name, state='deploying')
+        new_model = datastore.create_model(m_key, m_name, state='deploying')[0]
         datastore.add_model_to_controller(c_name, m_key)
         datastore.set_model_state(m_key, 'accepted')
         datastore.set_model_access(m_key, authorization.username, 'admin')
