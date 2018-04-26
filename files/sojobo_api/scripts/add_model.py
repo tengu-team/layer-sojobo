@@ -131,7 +131,7 @@ async def create_model(c_name, m_key, m_name, usr, pwd, cred_name, workspace_typ
                             'name': m_name,
                             'type': workspace_type,
                             'company': None})
-                            
+
         logger.info('%s -> succesfully deployed model', m_name)
         await model.disconnect()
         await controller_connection.disconnect()

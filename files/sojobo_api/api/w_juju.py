@@ -204,7 +204,7 @@ def check_user_state(auth_data):
 def check_controller_state(auth_data, authorization):
     if auth_data['controller']:
         if auth_data['controller']['state'] != 'ready':
-            abort(403, "The Environment is not ready yet. Please wait untill the Environment is created!")
+            abort(409, "The Environment is not ready yet. Please wait untill the Environment is created!")
     elif check_if_admin(authorization):
         abort(404, 'The Environment does not exist')
     else:
@@ -213,14 +213,14 @@ def check_controller_state(auth_data, authorization):
 
 
 def check_model_state(auth_data):
-    if auth_data['model']:
+    if auth_data['model'] and auth_data['m_access']:
         state = auth_data['model']['state']
         if state == 'accepted':
-            abort(403, "The Workspace is not ready yet. Please wait untill the workspace is created!")
+            abort(409, "The Workspace is not ready yet. Please wait untill the workspace is created!")
         elif state == 'deleting':
-            abort(403, "The Workspace is being removed!")
-        elif state.startswith('error'):
-            abort(403, "Model in error state => {}".format(state))
+            abort(409, "The Workspace is being removed!")
+        elif state != 'ready':
+            abort(409, "Model in error state => {}".format(state))
     elif auth_data['c_access'] in ['superuser', 'add_model', 'admin']:
         abort(404, 'The Workspace does not exist')
     else:
