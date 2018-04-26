@@ -572,10 +572,14 @@ def grant_to_controller(user, controller):
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authenticated!', user, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authorized!', user, controller)
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        else:
+            comp = None
         if juju.authorize(auth_data, '/users/user/controllers/controller', 'put'):
             if juju.user_exists(user):
                 if request.json['access'] and juju.c_access_exists(request.json['access'].lower()):
-                    juju.grant_user_to_controller(controller, user, request.json['access'].lower())
+                    juju.grant_user_to_controller(controller, user, request.json['access'].lower(), comp)
                     LOGGER.info('/USERS/%s/controllers/%s [PUT] => Changing user access, check set_controller_access.log for more information!', user, controller)
                     code, response = 202, 'The user\'s access is being changed'
                 else:
@@ -653,9 +657,13 @@ def grant_to_model(user, controller):
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authenticated!', user, controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authorized!', user, controller)
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        else:
+            comp = None
         if juju.authorize(auth_data, '/users/user/controllers/controller/models', 'put'):
             if juju.user_exists(user):
-                juju.set_models_access(user, controller, models_access_levels)
+                juju.set_models_access(user, controller, models_access_levels, comp)
                 LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Setting model access, check set_model_access.log for more information!', user, controller)
                 code, response = 202, 'The model access is being changed'
             else:

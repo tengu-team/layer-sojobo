@@ -568,23 +568,25 @@ def get_machine_ip(machine_data):
     return mach_ips
 
 
-def add_machine(username, password, controller_name, model_key, series, constraints, spec):
+def add_machine(username, password, controller_name, model_key, series, constraints, spec, company):
     cons = '' if constraints is None else str(constraints)
     specifications = '' if spec is None else str(spec)
     serie = '' if series is None else str(series)
+    c_key = construct_controller_key(controller_name, company)
     Popen(["python3", "{}/scripts/add_machine.py".format(settings.SOJOBO_API_DIR), username,
-           password, controller_name, model_key, serie, cons, specifications])
+           password, c_key, model_key, serie, cons, specifications])
 
 
 def machine_exists(connection, machine):
     return machine in connection.state.state.get('machine', {}).keys()
 
 
-def remove_machine(connection, username, password, controller_name, model_key, machine):
+def remove_machine(connection, username, password, controller_name, model_key, machine, company):
     if not machine_exists(connection, machine):
         abort(404, errors.does_not_exist('machine')[1])
+    c_key = construct_controller_key(controller_name, company)
     Popen(["python3", "{}/scripts/remove_machine.py".format(settings.SOJOBO_API_DIR), username,
-           password, controller_name, model_key, machine])
+           password, c_key, model_key, machine])
 
 
 #####################################################################################
@@ -600,12 +602,14 @@ def app_exists(connection, app_name):
 
 
 def add_bundle(username, password, c_name, m_name, bundle, company):
+    c_key = construct_controller_key(c_name, company)
     Popen(["python3", "{}/scripts/bundle_deployment.py".format(settings.SOJOBO_API_DIR),
-           username, password, c_name, m_name, str(json.dumps(bundle))])
+           username, password, c_key, m_name, str(json.dumps(bundle))])
 
 
 def deploy_app(connection, controller, modelkey, username, password, controller_type,
-                     units, config, machine, application, series):
+                     units, config, machine, application, series, company):
+    c_key = construct_controller_key(controller, company)
     if app_exists(connection, application):
         abort(403, 'Application already exists!')
     if(cloud_supports_series(controller_type, series)):
@@ -615,7 +619,7 @@ def deploy_app(connection, controller, modelkey, username, password, controller_
         serie = '' if series is None else str(series)
         target = '' if machine is None else str(machine)
         Popen(["python3", "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
-               controller, modelkey, username, password, units, target,
+               c_key, modelkey, username, password, units, target,
                str(json.dumps(config)), application, serie])
     else:
         error = errors.invalid_option(series)
@@ -653,13 +657,12 @@ def get_application_entity(connection, application):
             return app[1]
 
 
-
-def remove_app(connection, application, username, password, controller, model_key):
+def remove_app(connection, application, username, password, controller, model_key, company):
+    c_key = construct_controller_key(controller, company)
     if not app_exists(connection, application):
         abort(404, 'The application does not exist!')
     Popen(["python3", "{}/scripts/remove_application.py".format(settings.SOJOBO_API_DIR), username,
-           password, controller, model_key, application])
-
+           password, c_key, model_key, application])
 
 
 def get_application_info(connection, application):
@@ -677,14 +680,16 @@ def get_unit_info(connection, application, unitnumber):
     return {}
 
 
-def add_unit(username, password, controller, mod_key, app_name, amount, target):
+def add_unit(username, password, controller, mod_key, app_name, amount, target, company):
+    c_key = construct_controller_key(controller, company)
     Popen(["python3", "{}/scripts/add_unit.py".format(settings.SOJOBO_API_DIR), username,
-           password, controller, mod_key, app_name, str(amount), target])
+           password, c_key, mod_key, app_name, str(amount), target])
 
 
-def remove_unit(username, password, controller, mod_key, unit_name):
+def remove_unit(username, password, controller, mod_key, unit_name, company):
+    c_key = construct_controller_key(controller, company)
     Popen(["python3", "{}/scripts/remove_unit.py".format(settings.SOJOBO_API_DIR), username,
-           password, controller, mod_key, unit_name])
+           password, c_key, mod_key, unit_name])
 
 
 def get_unit_ports(unit):
@@ -699,25 +704,28 @@ def get_relations_info(connection):
     return [{'name': a['name'], 'relations': a['relations']} for a in data]
 
 
-def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, relation1, relation2):
+def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, relation1, relation2, company):
+    c_key = construct_controller_key(c_name, company)
     Popen(["python3", "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
-           c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
+           c_key, endpoint, cacert,  m_name, uuid, juju_username, password,
            relation1, relation2])
 
 
-def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, app1, app2):
+def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, app1, app2, company):
+    c_key = construct_controller_key(c_name, company)
     Popen(["python3", "{}/scripts/remove_relation.py".format(settings.SOJOBO_API_DIR),
-           c_name, endpoint, cacert,  m_name, uuid, juju_username, password,
+           c_key, endpoint, cacert,  m_name, uuid, juju_username, password,
            app1, app2])
 
 
-def set_application_config(connection, username, password, controller_name, model_key, application, config):
+def set_application_config(connection, username, password, controller_name, model_key, application, config, company):
+    c_key = construct_controller_key(controller_name, company)
     if not app_exists(connection, application):
         abort(404, 'The application does not exist!')
     for con in config:
         config[con] = str(config[con])
     Popen(["python3", "{}/scripts/set_application_config.py".format(settings.SOJOBO_API_DIR),
-           username, password, controller_name, model_key, application, str(json.dumps(config))])
+           username, password, c_key, model_key, application, str(json.dumps(config))])
 
 
 async def get_application_config(connection, application):
@@ -746,13 +754,13 @@ def delete_user(username, company=None):
     controllers = datastore.get_ready_controllers(company)
     for controller in controllers:
         Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR),
-        username, controller['name']])
+        username, controller['_key']])
 
 
 def add_user_to_controllers(username, juju_username, password, company):
     controllers = datastore.get_ready_controllers_no_access(username, company)
     for controller in controllers:
-        c_name = controller['name']
+        c_name = controller['_key']
         endpoint = controller["endpoints"][0]
         cacert = controller["ca_cert"]
         Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR),
@@ -774,7 +782,7 @@ def change_user_password(username, password):
                           Please wait a few minutes before you try again.""".format(username))
 
     for controller in user["controllers"]:
-        c_name = controller["name"]
+        c_name = controller["_key"]
         endpoint = controller['endpoints'][0]
         ca_cert = controller['ca_cert']
         Popen(["python3", "{}/scripts/change_password.py".format(settings.SOJOBO_API_DIR),
@@ -869,21 +877,23 @@ def credential_exists(user, credential):
     return False
 
 
-def grant_user_to_controller(c_name, username, access):
-    controller_ds = datastore.get_controller(c_name)
+def grant_user_to_controller(c_name, username, access, company):
+    c_key = construct_controller_key(c_name, company)
+    controller_ds = datastore.get_controller(c_key)
     user_ds = datastore.get_user(username)
     endpoint = controller_ds['endpoints'][0]
     cacert= controller_ds['ca_cert']
     juju_username = user_ds["juju_username"]
     Popen(["python3", "{}/scripts/set_controller_access.py".format(settings.SOJOBO_API_DIR),
-           c_name, username, access, endpoint, cacert, juju_username])
+           c_key, username, access, endpoint, cacert, juju_username])
 
 
-def set_models_access(username, c_name, models_access):
+def set_models_access(username, c_name, models_access, company):
     # TODO: If time, reduce datastore calls.
+    c_key = construct_controller_key(c_name, company)
     for model in models_access:
         m_key = construct_model_key(c_name, model['name'])
-        model_info = datastore.get_model_connection_info(username, c_name, m_key)
+        model_info = datastore.get_model_connection_info(username, c_key, m_key)
         uuid = model_info["model"]["uuid"]
         endpoint = model_info["controller"]["endpoints"][0]
         cacert = model_info["controller"]["ca_cert"]
@@ -893,7 +903,7 @@ def set_models_access(username, c_name, models_access):
             else:
                 Popen(["python3",
                        "{}/scripts/set_model_access.py".format(settings.SOJOBO_API_DIR),
-                       username, c_name, endpoint, cacert, m_key, uuid, model["access"]])
+                       username, c_key, endpoint, cacert, m_key, uuid, model["access"]])
         else:
             abort(404, 'Model {} not found'.format(mod['name']))
 
@@ -940,7 +950,7 @@ def get_controllers_access(usr):
 
 def get_ucontroller_access(controller, username):
     if controller:
-        return datastore.get_controller_and_access(controller['name'], username)[0]
+        return datastore.get_controller_and_access(controller['_key'], username)[0]
     else:
         abort(404, 'The controller does not exist')
 
