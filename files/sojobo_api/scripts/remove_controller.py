@@ -38,6 +38,7 @@ def remove_controller(name, c_type):
         for l in lines:
             logger.error(l)
 
+
 if __name__ == '__main__':
     logger = logging.getLogger('remove-controller')
     hdlr = logging.FileHandler('{}/log/remove_controller.log'.format(settings.SOJOBO_API_DIR))

@@ -531,13 +531,13 @@ def get_controllers_access(user):
 def get_ucontroller_access(user, controller):
     try:
         LOGGER.info('/USERS/%s/controllers/%s [GET] => receiving call', user, controller)
-        auth_data = juju.get_connection_info(request.authorization)
+        auth_data = juju.get_connection_info(request.authorization, c_name=controller)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s [GET] => Authenticated!', user, controller)
         if juju.authorize(auth_data, '/users/user/controllers/controller', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 LOGGER.info('/USERS/%s/controllers/%s [GET] => Authorized!', user, controller)
-                code, response = 200, juju.get_ucontroller_access(controller, user)
+                code, response = 200, juju.get_ucontroller_access(auth_data['controller'], user)
                 LOGGER.info('/USERS/%s/controllers/%s [GET] => Succesfully retrieved controller access!', user, controller)
             else:
                 code, response = errors.does_not_exist('user')
@@ -687,9 +687,13 @@ def get_model_access(user, controller, model):
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authenticated!', user, controller, model)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authorized!', user, controller, model)
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        else:
+            comp = None
         if juju.authorize(auth_data, '/users/user/controllers/controller/models/model', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
-                access = juju.get_model_access(model, controller, user)
+                access = juju.get_model_access(model, controller, user, comp)
                 code, response = 200, {'access' : access}
                 LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Succesfully retrieved model access!', user, controller, model)
             else:

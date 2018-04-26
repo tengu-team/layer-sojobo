@@ -275,9 +275,9 @@ def remove_credential(username, cred_name):
 ###############################################################################
 #                           CONTROLLER FUNCTIONS                              #
 ###############################################################################
-def create_controller(controller_name, c_type, region, cred_name):
+def create_controller(juju_cname, controller_name, c_type, region, cred_name):
     controller = {
-        "_key": controller_name,
+        "_key": juju_cname,
         "name": controller_name,
         "state": "accepted",
         "type": c_type,
@@ -809,6 +809,8 @@ def upgrade_to_company_admin(company, username):
            "INSERT { _from: @c_id, _to: @u_id, is_admin: @is_admin}"
            "UPDATE { is_admin : @is_admin } in companyAccess")
     execute_aql_query(aql, u_id=u_id, c_id=c_id, is_admin=True)
+
+
 ###############################################################################
 #                          CONNECTION FUNCTIONS                               #
 ###############################################################################
