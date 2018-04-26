@@ -252,21 +252,25 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
 
     # Admin has authorization in every situation.
     if connection_info["user"]["name"] == settings.JUJU_ADMIN_USER:
-        print('Authzd')
         return True
     elif self_user == connection_info["user"]["name"]:
         return True
     elif connection_info['company']:
-        return connection_info['company']['is_admin']
-    elif "m_access" in connection_info:
-        return permissions.m_authorize(connection_info, resource, method)
-    elif "c_access" in connection_info:
-        return permissions.c_authorize(connection_info, resource, method)
-    # If no 'm_access' or 'c_access' is found in the connection info then there will
-    # only be user info.
-    elif "user" in connection_info and resource_user:
-        return permissions.superuser_authorize(connection_info["user"]["name"],
-                                               resource_user)
+        if connection_info['company']['is_admin']:
+            return True
+        elif "m_access" in connection_info:
+            return permissions.m_authorize(connection_info, resource, method)
+        elif "c_access" in connection_info:
+            return permissions.c_authorize(connection_info, resource, method)
+        # If no 'm_access' or 'c_access' is found in the connection info then there will
+        # only be user info.
+        elif "user" in connection_info and resource_user:
+            return permissions.superuser_authorize(connection_info["user"]["name"],
+                                                   resource_user)
+        else:
+            return False
+    else:
+        return False
 
 
 def get_connection_info(authorization, c_name=None, m_name=None):

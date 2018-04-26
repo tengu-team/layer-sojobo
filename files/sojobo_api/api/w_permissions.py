@@ -130,7 +130,7 @@ permissions = {
 			"c_access": ["admin", "company_admin", "superuser"]
 		},
 		"put": {
-			"c_access": ["admin", "company_admin", "superuser"]
+			"c_access": ["admin", "company_admin"]
 		},
 		"del": {
 			"c_access": ["admin", "company_admin"]
