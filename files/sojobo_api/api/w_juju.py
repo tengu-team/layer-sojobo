@@ -413,7 +413,8 @@ async def get_model_info(connection, data):
     credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
     return {'name': data['model']['name'], 'users': users, 'uuid': data['model']['uuid'],
             'applications': applications, 'machines': machines, 'juju-gui-url': gui,
-            'state': state, 'credentials': credentials}
+            'state': state, 'credentials': credentials,
+            'monitoring_state': data['model'].get('monitoring_state', 'disabled')}
 
 
 def get_ssh_keys_user(username):
