@@ -357,7 +357,7 @@ def get_ready_controllers(company=None):
         c_id = 'companies/{}'.format(company)
         aql = ('LET com = DOCUMENT(@c_id) '
                'FOR controller in controllers '
-               'FILTER controller.name in com.controllers and controller.state == "ready" '
+               'FILTER controller._key in com.controllers and controller.state == "ready" '
                'RETURN controller')
         return execute_aql_query(aql, rawResults=True, c_id=c_id)
 
@@ -375,7 +375,7 @@ def get_ready_controllers_with_access(username, company=None):
     aql = ('LET com = DOCUMENT(@c_id) '
            'FOR c, cEdge IN 1..1 INBOUND @u_id controllerAccess '
                 'FILTER c.state == "ready" '
-                'FILTER c.name IN com.controllers '
+                'FILTER c._key IN com.controllers '
                 'RETURN c')
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id)
 
@@ -394,7 +394,7 @@ def get_ready_controllers_no_access(username, company):
                     'RETURN c) '
                'FOR c IN controllers '
                     'FILTER c.state == "ready" '
-                    'FILTER c.name IN com.controllers '
+                    'FILTER c._key IN com.controllers '
                     'FILTER c NOT IN controllers_with_access '
                     'RETURN c')
     return execute_aql_query(aql, rawResults=True, u_id=u_id, c_id=c_id)

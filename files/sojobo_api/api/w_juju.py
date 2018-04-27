@@ -102,6 +102,8 @@ def check_constraints(data):
 
 async def authenticate(api_key, authorization, auth_data, controller=None, model=None):
     error = errors.unauthorized()
+    if not auth_data['user']:
+        abort(error[0], error[1])
     if api_key == settings.API_KEY:
         if auth_data['company']:
             comp = auth_data['company']['name']
@@ -277,11 +279,11 @@ def get_connection_info(authorization, c_name=None, m_name=None):
     company = datastore.get_company_user(authorization.username)
     if authorization:
         if c_name and m_name:
-            c_key = construct_controller_key(c_name, company)
+            c_key = construct_controller_key(c_name, company['company'])
             m_key = construct_model_key(c_name, m_name)
             return datastore.get_model_connection_info(authorization.username, c_key, m_key)
         elif c_name and not m_name:
-            c_key = construct_controller_key(c_name, company)
+            c_key = construct_controller_key(c_name, company['company'])
             return datastore.get_controller_connection_info(authorization.username, c_key)
         else:
             return datastore.get_user_connection_info(authorization.username)
@@ -342,13 +344,14 @@ def create_controller(auth_data, data, username, password, company):
     if not data['region'] in regions:
         code, response = 400, 'Region not supported for cloud {}. Please choose one of the following: {}'.format(data['type'], regions)
         abort(code, response)
-    datastore.create_controller(c_key, name, c_type, data['region'], data['credential'])
+    datastore.create_controller(c_key, data['controller'], c_type, data['region'], data['credential'])
     if auth_data['user']['name'] == settings.JUJU_ADMIN_USER:
         datastore.add_user_to_controller(c_key, auth_data['user']['name'], 'admin')
     else:
         datastore.add_user_to_controller(c_key, auth_data['user']['name'], 'company_admin')
         datastore.add_controller_to_company(c_key, auth_data['company']['name'])
-    return get_controller_types()[c_type].create_controller(c_key, data['region'], data['credential'], username, password)
+    get_controller_types()[c_type].create_controller(c_key, data['region'], data['credential'], username, password)
+    return 202, 'Environment {} is being created in region {}'.format(data['controller'], data['region'])
 
 
 def delete_controller(controller_name, controller_type, company):
@@ -759,6 +762,7 @@ def delete_user(username, company=None):
 
 def add_user_to_controllers(username, juju_username, password, company):
     controllers = datastore.get_ready_controllers_no_access(username, company)
+    print(controllers)
     for controller in controllers:
         c_name = controller['_key']
         endpoint = controller["endpoints"][0]
@@ -950,7 +954,7 @@ def get_controllers_access(usr):
 
 def get_ucontroller_access(controller, username):
     if controller:
-        return datastore.get_controller_and_access(controller['_key'], username)[0]
+        return datastore.get_controller_and_access(controller['_key'], username)
     else:
         abort(404, 'The controller does not exist')
 

@@ -333,7 +333,7 @@ def add_bundle(controller, model):
                 bundle['services'] = bundle['applications']
                 bundle.pop('applications')
             LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Bundle is being deployed, check bundle_deployment.log for more information!', controller, model)
-            juju.add_bundle(request.authorization.username, request.authorization.password, controller, model, bundle)
+            juju.add_bundle(request.authorization.username, request.authorization.password, controller, model, bundle, company)
             code, response = 202, "Bundle is being deployed"
             return juju.create_response(code, response)
         else:
