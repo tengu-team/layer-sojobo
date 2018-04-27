@@ -273,13 +273,17 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
 
 def get_connection_info(authorization, c_name=None, m_name=None):
     company = datastore.get_company_user(authorization.username)
+    if company:
+        comp = company['company']
+    else:
+        comp = None
     if authorization:
         if c_name and m_name:
-            c_key = construct_controller_key(c_name, company['company'])
+            c_key = construct_controller_key(c_name, comp)
             m_key = construct_model_key(c_name, m_name)
             return datastore.get_model_connection_info(authorization.username, c_key, m_key)
         elif c_name and not m_name:
-            c_key = construct_controller_key(c_name, company['company'])
+            c_key = construct_controller_key(c_name, comp)
             return datastore.get_controller_connection_info(authorization.username, c_key)
         else:
             return datastore.get_user_connection_info(authorization.username)

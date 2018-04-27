@@ -157,6 +157,7 @@ def create_user():
 @USERS.route('/<user>', methods=['GET'])
 def get_user_info(user):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s [GET] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -199,6 +200,7 @@ def get_user_info(user):
 @USERS.route('/<user>', methods=['PUT'])
 def change_user_password(user):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s [PUT] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -236,6 +238,7 @@ def change_user_password(user):
 @USERS.route('/<user>', methods=['DELETE'])
 def delete_user(user):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s [DELETE] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -274,6 +277,7 @@ def delete_user(user):
 @USERS.route('/<user>/ssh-keys', methods=['GET'])
 def get_ssh_keys(user):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s/ssh-keys [GET] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -305,6 +309,7 @@ def get_ssh_keys(user):
 @USERS.route('/<user>/ssh-keys', methods=['PUT'])
 def update_ssh_keys(user):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => receiving call', user)
         http_body = request.json
         auth_data = juju.get_connection_info(request.authorization)
@@ -346,6 +351,7 @@ def update_ssh_keys(user):
 @USERS.route('/<user>/credentials', methods=['GET'])
 def get_credentials(user):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s/credentials [GET] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -377,6 +383,7 @@ def get_credentials(user):
 @USERS.route('/<user>/credentials', methods=['POST'])
 def add_credential(user):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s/credentials [POST] => receiving call', user)
         credential = request.json
         auth_data = juju.get_connection_info(request.authorization)
@@ -417,6 +424,7 @@ def add_credential(user):
 @USERS.route('/<user>/credentials/<credential>', methods=['GET'])
 def get_credential(user, credential):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s/credentials/%s [GET] => receiving call', user, credential)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -451,6 +459,7 @@ def get_credential(user, credential):
 @USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
 def remove_credential(user, credential):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s/credentials/%s [DELETE] => receiving call', user, credential)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -486,6 +495,7 @@ def remove_credential(user, credential):
 @USERS.route('/<user>/controllers', methods=['GET'])
 def get_controllers_access(user):
     try:
+        user = unquote(user)
         LOGGER.info('/USERS/%s/controllers [GET] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -530,6 +540,8 @@ def get_controllers_access(user):
 @USERS.route('/<user>/controllers/<controller>', methods=['GET'])
 def get_ucontroller_access(user, controller):
     try:
+        user = unquote(user)
+        controller = unquote(controller)
         LOGGER.info('/USERS/%s/controllers/%s [GET] => receiving call', user, controller)
         auth_data = juju.get_connection_info(request.authorization, c_name=controller)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -567,6 +579,8 @@ def get_ucontroller_access(user, controller):
 @USERS.route('/<user>/controllers/<controller>', methods=['PUT'])
 def grant_to_controller(user, controller):
     try:
+        user = unquote(user)
+        controller = unquote(controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => receiving call', user, controller)
         auth_data = juju.get_connection_info(request.authorization, controller)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller)
@@ -611,6 +625,8 @@ def grant_to_controller(user, controller):
 @USERS.route('/<user>/controllers/<controller>/models', methods=['GET'])
 def get_models_access(user, controller):
     try:
+        user = unquote(user)
+        controller = unquote(controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [GET] => receiving call', user, controller)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
@@ -651,6 +667,8 @@ def get_models_access(user, controller):
 @USERS.route('/<user>/controllers/<controller>/models', methods=['PUT'])
 def grant_to_model(user, controller):
     try:
+        user = unquote(user)
+        controller = unquote(controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => receiving call', user, controller)
         models_access_levels = request.json
         auth_data = juju.get_connection_info(request.authorization)
@@ -689,6 +707,8 @@ def grant_to_model(user, controller):
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_access(user, controller, model):
     try:
+        user = unquote(user)
+        controller = unquote(controller)
         model = unquote(model)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => receiving call!', user, controller, model)
         auth_data = juju.get_connection_info(request.authorization)

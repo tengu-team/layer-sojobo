@@ -325,6 +325,10 @@ def add_bundle(controller, model):
         auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authenticated!', controller, model)
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        else:
+            comp = None
         if juju.authorize(auth_data, '/controllers/controller/models/model', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Authorized!', controller, model)
             # Check if the model is 'ready' or else a bundle cannot be deployed.
@@ -333,7 +337,7 @@ def add_bundle(controller, model):
                 bundle['services'] = bundle['applications']
                 bundle.pop('applications')
             LOGGER.info('/TENGU/controllers/%s/models/%s [POST] => Bundle is being deployed, check bundle_deployment.log for more information!', controller, model)
-            juju.add_bundle(request.authorization.username, request.authorization.password, controller, model, bundle, company)
+            juju.add_bundle(request.authorization.username, request.authorization.password, controller, model, bundle, comp)
             code, response = 202, "Bundle is being deployed"
             return juju.create_response(code, response)
         else:
