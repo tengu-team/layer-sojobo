@@ -8,9 +8,13 @@ subordinate: false
 provides:
   sojobo:
     interface: sojobo
+  trial:
+    interface: sojobo
   proxy:
     interface: http
+  nginx_stats:
+    interface: nginx-stats
 requires:
-  redis:
-    interface: redis
+  arango:
+    interface: arangodb
 series: [ 'xenial' ]

@@ -61,7 +61,7 @@ def key_does_not_exist(key):
 
 
 def no_permission():
-    return 405, 'You do not have permission to perform this operation!'
+    return 403, 'You do not have permission to perform this operation!'
 
 
 def invalid_ssh_key(key):

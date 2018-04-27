@@ -17,8 +17,9 @@
 from base64 import b64encode
 from hashlib import sha256
 import os
-import requests
 import shutil
+import sys
+import json
 import subprocess
 from charmhelpers.core import unitdata
 from charmhelpers.core.templating import render
@@ -26,6 +27,8 @@ from charmhelpers.core.hookenv import status_set, log, config, open_port, close_
 from charmhelpers.core.host import service_restart, chownr, adduser
 from charms.reactive import hook, when, when_not, set_state, remove_state
 import charms.leadership
+import pyArango.connection as pyArango
+
 
 
 API_DIR = '/opt/sojobo_api'
@@ -62,7 +65,7 @@ def configure_webapp():
     open_port(config()['port'])
     service_restart('nginx')
     set_state('api.configured')
-    status_set('blocked', 'Waiting for a connection with Redis')
+    status_set('blocked', 'Waiting for a connection with ArangoDB')
 
 
 @when('config.changed', 'api.running')
@@ -95,10 +98,9 @@ def set_secrets_local():
     db.set('password', leader_get()['password'])
 
 
-@when('api.configured', 'redis.available')
-@when_not('api.running')
-def connect_to_redis(redis):
-    redis_db = redis.redis_data()
+@when('api.configured', 'arango.available')
+@when_not('api.setup')
+def connect_to_arango(arango):
     api_key = db.get('api-key')
     password = db.get('password')
     render('settings.py', '{}/settings.py'.format(API_DIR), {
@@ -109,24 +111,87 @@ def connect_to_redis(redis):
         'LOCAL_CHARM_DIR': config()['charm-dir'],
         'SOJOBO_IP': 'http://{}'.format(HOST),
         'SOJOBO_USER': USER,
-        'REDIS_HOST': redis_db['host'],
-        'REDIS_PORT': redis_db['port'],
+        'ARANGO_HOST': arango.host(),
+        'ARANGO_PORT': arango.port(),
+        'ARANGO_USER': arango.username(),
+        'ARANGO_PASS': arango.password(),
+        'ARANGO_DB': 'sojobo',
         'REPO_NAME': config()['github-repo'],
-        'SOJOBO_API_PORT' : config()['port']
+        'SOJOBO_API_PORT': config()['port']
     })
     service_restart('nginx')
     status_set('active', 'admin-password: {} api-key: {}'.format(password, api_key))
-    set_state('api.running')
+    set_state('api.setup')
+
+
+@when('api.setup')
+@when_not('api.cloud_provided')
+def check_cloud():
+    print("Cloud config")
+    print(config()['cloud-type'])
+    if config()['cloud-type'] == "":
+        status_set('blocked', 'Please provide a cloud-type (e.g. cloud-type= "google") to setup your environment')
+    elif not os.path.isfile("{}/controllers/controller_{}.py".format(API_DIR, config()['cloud-type'] )):
+        status_set('blocked', 'Please provide the right subordinate charm to setup your environment')
+    else:
+        set_state('api.cloud_provided')
+
+
+@when('api.cloud_provided')
+@when_not('api.region_provided')
+def check_region():
+    sys.path.append('/opt')
+    from sojobo_api.api import w_juju as juju
+    supported_regions = juju.get_controller_types()[config()['cloud-type']].get_supported_regions()
+    if config()['cloud-region'] == "":
+        status_set('blocked', 'Please provide one of the following regions for your environment: {}'.format(supported_regions))
+    elif not config()['cloud-region'] in supported_regions:
+        status_set('blocked', 'Please provide one of the following regions for your environment: {}'.format(supported_regions))
+    else:
+        set_state('api.region_provided')
+
+
+@when('api.region_provided')
+@when_not('api.credential_provided')
+def check_cred():
+    if config()['cloud-credential'] == "":
+        status_set('blocked', 'Please provide a valid cloud-credential for your environment')
+    invalid_creds = invalid_credential(config()['cloud-credential'], config()['cloud-type'])
+    if not invalid_creds:
+        set_state('api.credential_provided')
+    else:
+        status_set('blocked', 'Please provide a valid cloud-credential for your environment. wrong keys were found: {}'.format(invalid_creds))
+
+
+@when('api.credential_provided')
+@when_not('api.login-setup')
+def setup():
+    status_set('maintenance', 'Setting up Login Environment!')
+    setup_environment()
+    set_state('api.login-setup')
+
+
+@when('api.login-setup')
+@when_not('api.running')
+def check_if_env_ready():
+    sys.path.append('/opt')
+    from sojobo_api.api import w_datastore as datastore
+    if 'login' in [con['name'] for con in datastore.get_ready_controllers()]:
+        set_state('api.running')
+    else:
+        status_set('maintenance', 'Please wait while we are setting up your environment')
 
 
 @when('leadership.is_leader', 'api.running')
 @when_not('admin.created')
 def create_admin():
     if leader_get().get('admin') != 'Created':
-        subprocess.check_call(["python3.6", "{}/scripts/add_user.py".format(API_DIR), 'admin', db.get('password')])
+        sys.path.append('/opt')
+        from sojobo_api.api import w_datastore as datastore
         leader_set({'admin': 'Created'})
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
         set_state('admin.created')
+        datastore.set_user_state('admin', 'ready')
     else:
         leader_set({'admin': 'Created'})
 
@@ -135,33 +200,50 @@ def create_admin():
 @when_not('leadership.is_leader')
 def status_update_not_leader():
     if leader_get().get('admin') != 'Created':
-        status_set('blocked', 'error creating admin user')
+        status_set('blocked', 'error creating Tengu admin user')
     else:
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
 
 
-@when_not('redis.available')
-def redis_db_removed():
+@when_not('arango.available')
+def arango_db_removed():
     remove_state('api.running')
     remove_state('admin.created')
-    status_set('blocked', 'Waiting for a connection with redis')
+    status_set('blocked', 'Waiting for a connection with ArangoDB')
 
 
-@when('sojobo.available', 'api.running')
+@when('sojobo.available', 'api.configured')
 def configure(sojobo):
     api_key = db.get('api-key')
-    sojobo.configure('http://{}:{}'.format(config()['host'], config()['port']), API_DIR, api_key, db.get('password'), USER)
+    sojobo.configure('http://{}:{}'.format(config()['host'], config()['port']),
+                     API_DIR, api_key, db.get('password'), USER)
+    check_cloud()
+
+
+@when('trial.available', 'api.running')
+def trial_config(trial):
+    api_key = db.get('api-key')
+    trial.configure('http://{}:{}'.format(config()['host'], config()['port']),
+                    API_DIR, api_key, db.get('password'), USER)
 
 
 @when('proxy.available', 'api.running')
 def configure_proxy(proxy):
     proxy.configure(config()['port'])
     set_state('api.proxy-configured')
+
+
+@when('nginx_stats.connected', 'api.running')
+def configure_nginx_stats(nginx_stats):
+    nginx_stats.configure(config()['port'], 'nginx_status')
+    set_state('api.nginx_stats-configured')
+
+
 ###############################################################################
 # UTILS
 ###############################################################################
 def mergecopytree(src, dst, symlinks=False, ignore=None):
-    """"Recursive copy src to dst, mergecopy directory if dst exists.
+    """Recursive copy src to dst, mergecopy directory if dst exists.
     OVERWRITES EXISTING FILES!!"""
     if not os.path.exists(dst):
         os.makedirs(dst)
@@ -184,10 +266,9 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 
 
 def install_api():
-    for pkg in ['Jinja2', 'Flask', 'pyyaml', 'click', 'pygments', 'apscheduler',
-                'gitpython', 'redis', 'asyncio_extras', 'requests']:
-        subprocess.check_call(['python3.6', '-m', 'pip', 'install', pkg])
-    subprocess.check_call(['python3.6', '-m', 'pip', 'install', 'juju==0.6.1'])
+    for pkg in ['Jinja2', 'flask', 'pyyaml', 'click', 'pygments','gitpython',
+                'asyncio_extras', 'requests', 'juju==0.6.1', 'async_generator']:
+        subprocess.check_call(['pip3', 'install', pkg])
     mergecopytree('files/sojobo_api', API_DIR)
     if not os.path.isdir('{}/files'.format(API_DIR)):
         os.mkdir('{}/files'.format(API_DIR))
@@ -205,3 +286,27 @@ def install_api():
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
     application_version_set('1.0.0')
+
+
+def invalid_credential(credential, cloud):
+    sys.path.append('/opt')
+    from sojobo_api.api import w_juju as juju
+    valid_keys = juju.get_controller_types()[cloud].get_cred_keys()
+    valid_cred = credential.replace("'", "\"")
+    cred = json.loads(valid_cred)
+    wrong_keys = []
+    if len(valid_keys) == len(list(cred.keys())):
+        for cred_value in valid_keys:
+            if cred_value not in list(cred.keys()):
+                wrong_keys.append(cred)
+    return wrong_keys
+
+
+def setup_environment():
+    sys.path.append('/opt')
+    from sojobo_api import settings
+    subprocess.check_call(['python3', '{}/scripts/setup.py'.format(API_DIR),
+                           config()['cloud-credential'],
+                           config()['cloud-type'], config()['cloud-region'],
+                           settings.ARANGO_HOST, settings.ARANGO_PORT,
+                           settings.ARANGO_USER, settings.ARANGO_PASS])

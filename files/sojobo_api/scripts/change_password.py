@@ -1,4 +1,3 @@
-
 # !/usr/bin/env python3
 # Copyright (C) 2017  Qrama
 #
@@ -16,51 +15,50 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
-import ast
 import sys
 import traceback
 import logging
+from juju import tag, errors
+from juju.client import client
+from juju.controller import Controller
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
 from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
 
-class JuJu_Token(object):  #pylint: disable=R0903
-    def __init__(self):
-        self.username = settings.JUJU_ADMIN_USER
-        self.password = settings.JUJU_ADMIN_PASSWORD
-        self.is_admin = True
 
-async def remove_ssh_key(ssh_keys, username):
+async def change_password(c_name, endpoint, ca_cert, juju_username, password):
     try:
-        current_keys = datastore.get_ssh_keys(username)
-        new_keys = ast.literal_eval(ssh_keys)
-        user = datastore.get_user(username)
-        token = JuJu_Token()
-        for con in user['controllers']:
-            for mod in con['models']:
-                if mod['access'] == 'write' or mod['access'] == 'admin':
-                    logger.info('Setting up Modelconnection for model: %s', mod['name'])
-                    model = juju.Model_Connection(token, con['name'], mod['name'])
-                    async with model.connect(token) as mod_con:
-                        for a_key in current_keys:
-                            logger.info('removing key: %s', a_key)
-                            await mod_con.remove_ssh_key(username, a_key)
-                        for r_key in new_keys:
-                            logger.info('adding key: %s', r_key)
-                            await mod_con.add_ssh_key(username, r_key)
-        datastore.update_ssh_keys(username, new_keys)
-    except Exception as e:
+        logger.info('Setting up Controller connection for %s.', c_name)
+        controller_connection = Controller()
+        await controller_connection.connect(endpoint=endpoint,
+                                            username=settings.JUJU_ADMIN_USER,
+                                            password=settings.JUJU_ADMIN_PASSWORD,
+                                            cacert=ca_cert)
+        logger.info('Controller connection as admin was successful.')
+
+        logger.info('Initializing user manager facade...')
+        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection)
+        entity = client.EntityPassword(password, tag.user(juju_username))
+
+        logger.info('Changing password...')
+        await user_facade.SetPassword([entity])
+        logger.info('Changed password!')
+
+    except Exception:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
         for l in lines:
             logger.error(l)
+    finally:
+        if 'controller_connection' in locals():
+            await juju.disconnect(controller_connection)
 
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
-    logger = logging.getLogger('remove_ssh_keys')
-    hdlr = logging.FileHandler('{}/log/update_ssh_keys.log'.format(sys.argv[3]))
+    logger = logging.getLogger('change_password')
+    hdlr = logging.FileHandler('{}/log/change_password.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -69,5 +67,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    result = loop.run_until_complete(remove_ssh_key(sys.argv[1], sys.argv[2]))
+    result = loop.run_until_complete(change_password(sys.argv[1], sys.argv[2],
+                                                     sys.argv[3], sys.argv[4],
+                                                     sys.argv[5]))
     loop.close()

@@ -8,8 +8,8 @@ Since it is still in beta, any suggestions and bugs are welcome on [Github](http
 The required charms can be found in the qrama-charms repo. In order to install these using the following commands, one must be in the topdir of the cloned qrama-charms repo.
 ```
 juju deploy ./sojobo-api
-juju deploy ./redis redis-server --series xenial
-juju add-relation sojobo-api redis
+juju deploy ./arangodb
+juju add-relation sojobo-api arangodb
 ```
 Each cloud environment has its own subordinate charm, containing some cloud-specific workflows.
 ```
@@ -25,7 +25,7 @@ When installation is completed, you can see the status of the installed sojobo-a
   }
 ```
 **Warning**
-We are waiting on a bugfix in libjuju. In order to circumvent the problem for now, one must manually edit the model.py file of the juju package (`/usr/local/lib/python3.6/dist-packages/juju`).
+We are waiting on a bugfix in libjuju. In order to circumvent the problem for now, one must manually edit the model.py file of the juju package (`/usr/local/lib/python3.5/dist-packages/juju`).
 L1293:
 ```python
   await self.revoke(username)
@@ -84,11 +84,11 @@ def get_supported_series():
 * A `get_supported_series()` function which returns a list of Ubuntu-versions this controller can deploy.
 
 # Documentation
-Documentation of the api can be found under [docs](docs).  
+Documentation of the api can be found under the Wiki Tab of this repository.  
 
 # Bugs
-Report bugs on [Github](https://github.com/Qrama/Sojobo-api/issues)
+Report bugs on [Github](https://github.com/tengu-team/layer-sojobo/issues)
 
 # Authors
-- Mathijs Moerman <mathijs.moerman@tengu.io>
 - Sébastien Pattyn <sebastien.pattyn@tengu.io>
+- Michiel Ghyselinck <michiel.ghyselinck@tengu.io>
