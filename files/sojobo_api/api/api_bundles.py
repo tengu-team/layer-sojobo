@@ -53,15 +53,10 @@ def get_all_bundles():
             company = auth_data['company']['name']
         else:
             company = None
-        if juju.authorize(auth_data, '/bundles/types', 'get'):
-            LOGGER.info('/BUNDLES/types [GET] => Authorized!')
-            types = bundles.get_all_bundles(company)
-            LOGGER.info('/BUNDLES/types [GET] => Succesfully retrieved all bundles!')
-            return juju.create_response(200, types)
-        else:
-            code, response = errors.no_permission()
-            LOGGER.info('/BUNDLES/types [GET] => No Permission to perform this action!')
-            return juju.create_response(code, response)
+        LOGGER.info('/BUNDLES/types [GET] => Always authorized!')
+        types = bundles.get_all_bundles(company)
+        LOGGER.info('/BUNDLES/types [GET] => Succesfully retrieved all bundles!')
+        return juju.create_response(200, types)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -82,22 +77,17 @@ def determine_closest_type():
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/BUNDLES/types [POST] => Authenticated!')
-        if juju.authorize(auth_data, '/bundles/types', 'post'):
-            LOGGER.info('/BUNDLES/types [POST] => Authorized!')
-            if 'applications' in data:
-                b_type = bundles.determine_closest_type(data['applications'])
-                if b_type:
-                    LOGGER.info('/BUNDLES/types [POST] => determined type: %s', b_type['name'])
-                    return juju.create_response(200, b_type)
-                else:
-                    LOGGER.info('/BUNDLES/types [POST] => no matching type found')
-                    return juju.create_response(404, 'Could not find a matching type.')
+        LOGGER.info('/BUNDLES/types [POST] => Always authorized!')
+        if 'applications' in data:
+            b_type = bundles.determine_closest_type(data['applications'])
+            if b_type:
+                LOGGER.info('/BUNDLES/types [POST] => determined type: %s', b_type['name'])
+                return juju.create_response(200, b_type)
             else:
-                return juju.create_response(400, 'The Body should contain an applications property.')
+                LOGGER.info('/BUNDLES/types [POST] => no matching type found')
+                return juju.create_response(404, 'Could not find a matching type.')
         else:
-            LOGGER.error('/BUNDLES/types [POST] => No Permission to perform this action!')
-            code, response = errors.no_permission()
-            return juju.create_response(code, response)
+            return juju.create_response(400, 'The Body should contain an applications property.')
     except KeyError:
         error_log()
         return juju.create_response(errors.invalid_data()[0], errors.invalid_data()[1])

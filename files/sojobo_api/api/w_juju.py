@@ -239,10 +239,9 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
 
     :param resource: The resource that the user tries to perform an action on.
 
-    :param method: The HTTP method (get, put, post, del)
+    :param method: The HTTP method (get, put, post, del).
 
     :param self_user: Calls like changing the password of a user can be done
-
     by an admin OR the user himself. In the latter case 'self_user' must
     be the user that is provided in the API call.
 
@@ -257,20 +256,17 @@ def authorize(connection_info, resource, method, self_user=None, resource_user=N
         return True
     elif self_user == connection_info["user"]["name"]:
         return True
-    elif connection_info['company']:
-        if connection_info['company']['is_admin']:
-            return True
-        elif "m_access" in connection_info:
-            return permissions.m_authorize(connection_info, resource, method)
-        elif "c_access" in connection_info:
-            return permissions.c_authorize(connection_info, resource, method)
-        # If no 'm_access' or 'c_access' is found in the connection info then there will
-        # only be user info.
-        elif "user" in connection_info and resource_user:
-            return permissions.superuser_authorize(connection_info["user"]["name"],
-                                                   resource_user)
-        else:
-            return False
+    elif connection_info['company'] and connection_info['company']['is_admin']:
+        return True
+    elif "m_access" in connection_info:
+        return permissions.m_authorize(connection_info, resource, method)
+    elif "c_access" in connection_info:
+        return permissions.c_authorize(connection_info, resource, method)
+    # If no 'm_access' or 'c_access' is found in the connection info then there will
+    # only be user info.
+    elif "user" in connection_info and resource_user:
+        return permissions.superuser_authorize(connection_info["user"]["name"],
+                                               resource_user)
     else:
         return False
 
@@ -413,7 +409,8 @@ async def get_model_info(connection, data):
     credentials = {'cloud': data['controller']['type'], 'credential-name': data['model']['credential']}
     return {'name': data['model']['name'], 'users': users, 'uuid': data['model']['uuid'],
             'applications': applications, 'machines': machines, 'juju-gui-url': gui,
-            'state': state, 'credentials': credentials}
+            'state': state, 'credentials': credentials,
+            'monitoring_state': data['model'].get('monitoring_state', 'disabled')}
 
 
 def get_ssh_keys_user(username):
