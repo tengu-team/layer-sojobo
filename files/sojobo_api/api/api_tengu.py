@@ -253,11 +253,16 @@ def get_models_info(controller):
         auth_data = juju.get_connection_info(request.authorization, c_name=controller)
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller)
         LOGGER.info('/TENGU/controllers/%s/models [GET] => Authenticated!', controller)
+        if auth_data['company']:
+            comp = auth_data['company']['name']
+        else:
+            comp = None
         if juju.authorize(auth_data, '/controllers/controller/models', 'get'):
             LOGGER.info('/TENGU/controllers/%s/models [GET] => Authorized!', controller)
-            code, response = 200, [m['name'] for m in juju.get_models_access(auth_data["user"]["name"], controller)]
+            code, response = 200, [m['name'] for m in juju.get_models_access(auth_data["user"]["name"], controller, comp)]
             LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
             new_models = []
+            print(response)
             for mod in response:
                 if mod != 'controller' and mod != 'default':
                     new_models.append(mod)
@@ -370,9 +375,10 @@ def delete_model(controller, model):
             comp = auth_data['company']['name']
         else:
             comp = None
+        print(auth_data)
         if juju.authorize(auth_data, '/controllers/controller/models/model', 'del'):
             LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Authorized!', controller, model)
-            juju.delete_model(request.authorization.username, request.authorization.password, controller, model, auth_data['model']['_key'], company)
+            juju.delete_model(request.authorization.username, request.authorization.password, controller, model, auth_data['model']['_key'], comp)
             code, response = 202, 'Model is being deleted!'
             LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Model is being deleted!', controller, model)
             return juju.create_response(code, response)

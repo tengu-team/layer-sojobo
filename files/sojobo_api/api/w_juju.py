@@ -960,8 +960,9 @@ def get_ucontroller_access(controller, username):
         abort(404, 'The controller does not exist')
 
 
-def get_models_access(username, c_name):
-    return datastore.get_models_access(c_name, username)
+def get_models_access(username, c_name, company):
+    c_key = construct_controller_key(c_name, company)
+    return datastore.get_models_access(c_key, username)
 
 
 ##############################################################################
