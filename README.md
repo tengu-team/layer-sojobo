@@ -19,25 +19,11 @@ juju add-relation sojobo-api controller-google
 When installation is completed, you can see the status of the installed sojobo-api by doing a get request to the root url. If everything is running, the response will look like this:
 ```json
   {
-    "version": "1.0.0",
+    "version": "0.18.0",
     "used_apis": ["api_tengu", "api_users"],
     "controllers": ["controller_google"]
   }
 ```
-**Warning**
-We are waiting on a bugfix in libjuju. In order to circumvent the problem for now, one must manually edit the model.py file of the juju package (`/usr/local/lib/python3.5/dist-packages/juju`).
-L1293:
-```python
-  await self.revoke(username)
-```
-must be replaced with:
-```python
-  try:
-      await self.revoke(username)
-  except:
-      pass
-```
-
 
 # API
 The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
