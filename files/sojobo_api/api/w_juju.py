@@ -382,9 +382,8 @@ def controller_exists(controller_name, company):
 def get_controller_info(data, company):
     #TODO: Give better parameters
     con_info = data['controller']
-    c_key = construct_controller_key(con_info['name'], company)
     if con_info['state'] == 'ready':
-        con_info['models'] = [m['name'] for m in get_models_access(data["user"]["name"], c_key)]
+        con_info['models'] = [m['name'] for m in get_models_access(data["user"]["name"], con_info['name'], company)]
     return con_info
 
 
