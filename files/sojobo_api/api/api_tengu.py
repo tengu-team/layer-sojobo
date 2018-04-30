@@ -136,7 +136,7 @@ def get_controller_info(controller):
             if 'models' in response:
                 new_models = []
                 for mod in response['models']:
-                    if mod['name'] != 'controller' and mod['name'] != 'default':
+                    if mod != 'controller' and mod != 'default':
                         new_models.append(mod)
                 response['models'] = new_models
             return juju.create_response(code, response)
