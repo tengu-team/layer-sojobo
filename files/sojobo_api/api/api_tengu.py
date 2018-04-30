@@ -133,6 +133,12 @@ def get_controller_info(controller):
             LOGGER.info('/TENGU/controllers/%s [GET] => Authorized!', controller)
             code, response = 200, juju.get_controller_info(auth_data, comp)
             LOGGER.info('/TENGU/controllers/%s [GET] => Succesfully retrieved controller information!', controller)
+            if 'models' in response:
+                new_models = []
+                for mod in response['models']:
+                    if mod['name'] != 'controller' and mod['name'] != 'default':
+                        new_models.append(mod)
+                response['models'] = new_models
             return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
