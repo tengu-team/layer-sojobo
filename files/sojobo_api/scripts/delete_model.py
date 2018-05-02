@@ -44,7 +44,6 @@ async def delete_model(c_name, m_name, m_key, usr, pwd):
         await model_facade.DestroyModels([client.Entity(tag.model(auth_data['model']['uuid']))])
 
         # Destroy model in datastore
-        datastore.delete_model(c_name, m_key)
         await controller_connection.disconnect()
 
         if auth_data["company"]:
@@ -58,10 +57,12 @@ async def delete_model(c_name, m_name, m_key, usr, pwd):
                             'name': m_name,
                             'company': None})
 
+        datastore.delete_model(c_name, m_key)
         logger.info('%s -> succesfully Destroyed model', m_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         lines = traceback.format_exception(exc_type, exc_value, exc_traceback)
+        datastore.set_model_state(m_key, lines)
         for l in lines:
             logger.error(l)
     finally:

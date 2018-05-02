@@ -402,13 +402,15 @@ def get_ready_controllers_no_access(username, company):
 
 def get_keys_controllers(company=None):
     if not company:
-        aql = 'FOR c in controllers RETURN c._key'
+        aql = 'FOR c in controllers RETURN c.name'
         return execute_aql_query(aql, rawResults=True)
     else:
         c_id = 'companies/{}'.format(company)
         aql = ('LET com = DOCUMENT(@c_id) '
-               'RETURN com.controllers')
-        return execute_aql_query(aql, rawResults=True, c_id=c_id)[0]
+               'FOR c in controllers '
+               'FILTER c._key in com.controllers '
+               'RETURN c.name')
+        return execute_aql_query(aql, rawResults=True, c_id=c_id)
 
 
 def get_cloud_controllers(c_type, company=None):

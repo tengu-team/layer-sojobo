@@ -111,6 +111,7 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
             comp = None
         if not controller and not model:
             if check_if_admin(authorization, company=comp):
+                await connect_to_random_controller(authorization, auth_data)
                 return True
             if len(get_all_controllers(company=comp)) == 0:
                 abort(error[0], error[1])
@@ -167,6 +168,7 @@ def check_if_company_admin(username, company):
 
 
 async def connect_to_random_controller(authorization, auth_data):
+    print('connecting to random controller with {}:{}'.format(authorization.password, authorization.username))
     error = errors.unauthorized()
     try:
         comp = None
@@ -380,9 +382,8 @@ def controller_exists(controller_name, company):
 def get_controller_info(data, company):
     #TODO: Give better parameters
     con_info = data['controller']
-    c_key = construct_controller_key(con_info['name'], company)
     if con_info['state'] == 'ready':
-        con_info['models'] = [m['name'] for m in get_models_access(data["user"]["name"], c_key)]
+        con_info['models'] = [m['name'] for m in get_models_access(data["user"]["name"], con_info['name'], company)]
     return con_info
 
 
