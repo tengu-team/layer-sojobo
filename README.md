@@ -50,7 +50,7 @@ When installation is completed, you can see the status of the installed sojobo-a
 
 # API
 The entire api is modular: extra modules will be loaded automatically if placed in the api-folder, provided they
-follow the naming rules and provide the required functions. The Documentation of the API can be found [here](https://github.com/tengu-team/layer-sojobo/wiki).
+follow the naming rules and provide the required functions.
 
 ## API-modules
 The api is written in Flask. This allows the use of blueprints to expand the api. API-modules file names must follow
@@ -65,8 +65,8 @@ def get():
 ```
 
 
-# Documentation
-Documentation of the api can be found under the Wiki Tab of this repository.  
+# API Documentation
+Documentation of the api can be found under the [Wiki Tab](https://github.com/tengu-team/layer-sojobo/wiki) of this repository.  
 
 # Bugs
 Report bugs on [Github](https://github.com/tengu-team/layer-sojobo/issues)
