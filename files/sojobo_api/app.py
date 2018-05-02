@@ -38,7 +38,7 @@ logging.basicConfig(filename='/opt/sojobo_api/log/flask-sojobo-api.log', level=l
 def index():
     try:
         if request.headers['api-key'] == settings.API_KEY:
-            code, response = 200, {'version': "1.0.0",  # see http://semver.org/
+            code, response = 200, {'version': "0.18.1",  # see http://semver.org/
                                    'used_apis': get_apis(),
                                    'controllers': get_controllers()}
         else:
