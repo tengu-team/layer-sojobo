@@ -42,7 +42,7 @@ juju config sojobo-api cloud-credential="{'application-id': xxxx, 'application-p
 When installation is completed, you can see the status of the installed sojobo-api by doing a get request to the root url. If everything is running, the response will look like this:
 ```json
   {
-    "version": "0.18.0",
+    "version": "0.18.1",
     "used_apis": ["api_tengu", "api_users", "api_bundles", "api_companies"],
     "controllers": ["controller_google"]
   }
