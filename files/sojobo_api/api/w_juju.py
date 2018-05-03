@@ -111,7 +111,8 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
             comp = None
         if not controller and not model:
             if check_if_admin(authorization, company=comp):
-                await connect_to_random_controller(authorization, auth_data)
+                if comp:
+                    await connect_to_random_controller(authorization, auth_data)
                 return True
             if len(get_all_controllers(company=comp)) == 0:
                 abort(error[0], error[1])
@@ -168,7 +169,6 @@ def check_if_company_admin(username, company):
 
 
 async def connect_to_random_controller(authorization, auth_data):
-    print('connecting to random controller with {}:{}'.format(authorization.password, authorization.username))
     error = errors.unauthorized()
     try:
         comp = None
@@ -181,7 +181,13 @@ async def connect_to_random_controller(authorization, auth_data):
                 add_user_to_controllers(authorization.username, auth_data['user']['juju_username'], authorization.password, comp)
                 abort(409, 'User {} is being added to the remaining environments'.format(auth_data['user']['name']))
             else:
-                abort(400, 'Please wait untill your first environment is set up!')
+                con = datastore.get_controller('login')
+                controller_connection = Controller()
+                await controller_connection.connect(endpoint=con['endpoints'][0],
+                                                    username=auth_data['user']['juju_username'],
+                                                    password=authorization.password,
+                                                    cacert=con['ca_cert'])
+                await controller_connection.disconnect()
         else:
             con = ready_controllers[randint(0, len(ready_controllers) - 1)]
             controller_connection = Controller()
