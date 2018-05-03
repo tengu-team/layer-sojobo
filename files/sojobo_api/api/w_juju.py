@@ -69,19 +69,6 @@ def create_response(http_code, return_object, is_json=False):
     )
 
 
-def check_input(data, input_type):
-    regex_dict = {"controller":{"regex":"^(?!-).*^\S+$", "e_message": "Controller name can not start with a hyphen and can not contain spaces!"},
-                  "credential":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Credentials may only contain letters, digits and hyphens but can not start with a hyphen"},
-                  "username":{"regex":"^[0-9a-zA-Z]([0-9a-zA-Z.-]*[0-9a-zA-Z])$", "e_message": "Username may only contain letters, digits and hyphens but can not start with a hyphen"},
-                  "model":{"regex":"^[0-9a-z]([0-9a-z.-]*[0-9a-z])$", "e_message": "model names may only contain lowercase letters, digits and hyphens"}}
-    if input_type in regex_dict:
-        pattern = re.compile(regex_dict[input_type]['regex'])
-        if pattern.match(data):
-            return True, data
-        else:
-            return False, regex_dict[input_type]['e_message']
-
-
 def check_constraints(data):
     cons = ['mem', 'arch', 'cores', 'spaces', 'container',
             'root-disk', 'tags', 'cpu-power', 'virt-type']
