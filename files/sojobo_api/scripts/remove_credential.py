@@ -33,10 +33,17 @@ async def remove_credential(username, cred_name):
         logger.info('Retrieving credential from database...')
         cred = juju.get_credential(username, cred_name)
         credential_name = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
+
+        comp = ds.get_company_user(username)
+        if not comp:
+            company = None
+        else:
+            company = comp['company']
+
         logger.info('Succesfully retrieved credential from database...')
 
         c_type = cred['type']
-        controllers = ds.get_cloud_controllers(c_type)
+        controllers = ds.get_cloud_controllers(username, c_type, company=company)
 
         for con in controllers:
             if con["type"] == c_type:

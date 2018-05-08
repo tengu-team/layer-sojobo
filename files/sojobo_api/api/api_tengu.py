@@ -213,10 +213,13 @@ def create_model(controller):
             comp = None
         if juju.authorize(auth_data, '/controllers/controller/models', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models [POST] => Authorized!', controller)
-            if juju.credential_exists(auth_data['user']['name'], data['credential']):
-                credential = juju.get_credential(auth_data['user']['name'], data['credential'])
+            cred = data.get('credential', None)
+            if not cred:
+                cred = auth_data['controller']['default-credential']
+            if juju.credential_exists(auth_data['user']['name'], cred):
+                credential = juju.get_credential(auth_data['user']['name'], cred)
                 if credential["type"] == auth_data['controller']["type"]:
-                    credential_name = data['credential']
+                    credential_name = cred
                     ws_type = None
                     if "workspace_type" in data:
                         ws_type = data['workspace_type']
@@ -268,7 +271,6 @@ def get_models_info(controller):
             code, response = 200, [m['name'] for m in juju.get_models_access(auth_data["user"]["name"], controller, comp)]
             LOGGER.info('/TENGU/controllers/%s/models [GET] => modelinfo retieved for all models!', controller)
             new_models = []
-            print(response)
             for mod in response:
                 if mod != 'controller' and mod != 'default':
                     new_models.append(mod)
@@ -381,7 +383,6 @@ def delete_model(controller, model):
             comp = auth_data['company']['name']
         else:
             comp = None
-        print(auth_data)
         if juju.authorize(auth_data, '/controllers/controller/models/model', 'del'):
             LOGGER.info('/TENGU/controllers/%s/models/%s [DELETE] => Authorized!', controller, model)
             juju.delete_model(request.authorization.username, request.authorization.password, controller, model, auth_data['model']['_key'], comp)
