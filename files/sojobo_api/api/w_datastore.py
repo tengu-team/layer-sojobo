@@ -238,7 +238,6 @@ def add_credential(username, cred):
     cred['state'] = 'accepted'
     aql = 'INSERT @credential INTO credentials LET newCredential = NEW RETURN newCredential '
     output = execute_aql_query(aql, rawResults=True, credential=cred)[0]
-    print(output)
     update_user_credential(username, {'name': cred['name'], 'key': output['_key'], 'type': output['type']})
 
 
