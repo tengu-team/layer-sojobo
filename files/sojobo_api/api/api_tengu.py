@@ -28,7 +28,7 @@ from flask import send_file, request, Blueprint, abort
 
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task
-from sojobo_api.api.logic.authorization import authorize
+from sojobo_api.api.core.authorization import authorize
 
 TENGU = Blueprint('tengu', __name__)
 LOGGER = logging.getLogger('api_tengu')

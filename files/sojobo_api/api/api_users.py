@@ -28,7 +28,7 @@ from flask import request, Blueprint
 
 from sojobo_api.api import w_errors as errors, w_juju as juju
 from sojobo_api.api.w_juju import execute_task
-from sojobo_api.api.logic.authorization import authorize
+from sojobo_api.api.core.authorization import authorize
 
 
 USERS = Blueprint('users', __name__)
