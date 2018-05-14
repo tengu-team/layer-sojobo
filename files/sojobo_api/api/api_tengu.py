@@ -31,7 +31,7 @@ from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api.core import w_errors as errors
 from sojobo_api.api.w_juju import execute_task
 from sojobo_api.api.core import w_tengu
-from sojobo_api.api.managers import model_manager
+from sojobo_api.api.managers import model_manager, controller_manager
 from sojobo_api.api.core.authorization import authorize
 
 TENGU = Blueprint('tengu', __name__)
@@ -1054,13 +1054,20 @@ def add_relation(controller, model):
                                                          state= auth_data["model"]["state"],
                                                          uuid = auth_data["model"]["uuid"],
                                                          credential_name = auth_data["model"]["credential"])
-                # TODO: Use controller object
-                endpoint = auth_data["controller"]["endpoints"][0]
-                cacert = auth_data["controller"]["ca_cert"]
+                # TODO: Controller object should be retrieved from connection info.
+                controller_object = controller_manager.ControllerObject(key = auth_data["controller"]["_key"],
+                                                                        name = auth_data["controller"]["name"],
+                                                                        state= auth_data["controller"]["state"],
+                                                                        type = auth_data["controller"]["type"],
+                                                                        region = auth_data["controller"]["region"],
+                                                                        models = auth_data["controller"]["models"],
+                                                                        endpoints = auth_data["controller"]["endpoints"],
+                                                                        uuid = auth_data["controller"]["uuid"],
+                                                                        ca_cert = auth_data["controller"]["ca_cert"],
+                                                                        default_credential_name = auth_data["controller"]["default-credential"])
                 juju_username = auth_data["user"]["juju_username"]
                 password = request.authorization.password
-                w_tengu.add_relation(auth_data["controller"]["_key"], endpoint,
-                                     cacert,model_object, juju_username, password,
+                w_tengu.add_relation(controller_object, model_object, juju_username, password,
                                      relation1, relation2, model_connection)
                 code, response = 202, "Relationship between {} and {} is being created!".format(relation1, relation2)
                 LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Relationship succesfully created.', controller_name, model_name)
