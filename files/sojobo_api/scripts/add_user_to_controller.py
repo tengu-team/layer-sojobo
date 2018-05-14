@@ -44,6 +44,10 @@ async def add_user_to_controller(username, password, juju_username, c_name, endp
                                 password=password)]
         await user_facade.AddUser(users)
 
+        logger.info('%s -> Adding credentials', c_name)
+        controller = datastore.get_controller(c_name)
+        await juju.update_cloud(controller_connection, controller['type'], controller['default-credential'], juju_username, settings.JUJU_ADMIN_USER)
+
         datastore.add_user_to_controller(c_name, username, 'login')
         logger.info('Succesfully added user %s to controller %s!', username, c_name)
         datastore.set_user_state(username, 'ready')
