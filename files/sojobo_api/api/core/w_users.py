@@ -1,9 +1,39 @@
 '''
 .. module: w_users
 '''
+import hashlib
+from sojobo_api.api import utils
 from sojobo_api.api.core import w_errors as errors
 from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api.managers import user_manager
+
+
+def create_user(username, password, company):
+    if not user_manager.user_exists(username):
+        juju_username = 'u{}{}'.format(
+                    hashlib.md5(username.encode('utf')).hexdigest(),
+                    utils.give_timestamp())
+        datastore.add_user_to_controller(username, juju_username, company)
+        controllers = datastore.get_ready_controllers(company)
+        if len(controllers) == 0:
+            datastore.set_user_state(username, 'ready')
+        else:
+            for controller in controllers:
+                controller_key = controller['_key']
+                user_manager.add_user_to_controllers(
+                    username, juju_username, password, controller_key)
+            datastore.set_user_state(username, 'ready')
+    else:
+        raise ValueError(errors.already_exists('user'))
+
+
+def delete_user(username, company=None):
+    datastore.set_user_state(username, 'deleting')
+    controllers = datastore.get_ready_controllers(company)
+    for controller in controllers:
+        controller_key = controller['_key']
+        user_manager.remove_user_from_controller(controller_key)
+    datastore.delete_user(username)
 
 
 def change_user_password(username, password):

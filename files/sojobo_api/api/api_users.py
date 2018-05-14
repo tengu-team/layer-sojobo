@@ -133,24 +133,24 @@ def create_user():
             company = auth_data['company']['name']
         else:
             company = None
-        if juju.check_if_admin(request.authorization, company=company):
-            if juju.user_exists(data['username']):
-                code, response = errors.already_exists('user')
-                LOGGER.error('/USERS [POST] => Username %s already exists!',
-                             data['username'])
-            elif data['password']:
+        if authorize(auth_data, '/users/', 'post'):
+            if data['password']:
                 juju.create_user(data['username'], data['password'], company)
-                code, response = 202, 'User {} is being created'.format(
-                            data['username'])
+                return utils.create_response(202, 'User {} is being created'.format(
+                            data['username']))
                 LOGGER.info('/USERS [POST] => Creating user %s, check add_user_to_controller.log for more information!',
                             data['username'])
             else:
                 code, response = errors.empty()
+                return juju.create_response(code, response)
                 LOGGER.error('/USERS [POST] => Password cannot be empty!')
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS [POST] => No Permission to perform this action!')
-        return juju.create_response(code, response)
+            return juju.create_response(code, response)
+    except ValueError as e:
+        error_log()
+        return utils.create_response(e.args[0], e.args[1])
     except KeyError:
         code, response = errors.invalid_data()
         error_log()

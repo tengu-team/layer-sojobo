@@ -27,17 +27,17 @@ from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api import w_juju as juju
 
 
-async def add_user_to_controller(username, password, juju_username, c_name,
-                                 endpoint, cacert):
+async def add_user_to_controller(username, password, juju_username, c_name):
     try:
         logger.info('Adding user %s to controller %s...', username, c_name)
         logger.info('Setting up Controller connection for %s...', c_name)
+        controller = datastore.get_controller(c_name)
         controller_connection = Controller()
         await controller_connection.connect(
-                    endpoint=endpoint,
+                    endpoint=controller['endpoint'],
                     username=settings.JUJU_ADMIN_USER,
                     password=settings.JUJU_ADMIN_PASSWORD,
-                    cacert=cacert)
+                    cacert=controller['ca-cert'])
         logger.info('Controller connection as admin was successful.')
 
         user_facade = client.UserManagerFacade.from_connection(
@@ -48,7 +48,7 @@ async def add_user_to_controller(username, password, juju_username, c_name,
         await user_facade.AddUser(users)
 
         logger.info('%s -> Adding credentials', c_name)
-        controller = datastore.get_controller(c_name)
+
         await juju.update_cloud(controller_connection, controller['type'],
                                 controller['default-credential'],
                                 juju_username, settings.JUJU_ADMIN_USER)
@@ -82,6 +82,5 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.set_debug(False)
     loop.run_until_complete(add_user_to_controller(sys.argv[1], sys.argv[2],
-                                                   sys.argv[3], sys.argv[4],
-                                                   sys.argv[5], sys.argv[6]))
+                                                   sys.argv[3], sys.argv[4]))
     loop.close()

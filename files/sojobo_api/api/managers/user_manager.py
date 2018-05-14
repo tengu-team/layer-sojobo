@@ -10,7 +10,7 @@ class UserObject(object):
 
     def __init__(self, username, password, juju_username,
                  controller_access=None, model_access=None, company=None,
-                 company_access=None, ssh_keys=None, credentials=None):
+                 company_admin=None, ssh_keys=None, credentials=None):
         """ This will create a user Object
 
         :param str username: The username used to login to the Tengu
@@ -24,8 +24,7 @@ class UserObject(object):
         :param str model_access: The access level on a given model(optional).
         :param str company: The name of the company, the user belongs to
             (optional).
-        :param str company_access: The access level for a user in his company
-            (optional).
+        :param bool company_admin: True if a user is a company admin(optional).
         :param list ssh_keys: A list of a user's ssh keys (optional).
         :param list credentials: A list of a user's credentials (optional).
         """
@@ -35,7 +34,7 @@ class UserObject(object):
         self.controller_access = controller_access
         self.model_access = model_access
         self.company = company
-        self.company_access = company_access
+        self.company_access = company_admin
         self.ssh_keys = ssh_keys
         self.credentials = credentials
 
@@ -56,6 +55,24 @@ def change_user_password(juju_username, new_password, controller_name):
     Popen(["python3",
            "{}/scripts/change_password.py".format(settings.SOJOBO_API_DIR),
            controller_name, juju_username, new_password])
+
+
+def add_user_to_controller(username, juju_username, password, controller_key):
+    Popen(["python3",
+           "{}/scripts/add_user_to_controller.py".format(
+                settings.SOJOBO_API_DIR),
+           username,
+           password,
+           juju_username,
+           controller_key])
+
+
+def remove_user_from_controller(username, controller_key):
+    Popen(["python3",
+           "{}/scripts/remove_user_from_controller.py".format(
+                settings.SOJOBO_API_DIR),
+           username,
+           controller_key])
 
 
 def user_exists(username):

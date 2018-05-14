@@ -47,7 +47,6 @@ async def remove_user_from_controller(username, c_name):
 
         logger.info('Removing user from %s', c_name)
         await user_facade.RemoveUser([entity])
-        datastore.delete_user(username)
         logger.info('Removed user %s from Controller %s!', username ,c_name)
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

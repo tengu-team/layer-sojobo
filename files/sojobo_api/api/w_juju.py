@@ -170,7 +170,6 @@ def check_if_company_admin(username, company):
 
 
 async def connect_to_random_controller(authorization, auth_data):
-    print('connecting to random controller with {}:{}'.format(authorization.password, authorization.username))
     error = errors.unauthorized()
     try:
         comp = None
@@ -702,38 +701,6 @@ async def get_application_config(connection, application):
 ###############################################################################
 # USER FUNCTIONS
 ###############################################################################
-
-
-def create_user(username, password, company):
-    # We create a seperate name with a timestamp that will be used in Juju.
-    # This is because Juju doesn't allow a username that has been used before.
-    # F.e. Juju does not allow you create a user 'bob', then delete him
-    # and then try to add a user that is also named 'bob', therefore we add a timestamp.
-    juju_username = 'u{}{}'.format(hashlib.md5(username.encode('utf')).hexdigest(), give_timestamp())
-    datastore.create_user(username, juju_username, company)
-    add_user_to_controllers(username, juju_username, password, company)
-
-
-
-def delete_user(username, company=None):
-    datastore.set_user_state(username, 'deleting')
-    controllers = datastore.get_ready_controllers(company)
-    for controller in controllers:
-        Popen(["python3", "{}/scripts/remove_user_from_controller.py".format(settings.SOJOBO_API_DIR),
-        username, controller['_key']])
-
-
-def add_user_to_controllers(username, juju_username, password, company):
-    controllers = datastore.get_ready_controllers_no_access(username, company)
-    for controller in controllers:
-        c_name = controller['_key']
-        endpoint = controller["endpoints"][0]
-        cacert = controller["ca_cert"]
-        Popen(["python3", "{}/scripts/add_user_to_controller.py".format(settings.SOJOBO_API_DIR),
-        username, password, juju_username, c_name, endpoint, cacert])
-    if len(controllers) == 0:
-        datastore.set_user_state(username, 'ready')
-
 
 
 def update_ssh_keys_user(username, ssh_keys):
