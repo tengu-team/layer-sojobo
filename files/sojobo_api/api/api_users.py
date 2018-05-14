@@ -27,6 +27,7 @@ from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint
 
 from sojobo_api.api.core import w_errors as errors
+from sojobo_api.api.core import w_users as users
 from sojobo_api.api import w_juju as juju
 from sojobo_api.api.w_juju import execute_task
 from sojobo_api.api.core.authorization import authorize
@@ -204,27 +205,27 @@ def get_user_info(user):
 @USERS.route('/<user>', methods=['PUT'])
 def change_user_password(user):
     try:
-        user = unquote(user)
-        LOGGER.info('/USERS/%s [PUT] => receiving call', user)
+        username = unquote(user)
+        LOGGER.info('/USERS/%s [PUT] => receiving call', username)
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
-        LOGGER.info('/USERS/%s [PUT] => Authenticated!', user)
-        if authorize(auth_data, '/users/user', 'put', self_user=user):
-            if juju.user_exists(user):
-                pwd = request.json['password']
-                if pwd:
-                    juju.change_user_password(user, pwd)
-                    code, response = 200, 'Succesfully changed password for user {}'.format(user)
-                    LOGGER.info('/USERS/%s [PUT] => Succesfully changed password for user %s!', user, user)
+        LOGGER.info('/USERS/%s [PUT] => Authenticated!', username)
+        if authorize(auth_data, '/users/user', 'put', self_user=username):
+            if juju.user_exists(username):
+                password = request.json['password']
+                if password:
+                    users.change_user_password(username, password)
+                    code, response = 200, 'Succesfully changed password for user {}'.format(username)
+                    LOGGER.info('/USERS/%s [PUT] => Succesfully changed password for user %s!', username, username)
                 else:
                     code, response = errors.empty()
-                    LOGGER.error('/USERS/%s [PUT] => User password can\'t be empty!', user)
+                    LOGGER.error('/USERS/%s [PUT] => User password can\'t be empty!', username)
             else:
                 code, response = errors.does_not_exist('user')
-                LOGGER.error('/USERS/%s [PUT] => User %s does not exist!', user, user)
+                LOGGER.error('/USERS/%s [PUT] => User %s does not exist!', username, username)
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/USERS/%s [PUT] => No Permission to perform this action!', user)
+            LOGGER.error('/USERS/%s [PUT] => No Permission to perform this action!', username)
         return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()

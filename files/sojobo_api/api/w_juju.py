@@ -735,25 +735,6 @@ def add_user_to_controllers(username, juju_username, password, company):
         datastore.set_user_state(username, 'ready')
 
 
-def change_user_password(username, password):
-    user = datastore.get_user_info(username)
-    juju_username = user["juju_username"]
-
-    # A user its password is changed on all the controllers where the user resides.
-    # We only change the password if all controllers are ready, to avoid problems.
-    # This is a temporary solution until something better is found.
-    for controller in user["controllers"]:
-        if controller["state"] != "ready":
-            abort(403, """The password for user {} cannot be changed because not all controllers are ready yet.
-                          Please wait a few minutes before you try again.""".format(username))
-
-    for controller in user["controllers"]:
-        c_name = controller["_key"]
-        endpoint = controller['endpoints'][0]
-        ca_cert = controller['ca_cert']
-        Popen(["python3", "{}/scripts/change_password.py".format(settings.SOJOBO_API_DIR),
-                c_name, endpoint, ca_cert, juju_username, password])
-
 
 def update_ssh_keys_user(username, ssh_keys):
     user_info = datastore.get_user_info(username)

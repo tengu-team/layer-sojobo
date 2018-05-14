@@ -13,32 +13,49 @@
 #
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-# pylint: disable=c0111,c0301,c0325,c0103,r0913,r0902,e0401,C0302, R0914
 import asyncio
-import sys
 import traceback
 import logging
-from juju import tag, errors
+import sys
+sys.path.append('/opt')  # noqa: E402
+
+from juju import tag
 from juju.client import client
 from juju.controller import Controller
-sys.path.append('/opt')
-from sojobo_api import settings  #pylint: disable=C0413
+
+from sojobo_api import settings
 from sojobo_api.api.storage import w_datastore as datastore
-from sojobo_api.api import w_juju as juju  #pylint: disable=C0413
+from sojobo_api.api import w_juju as juju
 
 
-async def change_password(c_name, endpoint, ca_cert, juju_username, password):
+async def change_password(controller_name, juju_username, password):
+    """
+    This script will change the user his password on the given controller.
+
+    :param juju_username: The username as it is known by JUJU, not the same as
+        the username to log in.
+    :type juju_username: str.
+    :param password: The new password for the provided user.
+    :type password: str.
+    :param controller_name: The name of the controller where the password needs
+        to be changed
+    :type controller_name: str.
+    """
     try:
-        logger.info('Setting up Controller connection for %s.', c_name)
+        logger.info('Setting up Controller connection for %s.',
+                    controller_name)
+        controller = datastore.get_controller(controller_name)
         controller_connection = Controller()
-        await controller_connection.connect(endpoint=endpoint,
-                                            username=settings.JUJU_ADMIN_USER,
-                                            password=settings.JUJU_ADMIN_PASSWORD,
-                                            cacert=ca_cert)
+        await controller_connection.connect(
+                    endpoint=controller['endpoint'][0],
+                    username=settings.JUJU_ADMIN_USER,
+                    password=settings.JUJU_ADMIN_PASSWORD,
+                    cacert=controller['ca-cert'])
         logger.info('Controller connection as admin was successful.')
 
         logger.info('Initializing user manager facade...')
-        user_facade = client.UserManagerFacade.from_connection(controller_connection.connection)
+        user_facade = client.UserManagerFacade.from_connection(
+                            controller_connection.connection)
         entity = client.EntityPassword(password, tag.user(juju_username))
 
         logger.info('Changing password...')
@@ -59,7 +76,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('change_password')
-    hdlr = logging.FileHandler('{}/log/change_password.log'.format(settings.SOJOBO_API_DIR))
+    hdlr = logging.FileHandler(
+                '{}/log/change_password.log'.format(settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -69,6 +87,5 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
     result = loop.run_until_complete(change_password(sys.argv[1], sys.argv[2],
-                                                     sys.argv[3], sys.argv[4],
-                                                     sys.argv[5]))
+                                                     sys.argv[3]))
     loop.close()
