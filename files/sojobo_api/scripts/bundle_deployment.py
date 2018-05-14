@@ -26,7 +26,8 @@ import yaml
 from juju.model import Model, BundleHandler
 sys.path.append('/opt')
 from sojobo_api import settings
-from sojobo_api.api import w_datastore as datastore, w_juju as juju
+from sojobo_api.api.storage import w_datastore as datastore
+from sojobo_api.api import w_juju as juju
 ################################################################################
 # Helper Functions
 ################################################################################

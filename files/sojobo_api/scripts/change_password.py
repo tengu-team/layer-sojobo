@@ -23,7 +23,8 @@ from juju.client import client
 from juju.controller import Controller
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
-from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
+from sojobo_api.api.storage import w_datastore as datastore
+from sojobo_api.api import w_juju as juju  #pylint: disable=C0413
 
 
 async def change_password(c_name, endpoint, ca_cert, juju_username, password):
