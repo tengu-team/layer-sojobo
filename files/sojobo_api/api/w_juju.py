@@ -572,26 +572,6 @@ def add_bundle(username, password, c_name, m_name, bundle, company):
            username, password, c_key, m_name, str(json.dumps(bundle))])
 
 
-def deploy_app(connection, controller, modelkey, username, password, controller_type,
-                     units, config, machine, application, series, company):
-    c_key = construct_controller_key(controller, company)
-    if app_exists(connection, application):
-        abort(403, 'Application already exists!')
-    if(cloud_supports_series(controller_type, series)):
-        if machine and not machine_exists(connection, machine):
-            error = errors.does_not_exist(machine)
-            abort(error[0], error[1])
-        serie = '' if series is None else str(series)
-        target = '' if machine is None else str(machine)
-        Popen(["python3", "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
-               c_key, modelkey, username, password, units, target,
-               str(json.dumps(config)), application, serie])
-    else:
-        error = errors.invalid_option(series)
-        abort(error[0], error[1])
-
-
-
 def check_if_exposed(connection, app_name):
     app_info = get_application_info(connection, app_name)
     return app_info['exposed']

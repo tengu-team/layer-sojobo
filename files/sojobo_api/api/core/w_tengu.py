@@ -19,3 +19,23 @@ def add_relation(controller_key, endpoint, cacert, model_object, juju_username,
             raise ValueError(app2_name)
     else:
         raise ValueError(app1_name)
+
+
+def deploy_application(connection, controller, model, username, password, units,
+                       config, machine, application, series):
+    if not w_juju.app_exists(connection, application):
+        if w_juju.cloud_supports_series(controller_type, series):
+            if machine and not w_juju.machine_exists(connection, machine):
+                error = errors.does_not_exist("machine %s".format(machine))
+                raise ValueError(error)
+            serie = '' if series is None else str(series)
+            target = '' if machine is None else str(machine)
+            model_manager.add_application(controller.key, model.key, username,
+                                          password, units, target, config,
+                                          application, serie)
+        else:
+            error = 400, "The cloud \'%s\' does not support '%s' series.".format(controller.type, series)
+            raise ValueError(error)
+    else:
+        error = errors.already_exists("application %s".format(application))
+        raise ValueError(error)

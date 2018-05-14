@@ -1,9 +1,10 @@
-import subprocess
+from subprocess import Popen
 
 from sojobo_api import settings
 
 class ModelObject:
-    def __init__(self, name, state, uuid, credential_name):
+    def __init__(self, key, name, state, uuid, credential_name):
+        self.key = key
         self.name = name
         self.state = state
         self.uuid = uuid
@@ -19,6 +20,14 @@ def add_relation(controller_key, endpoint, cacert,  model,
     :type state: str.
 
     """
-    subprocess.Popen(["python3", "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
-                      controller_key, endpoint, cacert, model.name, model.uuid,
-                      juju_username, password, relation1, relation2])
+    Popen(["python3",
+           "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
+           controller_key, endpoint, cacert, model_name, model_uuid,
+           juju_username, password, relation1, relation2])
+
+def add_application(controller_key, model_key, username, password, units,
+                    target, config, application, serie):
+    Popen(["python3",
+           "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
+           c_key, modelkey, username, password, units, target,
+           str(json.dumps(config)), application, serie])
