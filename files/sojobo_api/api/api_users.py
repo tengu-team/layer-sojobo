@@ -60,7 +60,8 @@ def login():
         LOGGER.info('/USERS/login [POST] => receiving call')
         print(request.headers, request.authorization)
         auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'],
+                     request.authorization, auth_data)
         code, response = 200, 'Success'
         LOGGER.info('/USERS/login [POST] => Succesfully logged in!')
     except KeyError:
@@ -80,7 +81,8 @@ def get_users_info():
     try:
         LOGGER.info('/USERS [GET] => receiving call')
         auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'],
+                     request.authorization, auth_data)
         LOGGER.info('/USERS [GET] => Authenticated!')
         if auth_data['company']:
             company = auth_data['company']['name']
@@ -124,7 +126,8 @@ def create_user():
         LOGGER.info('/USERS [POST] => receiving call')
         data = request.json
         auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'],
+                     request.authorization, auth_data)
         LOGGER.info('/USERS [POST] => Authenticated!')
         if auth_data['company']:
             company = auth_data['company']['name']
@@ -133,10 +136,12 @@ def create_user():
         if juju.check_if_admin(request.authorization, company=company):
             if juju.user_exists(data['username']):
                 code, response = errors.already_exists('user')
-                LOGGER.error('/USERS [POST] => Username %s already exists!', data['username'])
+                LOGGER.error('/USERS [POST] => Username %s already exists!',
+                             data['username'])
             elif data['password']:
                 juju.create_user(data['username'], data['password'], company)
-                code, response = 202, 'User {} is being created'.format(data['username'])
+                code, response = 202, 'User {} is being created'.format(
+                            data['username'])
                 LOGGER.info('/USERS [POST] => Creating user %s, check add_user_to_controller.log for more information!',
                             data['username'])
             else:
@@ -165,9 +170,11 @@ def get_user_info(user):
         user = unquote(user)
         LOGGER.info('/USERS/%s [GET] => receiving call', user)
         auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'],
+                     request.authorization, auth_data)
         LOGGER.info('/USERS/%s [GET] => Authenticated!', user)
-        if authorize(auth_data, '/users/user', 'get', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/user', 'get', self_user=user,
+                     resource_user=user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_user_info(user)
                 LOGGER.info('/USERS/%s [GET] => Succesfully retrieved user information!', user)
@@ -208,36 +215,39 @@ def change_user_password(user):
         username = unquote(user)
         LOGGER.info('/USERS/%s [PUT] => receiving call', username)
         auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(juju.authenticate, request.headers['api-key'],
+                     request.authorization, auth_data)
         LOGGER.info('/USERS/%s [PUT] => Authenticated!', username)
         if authorize(auth_data, '/users/user', 'put', self_user=username):
-            if juju.user_exists(username):
-                password = request.json['password']
-                if password:
-                    users.change_user_password(username, password)
-                    code, response = 200, 'Succesfully changed password for user {}'.format(username)
-                    LOGGER.info('/USERS/%s [PUT] => Succesfully changed password for user %s!', username, username)
-                else:
-                    code, response = errors.empty()
-                    LOGGER.error('/USERS/%s [PUT] => User password can\'t be empty!', username)
+            password = request.json['password']
+            if password:
+                users.change_user_password(username, password)
+                return utils.create_response(200, 'Succesfully changed password for user {}'.format(username))
+                LOGGER.info('/USERS/%s [PUT] => Succesfully changed password for user %s!', username, username)
             else:
-                code, response = errors.does_not_exist('user')
+                code, response = errors.empty()
+                return utils.create_response(code, response)
+                LOGGER.error('/USERS/%s [PUT] => User password can\'t be empty!', username)
+                return utils.create_response(code, response)
                 LOGGER.error('/USERS/%s [PUT] => User %s does not exist!', username, username)
         else:
             code, response = errors.no_permission()
+            return utils.create_response(code, response)
             LOGGER.error('/USERS/%s [PUT] => No Permission to perform this action!', username)
-        return juju.create_response(code, response)
+    except ValueError as e:
+        error_log()
+        return utils.create_response(e.args[0], e.args[1])
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>', methods=['DELETE'])

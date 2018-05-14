@@ -1,9 +1,9 @@
 '''
 .. module: user_manager
 '''
-
 from subprocess import Popen
 from sojobo_api import settings
+from sojobo_api.api.storage import w_datastore as datastore
 
 
 class UserObject(object):
@@ -56,3 +56,7 @@ def change_user_password(juju_username, new_password, controller_name):
     Popen(["python3",
            "{}/scripts/change_password.py".format(settings.SOJOBO_API_DIR),
            controller_name, juju_username, new_password])
+
+
+def user_exists(username):
+    return datastore.user_exists(username)
