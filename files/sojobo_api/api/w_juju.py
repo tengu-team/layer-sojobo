@@ -31,7 +31,8 @@ from juju.client import client
 from juju.controller import Controller
 from juju.errors import JujuAPIError
 from juju.model import Model
-from sojobo_api.api import w_errors as errors, w_datastore as datastore
+from sojobo_api.api.core import w_errors as errors
+from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api import settings
 
 
@@ -647,6 +648,13 @@ def get_unit_ports(unit):
 def get_relations_info(connection):
     data = get_applications_info(connection)
     return [{'name': a['name'], 'relations': a['relations']} for a in data]
+
+
+def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, relation1, relation2, company):
+    c_key = construct_controller_key(c_name, company)
+    Popen(["python3", "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
+           c_key, endpoint, cacert,  m_name, uuid, juju_username, password,
+           relation1, relation2])
 
 
 def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, app1, app2, company):

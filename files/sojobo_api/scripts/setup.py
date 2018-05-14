@@ -22,7 +22,8 @@ import subprocess as sp
 import pyArango.connection as pyArango
 sys.path.append('/opt')
 from sojobo_api import settings
-from sojobo_api.api import w_juju as juju, w_datastore as datastore
+from sojobo_api.api.storage import w_datastore as datastore
+from sojobo_api.api import w_juju as juju
 
 
 def get_arangodb_connection(host, port, username, password):

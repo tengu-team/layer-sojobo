@@ -26,7 +26,8 @@ from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint
 
-from sojobo_api.api import w_errors as errors, w_juju as juju
+from sojobo_api.api.core import w_errors as errors
+from sojobo_api.api import w_juju as juju
 from sojobo_api.api.w_juju import execute_task
 from sojobo_api.api.core.authorization import authorize
 
@@ -634,11 +635,15 @@ def get_models_access(user, controller):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Authenticated!', user, controller)
+<<<<<<< HEAD
         if auth_data['company']:
             comp = auth_data['company']['name']
         else:
             comp = None
         if juju.authorize(auth_data, '/users/user/controllers/controller/models', 'get', self_user=user, resource_user=user):
+=======
+        if authorize(auth_data, '/users/user/controllers/controller/models', 'get', self_user=user, resource_user=user):
+>>>>>>> d4bbc512040614b965e601bb5a925c530d365916
             if juju.user_exists(user):
                 LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Authorized!', user, controller)
                 code, response = 200, juju.get_models_access(user, controller, comp)

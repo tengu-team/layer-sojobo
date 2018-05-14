@@ -25,7 +25,8 @@ from juju.controller import Controller
 from juju.errors import JujuAPIError, JujuError
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
-from sojobo_api.api import w_datastore as datastore, w_juju as juju  #pylint: disable=C0413
+from sojobo_api.api.storage import w_datastore as datastore
+from sojobo_api.api import w_juju as juju  #pylint: disable=C0413
 
 
 async def create_model(c_name, m_key, m_name, usr, pwd, cred_name, workspace_type):

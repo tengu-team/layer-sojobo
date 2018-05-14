@@ -20,7 +20,8 @@ import logging
 from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint, abort
 from sojobo_api.api.w_juju import create_response
-from sojobo_api.api import w_juju as juju, w_errors as errors
+from sojobo_api.api import w_juju as juju
+from sojobo_api.api.core import w_errors as errors
 from sojobo_api import settings
 
 

@@ -24,7 +24,8 @@ from juju.client import client
 from juju.model import Model
 sys.path.append('/opt')
 from sojobo_api import settings
-from sojobo_api.api import w_datastore as datastore, w_juju as juju
+from sojobo_api.api.storage import w_datastore as datastore
+from sojobo_api.api import w_juju as juju
 
 
 async def add_application(c_name, m_key, username, password, units, machine, config, application, series):

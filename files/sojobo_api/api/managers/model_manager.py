@@ -10,8 +10,8 @@ class ModelObject:
         self.uuid = uuid
         self.credential_name = credential_name
 
-def add_relation(controller_key, endpoint, cacert,  model,
-                 juju_username, password, relation1, relation2):
+def add_relation(controller_key, endpoint, cacert,  model_name,
+                 model_uuid, juju_username, password, relation1, relation2):
     """Executes background script that adds a relation between two applications in a model.
 
     :param controller_name: The name of the controller where the model resides.
