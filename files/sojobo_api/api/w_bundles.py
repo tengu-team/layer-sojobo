@@ -28,7 +28,7 @@ import hashlib
 import requests
 import yaml
 from flask import abort, Response
-from sojobo_api.api import w_datastore as datastore
+from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api import settings
 
 
