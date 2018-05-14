@@ -28,6 +28,8 @@ from flask import send_file, request, Blueprint, abort
 
 from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
 from sojobo_api.api.w_juju import execute_task
+from sojobo_api.api.core import w_tengu
+from sojobo_api.api.managers import model_manager
 from sojobo_api.api.core.authorization import authorize
 
 TENGU = Blueprint('tengu', __name__)
@@ -1031,52 +1033,39 @@ def get_relations_info(controller, model):
 @TENGU.route('/controllers/<controller>/models/<model>/relations', methods=['PUT'])
 def add_relation(controller, model):
     try:
-        controller = unquote(controller)
-        model = unquote(model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => receiving call', controller, model)
-        data = request.json
-        auth_data = juju.get_connection_info(request.authorization, controller, model)
-        model_connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller, model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authenticated!', controller, model)
-        if auth_data['company']:
-            comp = auth_data['company']['name']
-        else:
-            comp = None
+        controller_name = unquote(controller)
+        model_name = unquote(model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => receiving call', controller_name, model_name)
+        json_data = request.json
+        auth_data = juju.get_connection_info(request.authorization, controller_name, model_name)
+        model_connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller_name, model_name)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authenticated!', controller_name, model_name)
         if authorize(auth_data, '/controllers/controller/models/model/relations', 'put'):
-            LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authorized!', controller, model)
-            # TODO: Proper check will have to be implemented!
-            relation1, relation2 = data['app1'], data['app2']
-            app1, app2 = data['app1'], data['app2']
-            if ':' in app1:
-                app1 = app1.split(':')[0]
-            if ':' in app2:
-                app2 = app2.split(':')[0]
-
-            print("======DEBUGGING=====")
-            print(app1)
-            print(app2)
-
-            if juju.app_exists(model_connection, app1) and juju.app_exists(model_connection, app2):
-
-                # TODO: Check if relation is ambiguous.
-
+            LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Authorized!', controller_name, model_name)
+            try:
+                relation1 = json_data["app1"]
+                relation2 = json_data["app2"]
+                # TODO: Model object should be retrieved from connection info.
+                model_object = model_manager.ModelObject(name = auth_data["model"]["name"],
+                                                         state= auth_data["model"]["state"],
+                                                         uuid = auth_data["model"]["uuid"],
+                                                         credential_name = auth_data["model"]["credential"])
+                # TODO: Use controller object
                 endpoint = auth_data["controller"]["endpoints"][0]
                 cacert = auth_data["controller"]["ca_cert"]
-                m_name = auth_data["model"]["name"]
-                uuid = auth_data["model"]["uuid"]
                 juju_username = auth_data["user"]["juju_username"]
                 password = request.authorization.password
-                juju.add_relation(controller, endpoint, cacert,m_name, uuid,
-                                  juju_username, password, relation1, relation2, comp)
-
-                code, response = 202, "Relationship between {} and {} is being created!".format(app1, app2)
-                LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Relationship succesfully created.', controller, model)
-            else:
-                code, response = errors.does_not_exist('application')
-                LOGGER.error('/TENGU/controllers/%s/models/%s/relations [PUT] => Application does not exist!', controller, model)
+                w_tengu.add_relation(auth_data["controller"]["_key"], endpoint,
+                                     cacert,model_object, juju_username, password,
+                                     relation1, relation2, model_connection)
+                code, response = 202, "Relationship between {} and {} is being created!".format(relation1, relation2)
+                LOGGER.info('/TENGU/controllers/%s/models/%s/relations [PUT] => Relationship succesfully created.', controller_name, model_name)
+            except ValueError as e:
+                code, response = errors.does_not_exist("application" + e.args[0])
+                LOGGER.error('/TENGU/controllers/%s/models/%s/relations [PUT] => Application %s does not exist!', controller_name, model_name, e.args[0])
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/TENGU/controllers/%s/models/%s/relations [PUT] => No permission to perform this acion!', controller, model)
+            LOGGER.error('/TENGU/controllers/%s/models/%s/relations [PUT] => No permission to perform this acion!', controller_name, model_name)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
