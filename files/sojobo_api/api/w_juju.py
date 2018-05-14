@@ -669,13 +669,6 @@ def get_relations_info(connection):
     return [{'name': a['name'], 'relations': a['relations']} for a in data]
 
 
-def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, relation1, relation2, company):
-    c_key = construct_controller_key(c_name, company)
-    Popen(["python3", "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
-           c_key, endpoint, cacert,  m_name, uuid, juju_username, password,
-           relation1, relation2])
-
-
 def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, app1, app2, company):
     c_key = construct_controller_key(c_name, company)
     Popen(["python3", "{}/scripts/remove_relation.py".format(settings.SOJOBO_API_DIR),
