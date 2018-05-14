@@ -23,8 +23,8 @@ from werkzeug.exceptions import HTTPException
 from sojobo_api.api.w_juju import execute_task
 from flask import request, Blueprint, abort
 from sojobo_api.api.storage import w_datastore as datastore
-from sojobo_api.api import w_juju as juju, w_bundles as bundles
-from sojobo_api.api.core import w_errors as errors
+from sojobo_api.api import w_juju as juju
+from sojobo_api.api.core import w_errors as errors, w_bundles as bundles
 from sojobo_api import settings
 
 
