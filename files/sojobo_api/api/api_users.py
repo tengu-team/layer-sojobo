@@ -21,11 +21,14 @@ import sys
 import traceback
 import base64
 import hashlib
+
 from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint
+
 from sojobo_api.api import w_errors as errors, w_juju as juju
 from sojobo_api.api.w_juju import execute_task
+from sojobo_api.api.core.authorization import authorize
 
 
 USERS = Blueprint('users', __name__)
@@ -162,7 +165,7 @@ def get_user_info(user):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [GET] => Authenticated!', user)
-        if juju.authorize(auth_data, '/users/user', 'get', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/user', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_user_info(user)
                 LOGGER.info('/USERS/%s [GET] => Succesfully retrieved user information!', user)
@@ -205,7 +208,7 @@ def change_user_password(user):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [PUT] => Authenticated!', user)
-        if juju.authorize(auth_data, '/users/user', 'put', self_user=user):
+        if authorize(auth_data, '/users/user', 'put', self_user=user):
             if juju.user_exists(user):
                 pwd = request.json['password']
                 if pwd:
@@ -282,7 +285,7 @@ def get_ssh_keys(user):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/ssh-keys [GET] => Authenticated!', user)
-        if juju.authorize(auth_data, '/users/user/ssh-keys', 'get', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/user/ssh-keys', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_ssh_keys_user(user)
                 LOGGER.info('/USERS/%s/ssh-keys [GET] => Succesfully returned ssh-keys!', user)
@@ -315,7 +318,7 @@ def update_ssh_keys(user):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => Authenticated!', user)
-        if juju.authorize(auth_data, '/users/user/ssh-keys', 'put', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/user/ssh-keys', 'put', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 for key in http_body['ssh-keys']:
                     try:
@@ -356,7 +359,7 @@ def get_credentials(user):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials [GET] => Authenticated!', user)
-        if juju.authorize(auth_data, '/users/user/credentials', 'get', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/user/credentials', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_credentials(user)
                 LOGGER.info('/USERS/%s/credentials [GET] => Succesfully retrieved credentials!', user)
@@ -389,7 +392,7 @@ def add_credential(user):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials [POST] => Authenticated!', user)
-        if juju.authorize(auth_data, '/users/credentials', 'post', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/credentials', 'post', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 if not juju.credential_exists(user, credential['name']):
                     LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
@@ -429,7 +432,7 @@ def get_credential(user, credential):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials/%s [GET] => Authenticated!', user, credential)
-        if juju.authorize(auth_data, '/users/credentials/credential', 'get', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/credentials/credential', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 if juju.credential_exists(user, credential):
                     code, response = 200, juju.get_credential(user, credential)
@@ -464,7 +467,7 @@ def remove_credential(user, credential):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Authenticated!', user, credential)
-        if juju.authorize(auth_data, '/users/credentials/credential', 'del', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/credentials/credential', 'del', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 if juju.credential_exists(user, credential):
                     juju.remove_credential(user, credential)
@@ -500,7 +503,7 @@ def get_controllers_access(user):
         auth_data = juju.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers [GET] => Authenticated', user)
-        if juju.authorize(auth_data, '/users/controllers', 'get', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/controllers', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 code, response = 200, juju.get_controllers_access(user)
                 LOGGER.info('/USERS/%s/controllers [GET] => Succesfully retrieved controllers access!', user)
@@ -546,7 +549,7 @@ def get_ucontroller_access(user, controller):
         auth_data = juju.get_connection_info(request.authorization, c_name=controller)
         execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s [GET] => Authenticated!', user, controller)
-        if juju.authorize(auth_data, '/users/user/controllers/controller', 'get', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/user/controllers/controller', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 LOGGER.info('/USERS/%s/controllers/%s [GET] => Authorized!', user, controller)
                 code, response = 200, juju.get_ucontroller_access(auth_data['controller'], user)
@@ -590,7 +593,7 @@ def grant_to_controller(user, controller):
             comp = auth_data['company']['name']
         else:
             comp = None
-        if juju.authorize(auth_data, '/users/user/controllers/controller', 'put'):
+        if authorize(auth_data, '/users/user/controllers/controller', 'put'):
             if juju.user_exists(user):
                 if request.json['access'] and juju.c_access_exists(request.json['access'].lower()):
                     juju.grant_user_to_controller(controller, user, request.json['access'].lower(), comp)
@@ -683,7 +686,7 @@ def grant_to_model(user, controller):
             comp = auth_data['company']['name']
         else:
             comp = None
-        if juju.authorize(auth_data, '/users/user/controllers/controller/models', 'put'):
+        if authorize(auth_data, '/users/user/controllers/controller/models', 'put'):
             if juju.user_exists(user):
                 juju.set_models_access(user, controller, models_access_levels, comp)
                 LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Setting model access, check set_model_access.log for more information!', user, controller)
@@ -723,7 +726,7 @@ def get_model_access(user, controller, model):
             comp = auth_data['company']['name']
         else:
             comp = None
-        if juju.authorize(auth_data, '/users/user/controllers/controller/models/model', 'get', self_user=user, resource_user=user):
+        if authorize(auth_data, '/users/user/controllers/controller/models/model', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
                 access = juju.get_model_access(model, controller, user, comp)
                 code, response = 200, {'access' : access}

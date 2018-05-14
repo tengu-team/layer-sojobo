@@ -9,7 +9,7 @@ It is used to check if a user has the rights to perform certain actions.
 """
 
 
-permissions = {
+PERMISSIONS = {
 	"/bundles/types": {
 		"get": {
 			"c_access": ["admin", "company_admin", "superuser", "add-model", "login"]
@@ -180,15 +180,56 @@ permissions = {
 }
 
 
+def authorize(connection_info, resource, method, self_user=None, resource_user=None):
+    """Checks if a user is authorized to perform a certain http method on
+    a certain resource. F.e. Is the user allowed to create a model?
+
+    :param connection_info: Contains the controller and/or model access of the
+    user that is trying to authorize.
+
+    :param resource: The resource that the user tries to perform an action on.
+
+    :param method: The HTTP method (get, put, post, del).
+
+    :param self_user: Calls like changing the password of a user can be done
+    by an admin OR the user himself. In the latter case 'self_user' must
+    contain the user that is provided in the API call.
+
+    :param resource_user: A superuser is allowed to access and update info of
+    other users if they are on the same controller. When 'resource_user' is
+    provided there needs to be checked if the authenticated user is at least
+    superuser on a controller where resource_user resides. 'resource_user' is
+    only needed for User API calls."""
+
+    # Admin has authorization in every situation.
+    if connection_info["user"]["name"] == settings.JUJU_ADMIN_USER:
+        return True
+    elif self_user == connection_info["user"]["name"]:
+        return True
+    elif connection_info['company'] and connection_info['company']['is_admin']:
+        return True
+    elif "m_access" in connection_info:
+        return m_authorize(connection_info, resource, method)
+    elif "c_access" in connection_info:
+        return c_authorize(connection_info, resource, method)
+    # If no 'm_access' or 'c_access' is found in the connection info then there will
+    # only be user info.
+    elif "user" in connection_info and resource_user:
+        return superuser_authorize(connection_info["user"]["name"],
+                                               resource_user)
+    else:
+        return False
+
+
 def c_authorize(controller_connection_info, resource, method):
     controller_access = controller_connection_info['c_access']
-    allowed_access_levels = permissions[resource][method]['c_access']
+    allowed_access_levels = PERMISSIONS[resource][method]['c_access']
     return controller_access in allowed_access_levels
 
 
 def m_authorize(model_connection_info, resource, method):
     model_access = model_connection_info['m_access']
-    allowed_access_levels = permissions[resource][method]['m_access']
+    allowed_access_levels = PERMISSIONS[resource][method]['m_access']
     return model_access in allowed_access_levels
 
 
