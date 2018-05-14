@@ -1,8 +1,9 @@
 
 
 class ControllerObject:
-    def __init__(self, name, state, type, region, models, endpoints, uuid,
+    def __init__(self, key, name, state, type, region, models, endpoints, uuid,
                  ca_cert, default_credential_name):
+        self.key = key
         self.name = name
         self.state = state
         self.type = type
