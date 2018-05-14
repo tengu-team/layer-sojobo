@@ -19,24 +19,23 @@ import sys
 import traceback
 import logging
 import json
+
 from juju.client import client
 from juju.model import Model
 from juju.placement import parse as parse_placement
 from juju.errors import JujuAPIError
+
 sys.path.append('/opt')
 from sojobo_api import settings
 from sojobo_api.api import w_datastore as datastore, w_juju as juju
 
 
-async def add_relation(c_name, endpoint, cacert, m_name, uuid, juju_username, password, relation1, relation2):
+async def add_relation(controller_key, endpoint, cacert, model_name, uuid,
+                       juju_username, password, relation1, relation2):
     try:
-        logger.info('Setting up Model connection for %s:%s.', c_name, m_name)
+        logger.info('Setting up Model connection for %s:%s.', controller_key, model_name)
         model_connection = Model()
-        await model_connection.connect(endpoint,
-                                       uuid,
-                                       juju_username,
-                                       password,
-                                       cacert)
+        await model_connection.connect(endpoint, uuid, juju_username, password, cacert)
         logger.info('Model connection was successful.')
 
         app_facade = client.ApplicationFacade.from_connection(model_connection.connection)
@@ -51,7 +50,6 @@ async def add_relation(c_name, endpoint, cacert, m_name, uuid, juju_username, pa
                 logger.info('Relation %s <-> %s already exists', relation1, relation2)
             else:
                 raise
-
 
         await model_connection.disconnect()
     except Exception as e:
