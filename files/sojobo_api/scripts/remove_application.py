@@ -24,7 +24,8 @@ from juju.model import Model
 from juju.placement import parse as parse_placement
 sys.path.append('/opt')
 from sojobo_api import settings
-from sojobo_api.api import w_datastore as datastore, w_juju as juju
+from sojobo_api.api.storage import w_datastore as datastore
+from sojobo_api.api import w_juju as juju
 
 
 async def remove_application(username, password, c_name, m_key, app_name):
