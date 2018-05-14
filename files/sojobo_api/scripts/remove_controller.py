@@ -20,7 +20,7 @@ import traceback
 import sys
 sys.path.append('/opt')
 from sojobo_api import settings  #pylint: disable=C0413
-from sojobo_api.api import w_datastore as datastore#pylint: disable=C0413
+from sojobo_api.api.storage import w_datastore as datastore#pylint: disable=C0413
 
 
 def remove_controller(name, c_type):

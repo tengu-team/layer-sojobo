@@ -26,7 +26,9 @@ from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 from flask import send_file, request, Blueprint, abort
 
-from sojobo_api.api import w_errors as errors, w_juju as juju, w_datastore as datastore
+from sojobo_api.api import w_juju as juju
+from sojobo_api.api.storage import w_datastore as datastore
+from sojobo_api.api.core import w_errors as errors
 from sojobo_api.api.w_juju import execute_task
 from sojobo_api.api.core import w_tengu
 from sojobo_api.api.managers import model_manager, controller_manager

@@ -24,7 +24,8 @@ from juju import tag, errors
 from juju.client import client
 from juju.controller import Controller
 from sojobo_api import settings  #pylint: disable=C0413
-from sojobo_api.api import w_datastore as ds, w_juju as juju  #pylint: disable=C0413
+from sojobo_api.api.storage import w_datastore as datastore
+from sojobo_api.api import w_juju as juju  #pylint: disable=C0413
 
 
 async def remove_credential(username, cred_name):
@@ -34,7 +35,7 @@ async def remove_credential(username, cred_name):
         cred = juju.get_credential(username, cred_name)
         credential_name = 't{}'.format(hashlib.md5(cred_name.encode('utf')).hexdigest())
 
-        comp = ds.get_company_user(username)
+        comp = datastore.get_company_user(username)
         if not comp:
             company = None
         else:
@@ -43,7 +44,7 @@ async def remove_credential(username, cred_name):
         logger.info('Succesfully retrieved credential from database...')
 
         c_type = cred['type']
-        controllers = ds.get_cloud_controllers(username, c_type, company=company)
+        controllers = datastore.get_cloud_controllers(username, c_type, company=company)
 
         for con in controllers:
             if con["type"] == c_type:
@@ -62,7 +63,7 @@ async def remove_credential(username, cred_name):
                 logger.info('Credential was successfully removed from controller %s.', con["name"])
 
         logger.info('Removing credential from database...')
-        ds.remove_credential(username, cred_name)
+        datastore.remove_credential(username, cred_name)
         logger.info('Succesfully removed credential!')
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()
