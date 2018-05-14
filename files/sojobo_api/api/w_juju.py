@@ -31,7 +31,8 @@ from juju.client import client
 from juju.controller import Controller
 from juju.errors import JujuAPIError
 from juju.model import Model
-from sojobo_api.api import w_errors as errors, w_datastore as datastore
+from sojobo_api.api.core import w_errors as errors
+from sojobo_api.api import w_datastore as datastore
 from sojobo_api import settings
 
 
