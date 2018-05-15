@@ -461,33 +461,33 @@ def add_application(controller, model):
         LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authenticated!', controller_name, model_name)
         if authorize(auth_data, '/controllers/controller/models/model/applications', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authorized!', controller_name, model_name)
-                # TODO: Model object should be retrieved from connection info.
-                model_object = model_manager.ModelObject(key = auth_data["model"]["_key"],
-                                                         name = auth_data["model"]["name"],
-                                                         state= auth_data["model"]["state"],
-                                                         uuid = auth_data["model"]["uuid"],
-                                                         credential_name = auth_data["model"]["credential"])
-                # TODO: Controller object should be retrieved from connection info.
-                controller_object = controller_manager.ControllerObject(key = auth_data["controller"]["_key"],
-                                                                        name = auth_data["controller"]["name"],
-                                                                        state= auth_data["controller"]["state"],
-                                                                        type = auth_data["controller"]["type"],
-                                                                        region = auth_data["controller"]["region"],
-                                                                        models = auth_data["controller"]["models"],
-                                                                        endpoints = auth_data["controller"]["endpoints"],
-                                                                        uuid = auth_data["controller"]["uuid"],
-                                                                        ca_cert = auth_data["controller"]["ca_cert"],
-                                                                        default_credential_name = auth_data["controller"]["default-credential"])
-                try:
-                    w_tengu.deploy_app(connection, controller_object, model_object, request.authorization.username, request.authorization.password,
-                                    json_data.get('units', '1'), json_data.get('config', ''), json_data.get('target', None),
-                                    json_data.get('application', None), json_data.get('series', None))
-                    code, response = 202, 'Application is being deployed!'
-                    LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller_name, model_name)
-                    return juju.create_response(code, response)
-                except ValueError as:
-                    code, response = e.args[0], e.args[1]
-                    return juju.create_response(code, response)
+            # TODO: Model object should be retrieved from connection info.
+            model_object = model_manager.ModelObject(key = auth_data["model"]["_key"],
+                                                     name = auth_data["model"]["name"],
+                                                     state= auth_data["model"]["state"],
+                                                     uuid = auth_data["model"]["uuid"],
+                                                     credential_name = auth_data["model"]["credential"])
+            # TODO: Controller object should be retrieved from connection info.
+            controller_object = controller_manager.ControllerObject(key = auth_data["controller"]["_key"],
+                                                                    name = auth_data["controller"]["name"],
+                                                                    state= auth_data["controller"]["state"],
+                                                                    type = auth_data["controller"]["type"],
+                                                                    region = auth_data["controller"]["region"],
+                                                                    models = auth_data["controller"]["models"],
+                                                                    endpoints = auth_data["controller"]["endpoints"],
+                                                                    uuid = auth_data["controller"]["uuid"],
+                                                                    ca_cert = auth_data["controller"]["ca_cert"],
+                                                                    default_credential_name = auth_data["controller"]["default-credential"])
+            try:
+                w_tengu.deploy_app(connection, controller_object, model_object, request.authorization.username, request.authorization.password,
+                                json_data.get('units', '1'), json_data.get('config', ''), json_data.get('target', None),
+                                json_data.get('application', None), json_data.get('series', None))
+                code, response = 202, 'Application is being deployed!'
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller_name, model_name)
+                return juju.create_response(code, response)
+            except ValueError as e:
+                code, response = e.args[0], e.args[1]
+                return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/TENGU/controllers/%s/models/%s/applications [GET] => No Permission to perform this action!', controller_name, model_name)
