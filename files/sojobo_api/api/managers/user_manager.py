@@ -43,14 +43,11 @@ def change_user_password(juju_username, new_password, controller_name):
     """
     This function will change the user his password on the given controller.
 
-    :param juju_username: The username as it is known by JUJU, not the same as
+    :param str username: The username as it is known by JUJU, not the same as
         the username to log in.
-    :type juju_username: str.
-    :param new_password: The new password for the provided user.
-    :type new_password: str.
-    :param controller_name: The name of the controller where the password needs
-        to be changed
-    :type controller_name: str.
+    :param str new_password: The new password for the provided user.
+    :param str controller_name: The name of the controller where
+        the password needs to be changed
     """
     Popen(["python3",
            "{}/scripts/change_password.py".format(settings.SOJOBO_API_DIR),
@@ -58,6 +55,18 @@ def change_user_password(juju_username, new_password, controller_name):
 
 
 def add_user_to_controller(username, juju_username, password, controller_key):
+    '''
+    This function will add a user to a certain controller.
+
+    :param str username: The username used to login to the Tengu
+        environment.
+    :param str password: The pasword used to login to the Tengu
+        environment.
+    :param str juju_username: The username as it is known by JUJU, not the
+        same as the username to log in
+    :param str controller_key: The unique hash generated from company name and
+    provided controller name
+    '''
     Popen(["python3",
            "{}/scripts/add_user_to_controller.py".format(
                 settings.SOJOBO_API_DIR),
@@ -68,6 +77,14 @@ def add_user_to_controller(username, juju_username, password, controller_key):
 
 
 def remove_user_from_controller(username, controller_key):
+    '''
+    This function will remove a user from a certain controller.
+
+    :param str username: The username used to login to the Tengu
+        environment.
+    :param str controller_key: The unique hash generated from company name and
+    provided controller name
+    '''
     Popen(["python3",
            "{}/scripts/remove_user_from_controller.py".format(
                 settings.SOJOBO_API_DIR),
@@ -76,4 +93,10 @@ def remove_user_from_controller(username, controller_key):
 
 
 def user_exists(username):
+    '''
+    This function will check if a user already exists or not.
+
+    :param str username: The username used to login to the Tengu
+        environment.
+    '''
     return datastore.user_exists(username)

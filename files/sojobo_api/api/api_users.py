@@ -28,10 +28,10 @@ from flask import request, Blueprint
 
 from sojobo_api.api.core import w_errors as errors
 from sojobo_api.api.core import w_users as users
-from sojobo_api.api import w_juju as juju
+from sojobo_api.api import w_juju as juju, utils
 from sojobo_api.api.w_juju import execute_task
 from sojobo_api.api.core.authorization import authorize
-
+from sojobo_api.api.core.authentication import authenticate
 
 USERS = Blueprint('users', __name__)
 LOGGER = logging.getLogger("api_users")
@@ -58,22 +58,23 @@ def initialize():
 def login():
     try:
         LOGGER.info('/USERS/login [POST] => receiving call')
-        print(request.headers, request.authorization)
-        auth_data = juju.get_connection_info(request.authorization)
+        user = utils.get_connection_info(request.authorization)
         execute_task(juju.authenticate, request.headers['api-key'],
-                     request.authorization, auth_data)
+                     request.authorization, user)
         code, response = 200, 'Success'
         LOGGER.info('/USERS/login [POST] => Succesfully logged in!')
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/', methods=['GET'])
@@ -106,18 +107,18 @@ def get_users_info():
                         if con['name'] != 'login':
                             new_controllers.append(con)
                     user['controllers'] = new_controllers
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/', methods=['POST'])
@@ -135,33 +136,33 @@ def create_user():
             company = None
         if authorize(auth_data, '/users/', 'post'):
             if data['password']:
-                juju.create_user(data['username'], data['password'], company)
+                users.create_user(data['username'], data['password'], company)
                 return utils.create_response(202, 'User {} is being created'.format(
                             data['username']))
                 LOGGER.info('/USERS [POST] => Creating user %s, check add_user_to_controller.log for more information!',
                             data['username'])
             else:
                 code, response = errors.empty()
-                return juju.create_response(code, response)
+                return utils.create_response(code, response)
                 LOGGER.error('/USERS [POST] => Password cannot be empty!')
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS [POST] => No Permission to perform this action!')
-            return juju.create_response(code, response)
+            return utils.create_response(code, response)
     except ValueError as e:
         error_log()
         return utils.create_response(e.args[0], e.args[1])
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>', methods=['GET'])
@@ -195,18 +196,18 @@ def get_user_info(user):
                 if con['name'] != 'login':
                     new_controllers.append(con)
             response['controllers'] = new_controllers
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>', methods=['PUT'])
@@ -286,7 +287,7 @@ def delete_user(user):
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+    return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/ssh-keys', methods=['GET'])
@@ -307,18 +308,18 @@ def get_ssh_keys(user):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/ssh-keys [GET] => No Permission to perform this action!', user)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/ssh-keys', methods=['PUT'])
@@ -339,7 +340,7 @@ def update_ssh_keys(user):
                         output = ':'.join(a+b for a,b in zip(fp_plain[::2], fp_plain[1::2]))
                     except Exception:
                         code, response = errors.invalid_ssh_key(key)
-                        return juju.create_response(code, response)
+                        return utils.create_response(code, response)
                 juju.update_ssh_keys_user(user, http_body['ssh-keys'])
                 LOGGER.info('/USERS/%s/ssh-keys [PUT] => SSH-keys are being updated, check update_ssh_keys_all_models.log for more information!', user)
                 code, response = 202, 'SSH-keys are being updated'
@@ -349,18 +350,18 @@ def update_ssh_keys(user):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/ssh-keys [PUT] => No Permission to perform this action!', user)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials', methods=['GET'])
@@ -381,18 +382,18 @@ def get_credentials(user):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials [GET] => No Permission to perform this action!', user)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials', methods=['POST'])
@@ -410,30 +411,30 @@ def add_credential(user):
                     LOGGER.info('/USERS/%s/credentials [POST] => Adding credentials, check add_credential.log for more information!', user)
                     juju_username = juju.get_user_info(user)["juju_username"]
                     code, response = juju.add_credential(user, juju_username, request.authorization.password, credential)
-                    return juju.create_response(code, response)
+                    return utils.create_response(code, response)
                 else:
                     code, response = errors.already_exists('credential')
                     LOGGER.error('/USERS/%s/credentials [POST] => Credential for User %s already exists!', user, user)
-                    return juju.create_response(code, response)
+                    return utils.create_response(code, response)
             else:
                 code, response = errors.does_not_exist('user')
                 LOGGER.error('/USERS/%s/credentials [POST] => User %s does not exist!', user, user)
-                return juju.create_response(code, response)
+                return utils.create_response(code, response)
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials [POST] => No Permission to perform this action!', user)
-            return juju.create_response(code, response)
+            return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials/<credential>', methods=['GET'])
@@ -457,18 +458,18 @@ def get_credential(user, credential):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials/%s [GET] => No Permission to perform this action!', user, credential)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/credentials/<credential>', methods=['DELETE'])
@@ -493,18 +494,18 @@ def remove_credential(user, credential):
         else:
             code, response = errors.no_permission()
             LOGGER.error('/USERS/%s/credentials/%s [DELETE] => No Permission to perform this action!', user, credential)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers', methods=['GET'])
@@ -538,18 +539,18 @@ def get_controllers_access(user):
             if con['name'] != 'login':
                 new_controllers.append(con)
         response = new_controllers
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['GET'])
@@ -577,18 +578,18 @@ def get_ucontroller_access(user, controller):
             if mod['name'] != 'controller' and mod['name'] != 'default':
                 new_models.append(mod)
         response['models'] = new_models
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>', methods=['PUT'])
@@ -620,18 +621,18 @@ def grant_to_controller(user, controller):
         else:
             LOGGER.error('/USERS/%s/controllers/%s [PUT] => No Permission to perform this action', user, controller)
             code, response = errors.no_permission()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
@@ -673,18 +674,18 @@ def get_models_access(user, controller):
             if mod['name'] != 'controller' and mod['name'] != 'default':
                 new_models.append(mod)
         response = new_models
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>/models', methods=['PUT'])
@@ -713,18 +714,18 @@ def grant_to_model(user, controller):
         else:
             LOGGER.error('/USERS/%s/controllers/%s/models [PUT] => No Permission to perform this action!', user, controller)
             code, response = errors.no_permission()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
     except HTTPException:
         ers = error_log()
         raise
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-        return juju.create_response(code, response)
+        return utils.create_response(code, response)
 
 
 @USERS.route('/<user>/controllers/<controller>/models/<model>', methods=['GET'])
@@ -763,7 +764,7 @@ def get_model_access(user, controller, model):
     except Exception:
         ers = error_log()
         code, response = errors.cmd_error(ers)
-    return juju.create_response(code, response)
+    return utils.create_response(code, response)
 
 def error_log():
     exc_type, exc_value, exc_traceback = sys.exc_info()

@@ -27,11 +27,12 @@ from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api import w_juju as juju
 
 
-async def add_user_to_controller(username, password, juju_username, c_name):
+async def add_user_to_controller(username, password,
+                                 juju_username, controller_key):
     try:
-        logger.info('Adding user %s to controller %s...', username, c_name)
-        logger.info('Setting up Controller connection for %s...', c_name)
-        controller = datastore.get_controller(c_name)
+        logger.info('Adding user %s to controller %s...', username, controller_key)
+        logger.info('Setting up Controller connection for %s...', controller_key)
+        controller = datastore.get_controller(controller_key)
         controller_connection = Controller()
         await controller_connection.connect(
                     endpoint=controller['endpoint'],
@@ -47,15 +48,15 @@ async def add_user_to_controller(username, password, juju_username, c_name):
                                 password=password)]
         await user_facade.AddUser(users)
 
-        logger.info('%s -> Adding credentials', c_name)
+        logger.info('%s -> Adding credentials', controller_key)
 
         await juju.update_cloud(controller_connection, controller['type'],
                                 controller['default-credential'],
                                 juju_username, settings.JUJU_ADMIN_USER)
 
-        datastore.add_user_to_controller(c_name, username, 'login')
+        datastore.add_user_to_controller(controller_key, username, 'login')
         logger.info('Succesfully added user %s to controller %s!',
-                    username, c_name)
+                    username, controller_key)
         datastore.set_user_state(username, 'ready')
     except Exception as e:
         exc_type, exc_value, exc_traceback = sys.exc_info()

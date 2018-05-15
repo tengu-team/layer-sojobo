@@ -1,5 +1,9 @@
 import json
 import datetime
+from random import randint
+from juju.controller import Controller
+from juju.errors import JujuAPIError
+
 from Flask import Response
 from sojobo_api.api.core import w_errors as errors
 from sojobo_api.api.storage import w_datastore as datastore
@@ -11,6 +15,11 @@ from sojobo_api.api.managers import (
 
 
 def give_timestamp():
+    '''
+    This function will generate the current timestamp in the right format. This
+    is used to add a timestamp to the juju_username. In that way, there will
+    allways be an unique juju username.
+    '''
     dt = datetime.datetime.now()
     dt_values = [dt.month, dt.day, dt.hour, dt.minute, dt.second]
     timestamp = str(dt.year)
@@ -30,6 +39,16 @@ def create_response(http_code, return_object, is_json=False):
 
 
 def get_connection_info(authorization, controller_name=None, model_name=None):
+    '''
+    This function will query ArangoDB with all the required information to
+    perform the required actions on the API.
+
+    :param obj authorization: The basic auth object that was send to the api.
+    :param str controller_name: The name of the controller on which the action
+        will be performed(optional).
+    :param str model_name: The name of the model on which the action will be
+        performed(optional).
+    '''
     company = datastore.get_company_user(authorization.username)
     if company:
         company_name = company['company']
@@ -71,3 +90,41 @@ def get_connection_info(authorization, controller_name=None, model_name=None):
         return user
     else:
         raise ValueError(errors.unauthorized())
+
+
+async def connect_to_random_controller(user):
+    '''
+    This function will connect to a random controller to check if the provided
+    username and password of the user are right.
+
+    :param obj user: The UserObject of the User that is using the API.
+    '''
+    error = errors.unauthorized()
+    try:
+        ready_controllers = datastore.get_ready_controllers_with_access(
+                    user.username, company=user.company)
+        if len(ready_controllers) == 0:
+            read_cons_no_acc = datastore.get_ready_controllers_no_access(
+                        user.username, user.company)
+            if len(read_cons_no_acc) > 0:
+                user_manager.add_user_to_controllers(
+                            user.username,
+                            user.juju_username,
+                            user.password,
+                            user.company)
+                raise ValueError(409, ('User {} is being added to the '
+                                       'remaining environments').format(
+                                       user.username))
+            else:
+                raise ValueError(400, ('Please wait untill your first '
+                                       'environment is set up!'))
+        else:
+            con = ready_controllers[randint(0, len(ready_controllers) - 1)]
+            controller_connection = Controller()
+            await controller_connection.connect(endpoint=con['endpoints'][0],
+                                                username=user.juju_username,
+                                                password=user.password,
+                                                cacert=con['ca_cert'])
+            await controller_connection.disconnect()
+    except JujuAPIError:
+        raise ValueError(error[0], error[1])
