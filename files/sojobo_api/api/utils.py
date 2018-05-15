@@ -1,3 +1,4 @@
+import asyncio
 import json
 import datetime
 from random import randint
@@ -128,3 +129,17 @@ async def connect_to_random_controller(user):
             await controller_connection.disconnect()
     except JujuAPIError:
         raise ValueError(error[0], error[1])
+
+
+def execute_task(command, *args, **kwargs):
+    '''
+    This function is a wrapper that will make it possible to get the event
+    loop and start async functions.
+
+    :param command: this is the async function that will have to be executed
+        with his args and kwargs that are provided.
+    '''
+    loop = asyncio.get_event_loop()
+    loop.set_debug(False)
+    result = loop.run_until_complete(command(*args, **kwargs))
+    return result

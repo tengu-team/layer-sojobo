@@ -26,12 +26,15 @@ from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 from flask import request, Blueprint
 
-from sojobo_api.api.core import w_errors as errors
-from sojobo_api.api.core import w_users as users
+from sojobo_api.api.core import (
+    w_errors as errors,
+    w_users as users,
+    authentication
+    )
 from sojobo_api.api import w_juju as juju, utils
-from sojobo_api.api.w_juju import execute_task
+from sojobo_api.api.utils import execute_task
 from sojobo_api.api.core.authorization import authorize
-from sojobo_api.api.core.authentication import authenticate
+
 
 USERS = Blueprint('users', __name__)
 LOGGER = logging.getLogger("api_users")
@@ -59,11 +62,13 @@ def login():
     try:
         LOGGER.info('/USERS/login [POST] => receiving call')
         user = utils.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'],
-                     request.authorization, user)
-        code, response = 200, 'Success'
+        execute_task(authentication.authenticate,
+                     request.headers['api-key'], user)
         LOGGER.info('/USERS/login [POST] => Succesfully logged in!')
-        return utils.create_response(code, response)
+        return utils.create_response(200, 'Success')
+    except ValueError as e:
+        error_log()
+        return utils.create_response(e.args[0], e.args[1])
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -81,33 +86,34 @@ def login():
 def get_users_info():
     try:
         LOGGER.info('/USERS [GET] => receiving call')
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'],
-                     request.authorization, auth_data)
+        usrobj = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate,
+                     request.headers['api-key'], usrobj)
         LOGGER.info('/USERS [GET] => Authenticated!')
-        if auth_data['company']:
-            company = auth_data['company']['name']
-        else:
-            company = None
-        if juju.check_if_admin(request.authorization, company=company):
-            code, response = 200, juju.get_users_info(company)
+        if authentication.check_if_admin(usrobj, company=usrobj.company):
+            code, response = 200, user_manager.get_users_info(usrobj.company)
             LOGGER.info('/USERS [GET] => Succesfully retieved all users!')
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/USERS [GET] => No Permission to perform this action!')
+            LOGGER.error('/USERS [GET] => No Permission '
+                         'to perform this action!')
             for user in response:
                 if 'controllers' in user:
                     new_controllers = []
                     for con in user['controllers']:
                         new_models = []
                         for mod in con['models']:
-                            if mod['name'] != 'controller' and mod['name'] != 'default':
+                            if mod['name'] != 'controller' and \
+                               mod['name'] != 'default':
                                 new_models.append(mod)
                         con['models'] = new_models
                         if con['name'] != 'login':
                             new_controllers.append(con)
                     user['controllers'] = new_controllers
         return utils.create_response(code, response)
+    except ValueError as e:
+        error_log()
+        return utils.create_response(e.args[0], e.args[1])
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
@@ -126,28 +132,29 @@ def create_user():
     try:
         LOGGER.info('/USERS [POST] => receiving call')
         data = request.json
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'],
-                     request.authorization, auth_data)
+        usrobj = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'],
+                     usrobj)
         LOGGER.info('/USERS [POST] => Authenticated!')
-        if auth_data['company']:
-            company = auth_data['company']['name']
-        else:
-            company = None
         if authorize(auth_data, '/users/', 'post'):
             if data['password']:
-                users.create_user(data['username'], data['password'], company)
-                return utils.create_response(202, 'User {} is being created'.format(
-                            data['username']))
-                LOGGER.info('/USERS [POST] => Creating user %s, check add_user_to_controller.log for more information!',
-                            data['username'])
+                users.create_user(data['username'],
+                                  data['password'],
+                                  usrobj.company)
+                return utils.create_response(
+                            202,
+                            'User {} is being created'.format(usrobj.username))
+                LOGGER.info(('/USERS [POST] => Creating user %s, check add_'
+                             'user_to_controller.log for more information!'),
+                            usrobj.username)
             else:
                 code, response = errors.empty()
                 return utils.create_response(code, response)
                 LOGGER.error('/USERS [POST] => Password cannot be empty!')
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/USERS [POST] => No Permission to perform this action!')
+            LOGGER.error('/USERS [POST] => No Permission to '
+                         'perform this action!')
             return utils.create_response(code, response)
     except ValueError as e:
         error_log()
@@ -168,29 +175,33 @@ def create_user():
 @USERS.route('/<user>', methods=['GET'])
 def get_user_info(user):
     try:
-        user = unquote(user)
-        LOGGER.info('/USERS/%s [GET] => receiving call', user)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'],
-                     request.authorization, auth_data)
-        LOGGER.info('/USERS/%s [GET] => Authenticated!', user)
-        if authorize(auth_data, '/users/user', 'get', self_user=user,
-                     resource_user=user):
-            if juju.user_exists(user):
-                code, response = 200, juju.get_user_info(user)
-                LOGGER.info('/USERS/%s [GET] => Succesfully retrieved user information!', user)
+        username = unquote(user)
+        LOGGER.info('/USERS/%s [GET] => receiving call', username)
+        usrobj = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'],
+                     request.authorization, usrobj)
+        LOGGER.info('/USERS/%s [GET] => Authenticated!', username)
+        if authorize(auth_data, '/users/user', 'get', self_user=username,
+                     resource_user=username):
+            if user_manager.user_exists(username):
+                code, response = 200, users.get_user_info(username)
+                LOGGER.info('/USERS/%s [GET] => Succesfully retrieved user '
+                            'information!', username)
             else:
                 code, response = errors.does_not_exist('user')
-                LOGGER.error('/USERS/%s [GET] => User %s does not exist!', user, user)
+                LOGGER.error('/USERS/%s [GET] => User %s does not exist!',
+                             username, username)
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/USERS/%s [GET] => No Permission to perform action!', user)
+            LOGGER.error('/USERS/%s [GET] => No Permission to perform action!',
+                         username)
         if 'controllers' in response:
             new_controllers = []
             for con in response['controllers']:
                 new_models = []
                 for mod in con['models']:
-                    if mod['name'] != 'controller' and mod['name'] != 'default':
+                    if mod['name'] != 'controller' and \
+                       mod['name'] != 'default':
                         new_models.append(mod)
                 con['models'] = new_models
                 if con['name'] != 'login':
@@ -215,26 +226,32 @@ def change_user_password(user):
     try:
         username = unquote(user)
         LOGGER.info('/USERS/%s [PUT] => receiving call', username)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'],
-                     request.authorization, auth_data)
+        usrobj = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'],
+                     usrobj)
         LOGGER.info('/USERS/%s [PUT] => Authenticated!', username)
         if authorize(auth_data, '/users/user', 'put', self_user=username):
             password = request.json['password']
             if password:
                 users.change_user_password(username, password)
-                return utils.create_response(200, 'Succesfully changed password for user {}'.format(username))
-                LOGGER.info('/USERS/%s [PUT] => Succesfully changed password for user %s!', username, username)
+                return utils.create_response(200,
+                                             ('Succesfully changed password '
+                                              'for user {}').format(username))
+                LOGGER.info('/USERS/%s [PUT] => Succesfully changed password '
+                            'for user %s!', username, username)
             else:
                 code, response = errors.empty()
                 return utils.create_response(code, response)
-                LOGGER.error('/USERS/%s [PUT] => User password can\'t be empty!', username)
+                LOGGER.error('/USERS/%s [PUT] => User password can\'t be '
+                             'empty!', username)
                 return utils.create_response(code, response)
-                LOGGER.error('/USERS/%s [PUT] => User %s does not exist!', username, username)
+                LOGGER.error('/USERS/%s [PUT] => User %s does not exist!',
+                             username, username)
         else:
             code, response = errors.no_permission()
             return utils.create_response(code, response)
-            LOGGER.error('/USERS/%s [PUT] => No Permission to perform this action!', username)
+            LOGGER.error('/USERS/%s [PUT] => No Permission to perform '
+                         'this action!', username)
     except ValueError as e:
         error_log()
         return utils.create_response(e.args[0], e.args[1])
@@ -256,8 +273,8 @@ def delete_user(user):
     try:
         user = unquote(user)
         LOGGER.info('/USERS/%s [DELETE] => receiving call', user)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s [DELETE] => Authenticated!', user)
         if auth_data['company']:
             company = auth_data['company']['name']
@@ -295,8 +312,8 @@ def get_ssh_keys(user):
     try:
         user = unquote(user)
         LOGGER.info('/USERS/%s/ssh-keys [GET] => receiving call', user)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/ssh-keys [GET] => Authenticated!', user)
         if authorize(auth_data, '/users/user/ssh-keys', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -328,8 +345,8 @@ def update_ssh_keys(user):
         user = unquote(user)
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => receiving call', user)
         http_body = request.json
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/ssh-keys [PUT] => Authenticated!', user)
         if authorize(auth_data, '/users/user/ssh-keys', 'put', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -369,8 +386,8 @@ def get_credentials(user):
     try:
         user = unquote(user)
         LOGGER.info('/USERS/%s/credentials [GET] => receiving call', user)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials [GET] => Authenticated!', user)
         if authorize(auth_data, '/users/user/credentials', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -402,8 +419,8 @@ def add_credential(user):
         user = unquote(user)
         LOGGER.info('/USERS/%s/credentials [POST] => receiving call', user)
         credential = request.json
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials [POST] => Authenticated!', user)
         if authorize(auth_data, '/users/credentials', 'post', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -442,8 +459,8 @@ def get_credential(user, credential):
     try:
         user = unquote(user)
         LOGGER.info('/USERS/%s/credentials/%s [GET] => receiving call', user, credential)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials/%s [GET] => Authenticated!', user, credential)
         if authorize(auth_data, '/users/credentials/credential', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -477,8 +494,8 @@ def remove_credential(user, credential):
     try:
         user = unquote(user)
         LOGGER.info('/USERS/%s/credentials/%s [DELETE] => receiving call', user, credential)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/credentials/%s [DELETE] => Authenticated!', user, credential)
         if authorize(auth_data, '/users/credentials/credential', 'del', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -513,8 +530,8 @@ def get_controllers_access(user):
     try:
         user = unquote(user)
         LOGGER.info('/USERS/%s/controllers [GET] => receiving call', user)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers [GET] => Authenticated', user)
         if authorize(auth_data, '/users/controllers', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -559,8 +576,8 @@ def get_ucontroller_access(user, controller):
         user = unquote(user)
         controller = unquote(controller)
         LOGGER.info('/USERS/%s/controllers/%s [GET] => receiving call', user, controller)
-        auth_data = juju.get_connection_info(request.authorization, c_name=controller)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization, c_name=controller)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s [GET] => Authenticated!', user, controller)
         if authorize(auth_data, '/users/user/controllers/controller', 'get', self_user=user, resource_user=user):
             if juju.user_exists(user):
@@ -598,8 +615,8 @@ def grant_to_controller(user, controller):
         user = unquote(user)
         controller = unquote(controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => receiving call', user, controller)
-        auth_data = juju.get_connection_info(request.authorization, controller)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller)
+        auth_data = utils.get_connection_info(request.authorization, controller)
+        connection = execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authenticated!', user, controller)
         LOGGER.info('/USERS/%s/controllers/%s [PUT] => Authorized!', user, controller)
         if auth_data['company']:
@@ -644,8 +661,8 @@ def get_models_access(user, controller):
         user = unquote(user)
         controller = unquote(controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [GET] => receiving call', user, controller)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models [GET] => Authenticated!', user, controller)
 <<<<<<< HEAD
         if auth_data['company']:
@@ -695,8 +712,8 @@ def grant_to_model(user, controller):
         controller = unquote(controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => receiving call', user, controller)
         models_access_levels = request.json
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authenticated!', user, controller)
         LOGGER.info('/USERS/%s/controllers/%s/models [PUT] => Authorized!', user, controller)
         if auth_data['company']:
@@ -735,8 +752,8 @@ def get_model_access(user, controller, model):
         controller = unquote(controller)
         model = unquote(model)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => receiving call!', user, controller, model)
-        auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        auth_data = utils.get_connection_info(request.authorization)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authenticated!', user, controller, model)
         LOGGER.info('/USERS/%s/controllers/%s/models/%s [GET] => Authorized!', user, controller, model)
         if auth_data['company']:
