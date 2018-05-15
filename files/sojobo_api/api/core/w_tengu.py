@@ -23,17 +23,10 @@ def add_relation(controller, model, juju_username,
         raise ValueError(app1_name)
 
 def add_machine(controller, model, username, password, series, constraints,
-                spec, comp, data):
+                spec, company, url):
     if constraints:
         w_juju.check_constraints(constraints)
-    if 'url' in data and w_juju.cloud_supports_series(controller.type, series):
-        spec = 'ssh:ubuntu@{}'.format(data['url'])
+    if url and w_juju.cloud_supports_series(controller.type, series):
+        spec = 'ssh:ubuntu@{}'.format(url)
     if w_juju.cloud_supports_series(controller.name, series):
-        machine_manager.add_machine(username, password, controller, model.key, series, constraints, spec, comp)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller.name, model.name)
-        code, response = 202, 'Machine is being deployed!'
-        return juju.create_response(code, response)
-    else:
-        code, response = 400, 'This cloud does not support this version of Ubuntu'
-        LOGGER.error('/TENGU/controllers/%s/models/%s/machines [POST] => This cloud does not support this version of Ubuntu!', controller, model)
-        return juju.create_response(code, response)
+        machine_manager.add_machine(username, password, controller.name, model.key, series, constraints, spec, company)

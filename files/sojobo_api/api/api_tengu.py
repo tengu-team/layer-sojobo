@@ -759,7 +759,6 @@ def add_machine(controller, model):
                 return juju.create_response(code, response)
             except ValueError as e:
 
-            url = data.get('url', None)
             if constraints:
                 juju.check_constraints(constraints)
             if 'url' in data and juju.cloud_supports_series(auth_data['controller']['type'], series):
