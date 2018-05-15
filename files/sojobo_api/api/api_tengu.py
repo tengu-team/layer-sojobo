@@ -479,7 +479,7 @@ def add_application(controller, model):
                                                                     ca_cert = auth_data["controller"]["ca_cert"],
                                                                     default_credential_name = auth_data["controller"]["default-credential"])
             try:
-                w_tengu.deploy_app(connection, controller_object, model_object, request.authorization.username, request.authorization.password,
+                w_tengu.deploy_application(connection, controller_object, model_object, request.authorization.username, request.authorization.password,
                                 json_data.get('units', '1'), json_data.get('config', ''), json_data.get('target', None),
                                 json_data.get('application', None), json_data.get('series', None))
                 code, response = 202, 'Application is being deployed!'
