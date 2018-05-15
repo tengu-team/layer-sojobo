@@ -3,7 +3,8 @@ import subprocess
 from sojobo_api import settings
 
 class ModelObject:
-    def __init__(self, name, state, uuid, credential_name):
+    def __init__(self, key, name, state, uuid, credential_name):
+        self.key = key
         self.name = name
         self.state = state
         self.uuid = uuid

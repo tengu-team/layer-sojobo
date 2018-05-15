@@ -725,14 +725,41 @@ def add_machine(controller, model):
         connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
         LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Authenticated!', controller, model)
         if auth_data['company']:
-            comp = auth_data['company']['name']
+            company = auth_data['company']['name']
         else:
-            comp = None
+            company = None
         if authorize(auth_data, '/controllers/controller/models/model/machines', 'post'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Authorized!', controller, model)
             constraints = data.get('constraints', None)
             series = data.get('series', None)
             spec = None
+            url = data.get('url', None)
+            # TODO: Model object should be retrieved from connection info.
+            model_object = model_manager.ModelObject(key = auth_data['model']['_key']
+                                                     name = auth_data["model"]["name"],
+                                                     state= auth_data["model"]["state"],
+                                                     uuid = auth_data["model"]["uuid"],
+                                                     credential_name = auth_data["model"]["credential"])
+            # TODO: Controller object should be retrieved from connection info.
+            controller_object = controller_manager.ControllerObject(key = auth_data["controller"]["_key"],
+                                                                    name = auth_data["controller"]["name"],
+                                                                    state= auth_data["controller"]["state"],
+                                                                    type = auth_data["controller"]["type"],
+                                                                    region = auth_data["controller"]["region"],
+                                                                    models = auth_data["controller"]["models"],
+                                                                    endpoints = auth_data["controller"]["endpoints"],
+                                                                    uuid = auth_data["controller"]["uuid"],
+                                                                    ca_cert = auth_data["controller"]["ca_cert"],
+                                                                    default_credential_name = auth_data["controller"]["default-credential"])
+            try:
+                w_tengu.add_machine(controller_object, model_object, request.authorization.username,
+                                    request.authorization.password, series, constraints, spec, company, url)
+                LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller, model)
+                code, response = 202, 'Machine is being deployed!'
+                return juju.create_response(code, response)
+            except ValueError as e:
+
+            url = data.get('url', None)
             if constraints:
                 juju.check_constraints(constraints)
             if 'url' in data and juju.cloud_supports_series(auth_data['controller']['type'], series):

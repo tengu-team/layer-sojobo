@@ -1,5 +1,5 @@
 from sojobo_api.api import w_juju
-from sojobo_api.api.managers import model_manager
+from sojobo_api.api.managers import machine_manager, model_manager
 
 """This module holds logic that does not belong in api_tengu."""
 
@@ -21,3 +21,19 @@ def add_relation(controller, model, juju_username,
             raise ValueError(app2_name)
     else:
         raise ValueError(app1_name)
+
+def add_machine(controller, model, username, password, series, constraints,
+                spec, comp, data):
+    if constraints:
+        w_juju.check_constraints(constraints)
+    if 'url' in data and w_juju.cloud_supports_series(controller.type, series):
+        spec = 'ssh:ubuntu@{}'.format(data['url'])
+    if w_juju.cloud_supports_series(controller.name, series):
+        machine_manager.add_machine(username, password, controller, model.key, series, constraints, spec, comp)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller.name, model.name)
+        code, response = 202, 'Machine is being deployed!'
+        return juju.create_response(code, response)
+    else:
+        code, response = 400, 'This cloud does not support this version of Ubuntu'
+        LOGGER.error('/TENGU/controllers/%s/models/%s/machines [POST] => This cloud does not support this version of Ubuntu!', controller, model)
+        return juju.create_response(code, response)
