@@ -20,11 +20,10 @@ import zipfile
 import sys
 import traceback
 import logging
-import time
 
 from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
-from flask import send_file, request, Blueprint, abort
+from flask import send_file, request, Blueprint
 
 from sojobo_api.api import w_juju as juju
 from sojobo_api.api.storage import w_datastore as datastore
@@ -40,8 +39,10 @@ WS_LOGGER = logging.getLogger('websockets.protocol')
 LOGGER.setLevel(logging.DEBUG)
 WS_LOGGER.setLevel(logging.DEBUG)
 
+
 def get():
     return TENGU
+
 
 @TENGU.before_app_first_request
 def initialize():
@@ -82,7 +83,6 @@ def get_all_controllers():
         ers = error_log()
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
-
 
 
 @TENGU.route('/controllers', methods=['POST'])
@@ -162,7 +162,6 @@ def get_controller_info(controller):
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
-
 
 
 @TENGU.route('/controllers/<controller>', methods=['DELETE'])
@@ -259,6 +258,7 @@ def create_model(controller):
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
 
+
 @TENGU.route('/controllers/<controller>/models', methods=['GET'])
 def get_models_info(controller):
     try:
@@ -298,6 +298,7 @@ def get_models_info(controller):
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
+
 
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_info(controller, model):
@@ -446,7 +447,6 @@ def get_applications_info(controller, model):
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
-
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['POST'])
@@ -619,6 +619,7 @@ def remove_app(controller, model, application):
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
+
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/config', methods=['GET'])
 def get_application_config(controller, model, application):
@@ -807,7 +808,6 @@ def get_machine_info(controller, model, machine):
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
-
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['DELETE'])
@@ -1260,6 +1260,7 @@ def restore_controllers():
         ers = error_log()
         code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
+
 
 def error_log():
     exc_type, exc_value, exc_traceback = sys.exc_info()

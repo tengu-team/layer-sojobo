@@ -175,7 +175,7 @@ def setup():
 @when_not('api.running')
 def check_if_env_ready():
     sys.path.append('/opt')
-    from sojobo_api.api import w_datastore as datastore
+    from sojobo_api.api.storage import w_datastore as datastore
     if 'login' in [con['name'] for con in datastore.get_ready_controllers()]:
         set_state('api.running')
     else:
@@ -187,7 +187,7 @@ def check_if_env_ready():
 def create_admin():
     if leader_get().get('admin') != 'Created':
         sys.path.append('/opt')
-        from sojobo_api.api import w_datastore as datastore
+        from sojobo_api.api.storage import w_datastore as datastore
         leader_set({'admin': 'Created'})
         status_set('active', 'admin-password: {} api-key: {}'.format(db.get('password'), db.get('api-key')))
         set_state('admin.created')
