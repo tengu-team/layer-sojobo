@@ -147,8 +147,10 @@ def set_user_state(username, state):
 
 def get_ssh_keys(username):
     u_id = get_user_id(username)
-    aql = 'LET u = DOCUMENT(@u_id) RETURN u.ssh_keys'
-    return  execute_aql_query(aql, rawResults=True, u_id=u_id)
+    aql = ('LET u = DOCUMENT(@u_id) '
+           'FOR key in u.ssh_keys '
+           'RETURN key')
+    return execute_aql_query(aql, rawResults=True, u_id=u_id)
 
 
 def update_ssh_keys(username, ssh_keys):
