@@ -13,8 +13,8 @@ class ModelObject:
         self.credential_name = credential_name
 
 
-def add_relation(controller_key, endpoint, cacert,  model_name,
-                 model_uuid, juju_username, password, relation1, relation2):
+def add_relation(controller_key, endpoint, cacert, model_uuid, juju_username,
+                 password, relation1, relation2):
     """Executes background script that adds a relation between two applications in a model.
 
     :param controller_name: The name of the controller where the model resides.
@@ -25,8 +25,8 @@ def add_relation(controller_key, endpoint, cacert,  model_name,
     """
     Popen(["python3",
            "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
-           controller_key, endpoint, cacert, model_name, model_uuid,
-           juju_username, password, relation1, relation2])
+           controller_key, endpoint, cacert, model_uuid, juju_username,
+           password, relation1, relation2])
 
 
 def add_application(controller_key, model_key, username, password, units,

@@ -21,8 +21,8 @@ def get_application_entity(application_name):
     return entity
 
 
-def add_relation(controller, model, juju_username,
-                 password, relation1, relation2, model_connection):
+def add_relation(controller, model, juju_username, password, relation1,
+                 relation2, model_connection):
     app1_name, app2_name = relation1, relation2
     if ':' in app1_name:
         app1_name = app1_name.split(':')[0]
@@ -32,9 +32,9 @@ def add_relation(controller, model, juju_username,
     if w_juju.app_exists(model_connection, app1_name):
         if w_juju.app_exists(model_connection, app2_name):
             model_manager.add_relation(controller.key, controller.endpoints[0],
-                                       controller.ca_cert, model.name,
-                                       model.uuid, juju_username, password,
-                                       relation1, relation2)
+                                       controller.ca_cert, model.uuid,
+                                       juju_username, password, relation1,
+                                       relation2)
         else:
             raise ValueError(app2_name)
     else:
