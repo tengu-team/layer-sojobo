@@ -13,16 +13,14 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 # pylint: disable=c0111,c0301,c0325,c0326,w0406,e0401,e0611
-from functools import wraps
-import requests
-import yaml
 import logging
 import sys
 import traceback
+
+from flask import request, Blueprint
 from werkzeug.exceptions import HTTPException
+
 from sojobo_api.api.w_juju import execute_task
-from flask import request, Blueprint, abort
-from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api import w_juju as juju
 from sojobo_api.api.core import w_errors as errors, w_bundles as bundles
 from sojobo_api import settings
@@ -33,6 +31,7 @@ REPO = settings.REPO_NAME
 LOGGER = logging.getLogger('api_bundles')
 LOGGER.setLevel(logging.DEBUG)
 
+
 @BUNDLES.before_app_first_request
 def initialize():
     hdlr = logging.FileHandler('/opt/sojobo_api/log/api_bundles.log')
@@ -41,8 +40,10 @@ def initialize():
     hdlr.setFormatter(formatter)
     LOGGER.addHandler(hdlr)
 
+
 def get():
     return BUNDLES
+
 
 @BUNDLES.route('/types', methods=['GET'])
 def get_all_bundles():
@@ -98,6 +99,7 @@ def determine_closest_type():
     except Exception:
         ers = error_log()
         return juju.create_response(errors.cmd_error(ers)[0], errors.cmd_error(ers)[1])
+
 
 @BUNDLES.route('/types', methods=['PUT'])
 def upload_types():

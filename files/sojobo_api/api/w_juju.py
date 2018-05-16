@@ -112,7 +112,8 @@ async def authenticate(api_key, authorization, auth_data, controller=None, model
             comp = None
         if not controller and not model:
             if check_if_admin(authorization, company=comp):
-                await connect_to_random_controller(authorization, auth_data)
+                if comp:
+                    await connect_to_random_controller(authorization, auth_data)
                 return True
             if len(get_all_controllers(company=comp)) == 0:
                 abort(error[0], error[1])
@@ -183,7 +184,13 @@ async def connect_to_random_controller(authorization, auth_data):
                 add_user_to_controllers(authorization.username, auth_data['user']['juju_username'], authorization.password, comp)
                 abort(409, 'User {} is being added to the remaining environments'.format(auth_data['user']['name']))
             else:
-                abort(400, 'Please wait untill your first environment is set up!')
+                con = datastore.get_controller('login')
+                controller_connection = Controller()
+                await controller_connection.connect(endpoint=con['endpoints'][0],
+                                                    username=auth_data['user']['juju_username'],
+                                                    password=authorization.password,
+                                                    cacert=con['ca_cert'])
+                await controller_connection.disconnect()
         else:
             con = ready_controllers[randint(0, len(ready_controllers) - 1)]
             controller_connection = Controller()
@@ -573,26 +580,6 @@ def add_bundle(username, password, c_name, m_name, bundle, company):
            username, password, c_key, m_name, str(json.dumps(bundle))])
 
 
-def deploy_app(connection, controller, modelkey, username, password, controller_type,
-                     units, config, machine, application, series, company):
-    c_key = construct_controller_key(controller, company)
-    if app_exists(connection, application):
-        abort(403, 'Application already exists!')
-    if(cloud_supports_series(controller_type, series)):
-        if machine and not machine_exists(connection, machine):
-            error = errors.does_not_exist(machine)
-            abort(error[0], error[1])
-        serie = '' if series is None else str(series)
-        target = '' if machine is None else str(machine)
-        Popen(["python3", "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
-               c_key, modelkey, username, password, units, target,
-               str(json.dumps(config)), application, serie])
-    else:
-        error = errors.invalid_option(series)
-        abort(error[0], error[1])
-
-
-
 def check_if_exposed(connection, app_name):
     app_info = get_application_info(connection, app_name)
     return app_info['exposed']
@@ -668,13 +655,6 @@ def get_unit_ports(unit):
 def get_relations_info(connection):
     data = get_applications_info(connection)
     return [{'name': a['name'], 'relations': a['relations']} for a in data]
-
-
-def add_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, relation1, relation2, company):
-    c_key = construct_controller_key(c_name, company)
-    Popen(["python3", "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
-           c_key, endpoint, cacert,  m_name, uuid, juju_username, password,
-           relation1, relation2])
 
 
 def remove_relation(c_name, endpoint, cacert,  m_name, uuid, juju_username, password, app1, app2, company):

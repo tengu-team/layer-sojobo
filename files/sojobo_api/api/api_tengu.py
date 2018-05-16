@@ -20,11 +20,10 @@ import zipfile
 import sys
 import traceback
 import logging
-import time
 
 from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
-from flask import send_file, request, Blueprint, abort
+from flask import send_file, request, Blueprint
 
 from sojobo_api.api import w_juju as juju
 from sojobo_api.api.storage import w_datastore as datastore
@@ -40,8 +39,10 @@ WS_LOGGER = logging.getLogger('websockets.protocol')
 LOGGER.setLevel(logging.DEBUG)
 WS_LOGGER.setLevel(logging.DEBUG)
 
+
 def get():
     return TENGU
+
 
 @TENGU.before_app_first_request
 def initialize():
@@ -82,7 +83,6 @@ def get_all_controllers():
         ers = error_log()
         code, response = errors.cmd_error(ers)
         return juju.create_response(code, response)
-
 
 
 @TENGU.route('/controllers', methods=['POST'])
@@ -162,7 +162,6 @@ def get_controller_info(controller):
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
-
 
 
 @TENGU.route('/controllers/<controller>', methods=['DELETE'])
@@ -259,6 +258,7 @@ def create_model(controller):
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
 
+
 @TENGU.route('/controllers/<controller>/models', methods=['GET'])
 def get_models_info(controller):
     try:
@@ -298,6 +298,7 @@ def get_models_info(controller):
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
+
 
 @TENGU.route('/controllers/<controller>/models/<model>', methods=['GET'])
 def get_model_info(controller, model):
@@ -448,36 +449,50 @@ def get_applications_info(controller, model):
             execute_task(juju.disconnect, connection)
 
 
-
 @TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['POST'])
 def add_application(controller, model):
     try:
-        controller = unquote(controller)
-        model = unquote(model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => receiving call', controller, model)
-        data = request.json
-        auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authenticated!', controller, model)
-        if auth_data['company']:
-            comp = auth_data['company']['name']
-        else:
-            comp = None
+        controller_name = unquote(controller)
+        model_name = unquote(model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => receiving call', controller_name, model_name)
+        json_data = request.json
+        auth_data = juju.get_connection_info(request.authorization, c_name=controller_name, m_name=model_name)
+        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller_name, model=model_name)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authenticated!', controller_name, model_name)
         if authorize(auth_data, '/controllers/controller/models/model/applications', 'post'):
-            LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authorized!', controller, model)
-            if auth_data['model'] is not None:
-                juju.deploy_app(connection, controller, auth_data['model']['_key'], request.authorization.username, request.authorization.password,
-                                auth_data['controller']['type'], data.get('units', "1"), data.get('config', ''), data.get('target', None),
-                                data.get('application', None), data.get('series', None), comp)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authorized!', controller_name, model_name)
+            # TODO: Model object should be retrieved from connection info.
+            model_object = model_manager.ModelObject(key = auth_data["model"]["_key"],
+                                                     name = auth_data["model"]["name"],
+                                                     state= auth_data["model"]["state"],
+                                                     uuid = auth_data["model"]["uuid"],
+                                                     credential_name = auth_data["model"]["credential"])
+            # TODO: Controller object should be retrieved from connection info.
+            controller_object = controller_manager.ControllerObject(key = auth_data["controller"]["_key"],
+                                                                    name = auth_data["controller"]["name"],
+                                                                    state= auth_data["controller"]["state"],
+                                                                    type = auth_data["controller"]["type"],
+                                                                    region = auth_data["controller"]["region"],
+                                                                    models = auth_data["controller"]["models"],
+                                                                    endpoints = auth_data["controller"]["endpoints"],
+                                                                    uuid = auth_data["controller"]["uuid"],
+                                                                    ca_cert = auth_data["controller"]["ca_cert"],
+                                                                    default_credential_name = auth_data["controller"]["default-credential"])
+            juju_username = auth_data["user"]["juju_username"]
+            password = request.authorization.password
+            try:
+                w_tengu.deploy_application(connection, controller_object, model_object, juju_username, password,
+                                json_data.get('units', '1'), json_data.get('config', ''), json_data.get('target', None),
+                                json_data.get('application', None), json_data.get('series', None))
                 code, response = 202, 'Application is being deployed!'
-                LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller, model)
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller_name, model_name)
                 return juju.create_response(code, response)
-            else:
-                code, response = errors.does_not_exist("model " + model)
+            except ValueError as e:
+                code, response = e.args[0], e.args[1]
                 return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/TENGU/controllers/%s/models/%s/applications [GET] => No Permission to perform this action!', controller, model)
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications [GET] => No Permission to perform this action!', controller_name, model_name)
             return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
@@ -606,6 +621,7 @@ def remove_app(controller, model, application):
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
+
 
 @TENGU.route('/controllers/<controller>/models/<model>/applications/<application>/config', methods=['GET'])
 def get_application_config(controller, model, application):
@@ -794,7 +810,6 @@ def get_machine_info(controller, model, machine):
     finally:
         if 'connection' in locals():
             execute_task(juju.disconnect, connection)
-
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['DELETE'])
@@ -1050,7 +1065,8 @@ def add_relation(controller, model):
                 relation1 = json_data["app1"]
                 relation2 = json_data["app2"]
                 # TODO: Model object should be retrieved from connection info.
-                model_object = model_manager.ModelObject(name = auth_data["model"]["name"],
+                model_object = model_manager.ModelObject(key = auth_data["model"]["_key"],
+                                                         name = auth_data["model"]["name"],
                                                          state= auth_data["model"]["state"],
                                                          uuid = auth_data["model"]["uuid"],
                                                          credential_name = auth_data["model"]["credential"])
@@ -1246,6 +1262,7 @@ def restore_controllers():
         ers = error_log()
         code, response = errors.cmd_error(ers)
     return juju.create_response(code, response)
+
 
 def error_log():
     exc_type, exc_value, exc_traceback = sys.exc_info()
