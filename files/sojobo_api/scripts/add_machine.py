@@ -19,23 +19,31 @@ import sys
 import traceback
 import logging
 import json
-import ast
 from juju.model import Model
 from juju.client import client
-sys.path.append('/opt')
+from juju.placement import parse as parse_placement
+sys.path.append('/opt')  # noqa: E402
 from sojobo_api import settings
 from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api import w_juju as juju
 
 
-async def add_machine(username, password, controller_name, model_key, series, constraints, spec):
+async def add_machine(username, password, controller_key, model_key, series,
+                      constraints, spec):
     try:
-        auth_data = datastore.get_model_connection_info(username, controller_name, model_key)
+        auth_data = datastore.get_model_connection_info(username,
+                                                        controller_key,
+                                                        model_key)
         model_connection = Model()
-        logger.info('Setting up Model connection for %s:%s', controller_name, auth_data['model']['name'])
-        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
+        logger.info('Setting up Model connection for %s:%s', controller_key,
+                    auth_data['model']['name'])
+        await model_connection.connect(
+                    auth_data['controller']['endpoints'][0],
+                    auth_data['model']['uuid'],
+                    auth_data['user']['juju_username'],
+                    password, auth_data['controller']['ca_cert']
+                    )
         logger.info('Model connection was successful')
-
 
         params = client.AddMachineParams()
         params.jobs = ['JobHostUnits']
@@ -50,7 +58,9 @@ async def add_machine(username, password, controller_name, model_key, series, co
             cons = json.loads(json_acceptable_string)
             params.constraints = client.Value.from_json(cons)
 
-        client_facade = client.ClientFacade.from_connection(model_connection.connection)
+        client_facade = client.ClientFacade.from_connection(
+                    model_connection.connection
+                    )
         results = await client_facade.AddMachines([params])
         error = results.machines[0].error
         if error:
@@ -74,7 +84,8 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     ws_logger = logging.getLogger('websockets.protocol')
     logger = logging.getLogger('add_machine')
-    hdlr = logging.FileHandler('{}/log/add_machine.log'.format(settings.SOJOBO_API_DIR))
+    hdlr = logging.FileHandler('{}/log/add_machine.log'.format(
+                settings.SOJOBO_API_DIR))
     formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
     hdlr.setFormatter(formatter)
     ws_logger.addHandler(hdlr)
@@ -84,5 +95,6 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
     loop.run_until_complete(add_machine(sys.argv[1], sys.argv[2], sys.argv[3],
-                                           sys.argv[4], sys.argv[5], sys.argv[6], sys.argv[7]))
+                                        sys.argv[4], sys.argv[5], sys.argv[6],
+                                        sys.argv[7]))
     loop.close()

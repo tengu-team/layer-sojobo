@@ -2,6 +2,7 @@ import subprocess
 
 from sojobo_api import settings
 
+
 class ModelObject:
     def __init__(self, key, name, state, uuid, credential_name):
         self.key = key

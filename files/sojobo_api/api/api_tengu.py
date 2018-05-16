@@ -689,14 +689,23 @@ def get_machines_info(controller, model):
     try:
         controller = unquote(controller)
         model = unquote(model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => receiving call', controller, model)
-        auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => Authenticated!', controller, model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => '
+                    'receiving call', controller, model)
+        auth_data = juju.get_connection_info(request.authorization,
+                                             c_name=controller, m_name=model)
+        connection = execute_task(juju.authenticate,
+                                  request.headers['api-key'],
+                                  request.authorization, auth_data,
+                                  controller=controller, model=model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => '
+                    'Authenticated!', controller, model)
         if authorize(auth_data, '/controllers/controller/models/model/machines', 'get'):
-            LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => Authorized!', controller, model)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => '
+                        'Authorized!', controller, model)
             code, response = 200, juju.get_machines_info(connection)
-            LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => Succesfully retrieved machine information!', controller, model)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => '
+                        'Succesfully retrieved machine information!',
+                        controller, model)
             return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
@@ -719,62 +728,68 @@ def add_machine(controller, model):
     try:
         controller = unquote(controller)
         model = unquote(model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => receiving call', controller, model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => '
+                    'receiving call', controller, model)
         data = request.json
-        auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Authenticated!', controller, model)
+        auth_data = juju.get_connection_info(request.authorization,
+                                             c_name=controller, m_name=model)
+        connection = execute_task(juju.authenticate,
+                                  request.headers['api-key'],
+                                  request.authorization, auth_data,
+                                  controller=controller, model=model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => '
+                    'Authenticated!', controller, model)
         if auth_data['company']:
             company = auth_data['company']['name']
         else:
             company = None
         if authorize(auth_data, '/controllers/controller/models/model/machines', 'post'):
-            LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Authorized!', controller, model)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => '
+                        'Authorized!', controller, model)
             constraints = data.get('constraints', None)
             series = data.get('series', None)
             spec = None
             url = data.get('url', None)
             # TODO: Model object should be retrieved from connection info.
-            model_object = model_manager.ModelObject(key = auth_data['model']['_key']
-                                                     name = auth_data["model"]["name"],
-                                                     state= auth_data["model"]["state"],
-                                                     uuid = auth_data["model"]["uuid"],
-                                                     credential_name = auth_data["model"]["credential"])
+            model_object = model_manager.ModelObject(
+                        key=auth_data['model']['_key'],
+                        name=auth_data["model"]["name"],
+                        state=auth_data["model"]["state"],
+                        uuid=auth_data["model"]["uuid"],
+                        credential_name=auth_data["model"]["credential"])
             # TODO: Controller object should be retrieved from connection info.
-            controller_object = controller_manager.ControllerObject(key = auth_data["controller"]["_key"],
-                                                                    name = auth_data["controller"]["name"],
-                                                                    state= auth_data["controller"]["state"],
-                                                                    type = auth_data["controller"]["type"],
-                                                                    region = auth_data["controller"]["region"],
-                                                                    models = auth_data["controller"]["models"],
-                                                                    endpoints = auth_data["controller"]["endpoints"],
-                                                                    uuid = auth_data["controller"]["uuid"],
-                                                                    ca_cert = auth_data["controller"]["ca_cert"],
-                                                                    default_credential_name = auth_data["controller"]["default-credential"])
+            controller_object = controller_manager.ControllerObject(
+                        key=auth_data["controller"]["_key"],
+                        name=auth_data["controller"]["name"],
+                        state=auth_data["controller"]["state"],
+                        type=auth_data["controller"]["type"],
+                        region=auth_data["controller"]["region"],
+                        models=auth_data["controller"]["models"],
+                        endpoints=auth_data["controller"]["endpoints"],
+                        uuid=auth_data["controller"]["uuid"],
+                        ca_cert=auth_data["controller"]["ca_cert"],
+                        default_credential_name=auth_data["controller"]["default-credential"])
             try:
-                w_tengu.add_machine(controller_object, model_object, request.authorization.username,
-                                    request.authorization.password, series, constraints, spec, company, url)
-                LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller, model)
+                w_tengu.add_machine(controller_object, model_object,
+                                    request.authorization.username,
+                                    request.authorization.password,
+                                    series, constraints, spec, company, url)
+                LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] '
+                            '=> Creating Machine!', controller, model)
                 code, response = 202, 'Machine is being deployed!'
                 return juju.create_response(code, response)
-            except ValueError as e:
-
-            if constraints:
-                juju.check_constraints(constraints)
-            if 'url' in data and juju.cloud_supports_series(auth_data['controller']['type'], series):
-                spec = 'ssh:ubuntu@{}'.format(data['url'])
-            if juju.cloud_supports_series(controller, series):
-                juju.add_machine(request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], series, constraints, spec, comp)
-                LOGGER.info('/TENGU/controllers/%s/models/%s/machines [POST] => Creating Machine!', controller, model)
-                code, response = 202, 'Machine is being deployed!'
-                return juju.create_response(code, response)
-            else:
-                code, response = 400, 'This cloud does not support this version of Ubuntu'
-                LOGGER.error('/TENGU/controllers/%s/models/%s/machines [POST] => This cloud does not support this version of Ubuntu!', controller, model)
+            except ValueError:
+                code, response = 400,
+                'This cloud does not support this version of Ubuntu'
+                LOGGER.error('/TENGU/controllers/%s/models/%s/machines [POST]'
+                             ' => This cloud does not support this version '
+                             'of Ubuntu!', controller, model)
                 return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/TENGU/controllers/%s/models/%s/machines [POST] => No Permission to perform this action!', controller, model)
+            LOGGER.error('/TENGU/controllers/%s/models/%s/machines [POST] => '
+                         'No Permission to perform this action!',
+                         controller, model)
             return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
@@ -793,18 +808,27 @@ def add_machine(controller, model):
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['GET'])
-def get_machine_info(controller, model, machine):
+def get_machine(controller, model, machine):
     try:
         controller = unquote(controller)
         model = unquote(model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => receiving call', controller, model, machine)
-        auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Authenticated!', controller, model, machine)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => '
+                    'receiving call', controller, model, machine)
+        auth_data = juju.get_connection_info(request.authorization,
+                                             c_name=controller, m_name=model)
+        connection = execute_task(juju.authenticate,
+                                  request.headers['api-key'],
+                                  request.authorization, auth_data,
+                                  controller=controller, model=model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => '
+                    'Authenticated!', controller, model, machine)
         if authorize(auth_data, '/controllers/controller/models/model/machines/machine', 'get'):
-            LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Authorized!', controller, model, machine)
-            code, response = 200, juju.get_machine_info(connection, machine)
-            LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Succesfully retrieved machine information!', controller, model, machine)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => '
+                        'Authorized!', controller, model, machine)
+            code, response = 200, w_tengu.get_machine(connection, machine)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => '
+                        'Succesfully retrieved machine information!',
+                        controller, model, machine)
             return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()

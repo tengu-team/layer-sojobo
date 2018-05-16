@@ -3,6 +3,7 @@ from sojobo_api.api.managers import machine_manager, model_manager
 
 """This module holds logic that does not belong in api_tengu."""
 
+
 def add_relation(controller, model, juju_username,
                  password, relation1, relation2, model_connection):
     app1_name, app2_name = relation1, relation2
@@ -22,6 +23,7 @@ def add_relation(controller, model, juju_username,
     else:
         raise ValueError(app1_name)
 
+
 def add_machine(controller, model, username, password, series, constraints,
                 spec, company, url):
     if constraints:
@@ -29,4 +31,10 @@ def add_machine(controller, model, username, password, series, constraints,
     if url and w_juju.cloud_supports_series(controller.type, series):
         spec = 'ssh:ubuntu@{}'.format(url)
     if w_juju.cloud_supports_series(controller.name, series):
-        machine_manager.add_machine(username, password, controller.name, model.key, series, constraints, spec, company)
+        machine_manager.add_machine(username, password,
+                                    controller.name, model.key, series,
+                                    constraints, spec, company)
+
+
+def get_machine(connection, machine):
+    machine_manager.get_machine(connection, machine)
