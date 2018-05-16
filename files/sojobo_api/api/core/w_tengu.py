@@ -31,18 +31,17 @@ def add_relation(controller, model, juju_username, password, relation1,
 
     if w_juju.app_exists(model_connection, app1_name):
         if w_juju.app_exists(model_connection, app2_name):
-            model_manager.add_relation(controller.key, controller.endpoints[0],
-                                       controller.ca_cert, model.uuid,
-                                       juju_username, password, relation1,
-                                       relation2)
+            model_manager.add_relation(controller.endpoints[0], controller.ca_cert,
+                                       model.uuid, juju_username, password,
+                                       relation1, relation2)
         else:
             raise ValueError(app2_name)
     else:
         raise ValueError(app1_name)
 
 
-def deploy_application(connection, controller, model, username, password, units,
-                       config, machine, application, series):
+def deploy_application(connection, controller, model, juju_username, password,
+                       units, config, machine, application, series):
     try:
         get_application_entity(application)
     except theblues.errors.EntityNotFound:
@@ -54,11 +53,10 @@ def deploy_application(connection, controller, model, username, password, units,
             if machine and not w_juju.machine_exists(connection, machine):
                 error = errors.does_not_exist("machine %s".format(machine))
                 raise ValueError(error[0], error[1])
-            serie = '' if series is None else str(series)
-            target = '' if machine is None else str(machine)
-            model_manager.add_application(controller.key, model.key, username,
-                                          password, units, target, config,
-                                          application, serie)
+            model_manager.add_application(controller.endpoints[0], controller.ca_cert,
+                                          model.key, model.uuid, juju_username,
+                                          password, units, machine, config,
+                                          application, series)
         else:
             error = "The cloud \'{}\' does not support '{}' series.".format(controller.type, series)
             raise ValueError(400, error)

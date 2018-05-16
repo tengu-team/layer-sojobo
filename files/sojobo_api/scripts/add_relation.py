@@ -31,10 +31,10 @@ from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api import w_juju as juju
 
 
-async def add_relation(controller_key, endpoint, ca_cert, model_uuid,
-                       juju_username, password, relation1, relation2):
+async def add_relation(endpoint, ca_cert, model_uuid, juju_username, password,
+                       relation1, relation2):
     try:
-        logger.info('Setting up Model connection for %s:%s.', controller_key, model_uuid)
+        logger.info('Setting up Model connection for %s.', model_uuid)
         model_connection = Model()
         await model_connection.connect(endpoint, model_uuid, juju_username,
                                        password, ca_cert)
@@ -79,5 +79,5 @@ if __name__ == '__main__':
     loop.set_debug(True)
     loop.run_until_complete(add_relation(sys.argv[1], sys.argv[2], sys.argv[3],
                                          sys.argv[4], sys.argv[5], sys.argv[6],
-                                         sys.argv[7], sys.argv[8]))
+                                         sys.argv[7]))
     loop.close()

@@ -13,25 +13,20 @@ class ModelObject:
         self.credential_name = credential_name
 
 
-def add_relation(controller_key, endpoint, cacert, model_uuid, juju_username,
-                 password, relation1, relation2):
-    """Executes background script that adds a relation between two applications in a model.
-
-    :param controller_name: The name of the controller where the model resides.
-    :type name: str.
-    :param endpoint: IP-address of controller endpoint.
-    :type state: str.
-
-    """
+def add_relation(endpoint, cacert, model_uuid, juju_username, password,
+                 relation1, relation2):
+    """Executes background script that adds a relation between two applications in a model."""
     Popen(["python3",
            "{}/scripts/add_relation.py".format(settings.SOJOBO_API_DIR),
-           controller_key, endpoint, cacert, model_uuid, juju_username,
-           password, relation1, relation2])
+           endpoint, cacert, model_uuid, juju_username, password,
+           relation1, relation2])
 
 
-def add_application(controller_key, model_key, username, password, units,
-                    target, config, application, serie):
+def add_application(endpoint, ca_cert, model_key, model_uuid, juju_username,
+                    password, units, machine, config, application, series):
+    serie = '' if series is None else str(series)
+    target = '' if machine is None else str(machine)
     Popen(["python3",
            "{}/scripts/add_application.py".format(settings.SOJOBO_API_DIR),
-           controller_key, model_key, username, password, units, target,
-           str(json.dumps(config)), application, serie])
+           endpoint, ca_cert, model_key, model_uuid, juju_username, password,
+           units, target, str(json.dumps(config)), application, serie])

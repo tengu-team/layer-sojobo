@@ -30,17 +30,13 @@ from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api import w_juju as juju
 
 
-async def add_application(controller_name, m_key, username, password, units,
-                          machine, config, application, series):
+async def add_application(endpoint, ca_cert, model_key, model_uuid, juju_username,
+                          password, units, machine, config, application, series):
     try:
-        auth_data = datastore.get_model_connection_info(username, controller_name, m_key)
         model_connection = Model()
-        logger.info('Setting up Model connection for %s:%s', controller_name, auth_data['model']['name'])
-        await model_connection.connect(auth_data['controller']['endpoints'][0],
-                                       auth_data['model']['uuid'],
-                                       auth_data['user']['juju_username'],
-                                       password,
-                                       auth_data['controller']['ca_cert'])
+        logger.info('Setting up Model connection for %s', model_uuid)
+        await model_connection.connect(endpoint, model_uuid, juju_username,
+                                       password, ca_cert)
         logger.info('Model connection was successful.')
 
         logger.info('Creating model entity...')
@@ -100,19 +96,16 @@ async def add_application(controller_name, m_key, username, password, units,
 
         # If monitoring is enabled for the workspace then we need to add a
         # relation between the application and the tengu monitoring telegraf.
-        if juju.monitoring_enabled(auth_data["model"]):
+        if juju.monitoring_enabled(model_key):
             m_name = auth_data["model"]["name"]
-            logger.info('Updating monitoring relations for %s:%s', controller_name, m_name)
+            logger.info('Updating monitoring relations for %s:%s', model_uuid)
             applications_info = juju.get_applications_info(model_connection)
-            endpoint = auth_data["controller"]["endpoints"][0]
-            cacert = auth_data["controller"]["ca_cert"]
-            uuid = auth_data["model"]["uuid"]
             juju_username = auth_data["user"]["juju_username"]
-            juju.update_monitoring_relations(controller_name, endpoint, cacert, m_name,
-                                             uuid, juju_username, password,
+            juju.update_monitoring_relations(controller_name, endpoint, ca_cert, m_name,
+                                             model_uuid, juju_username, password,
                                              applications_info)
-            juju.add_monitoring_to_app(controller_name, endpoint, cacert, m_name,
-                                uuid, juju_username, password, application)
+            juju.add_monitoring_to_app(controller_name, endpoint, ca_cert, m_name,
+                                model_uuid, juju_username, password, application)
 
         await model_connection.disconnect()
         logger.info('Application %s succesfully added!', application)
@@ -141,5 +134,6 @@ if __name__ == '__main__':
     loop.set_debug(True)
     loop.run_until_complete(add_application(sys.argv[1], sys.argv[2], sys.argv[3],
                                             sys.argv[4], sys.argv[5], sys.argv[6],
-                                            sys.argv[7], sys.argv[8], sys.argv[9]))
+                                            sys.argv[7], sys.argv[8], sys.argv[9],
+                                            sys.argv[10], sys.argv[11]))
     loop.close()
