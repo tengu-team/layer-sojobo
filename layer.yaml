@@ -4,7 +4,7 @@ includes: ['layer:basic', 'layer:leadership', 'layer:apt', 'layer:juju-client',
 repo: git@github.com:tengu-team/Sojobo-api.git
 options:
   apt:
-    packages: ['python3-lxml']
+    packages: ['python3-lxml', 'python-dev']
   basic:
     use_venv: false
     include_system_packages: false

@@ -19,7 +19,7 @@ import os
 from flask import Flask, redirect, request, abort
 from sojobo_api import settings
 from sojobo_api.api.w_juju import create_response
-from sojobo_api.api.w_errors import invalid_data, unauthorized
+from sojobo_api.api.core.w_errors import invalid_data, unauthorized
 ########################################################################################################################
 # INIT FLASK
 ########################################################################################################################

@@ -266,8 +266,11 @@ def mergecopytree(src, dst, symlinks=False, ignore=None):
 
 
 def install_api():
-    for pkg in ['Jinja2', 'flask', 'pyyaml', 'click', 'pygments','gitpython',
-                'asyncio_extras', 'requests', 'juju==0.6.1', 'async_generator']:
+    subprocess.check_call(['pip3', 'install', '-U', 'setuptools',
+                           '--upgrade', 'pip'])
+    for pkg in ['Jinja2', 'flask', 'pyyaml', 'click', 'pygments', 'gitpython',
+                'asyncio_extras', 'requests', 'juju==0.6.1',
+                'async_generator', 'sshpubkeys']:
         subprocess.check_call(['pip3', 'install', pkg])
     mergecopytree('files/sojobo_api', API_DIR)
     if not os.path.isdir('{}/files'.format(API_DIR)):
@@ -285,7 +288,7 @@ def install_api():
     chownr(API_DIR, USER, GROUP, chowntopdir=True)
     service_restart('nginx')
     status_set('active', 'The Sojobo-api is installed')
-    application_version_set('1.0.0')
+    application_version_set('0.18.0')
 
 
 def invalid_credential(credential, cloud):

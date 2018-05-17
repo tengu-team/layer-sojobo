@@ -352,9 +352,13 @@ def update_ssh_keys(user):
             if juju.user_exists(user):
                 for key in http_body['ssh-keys']:
                     try:
-                        fp_key = base64.b64decode(key.strip().split()[1].encode('ascii'))
-                        fp_plain = hashlib.md5(fp_key).hexdigest()
-                        output = ':'.join(a+b for a,b in zip(fp_plain[::2], fp_plain[1::2]))
+                        if key.split(" ").count('ssh-rsa') == 1:
+                            fp_key = base64.b64decode(key.strip().split()[1].encode('ascii'))
+                            fp_plain = hashlib.md5(fp_key).hexdigest()
+                            output = ':'.join(a+b for a,b in zip(fp_plain[::2], fp_plain[1::2]))
+                        else:
+                            code, response = errors.invalid_ssh_key(key)
+                            return utils.create_response(code, response)
                     except Exception:
                         code, response = errors.invalid_ssh_key(key)
                         return utils.create_response(code, response)

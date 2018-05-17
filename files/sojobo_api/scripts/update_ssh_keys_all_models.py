@@ -40,7 +40,6 @@ async def update_ssh_keys_all_models(ssh_keys, username):
         json_acceptable_string = ssh_keys.replace("'", "\"")
         new_keys = json.loads(json_acceptable_string)
 
-
         for controller in user_info["controllers"]:
             endpoint = controller["endpoints"][0]
             cacert = controller["ca_cert"]
@@ -60,18 +59,19 @@ async def update_ssh_keys_all_models(ssh_keys, username):
                     key_facade = client.KeyManagerFacade.from_connection(model_connection.connection)
 
                     logger.info('Removing current ssh keys...')
-                    for key in current_keys:
-                        key = base64.b64decode(bytes(key.strip().split()[1].encode('ascii')))
-                        key = hashlib.md5(key).hexdigest()
-                        key = ':'.join(a+b for a, b in zip(key[::2], key[1::2]))
-                        logger.info('removing key: %s', key)
-                        await key_facade.DeleteKeys([key], juju_username)
-
-                    logger.info('Adding new ssh keys...')
-                    for key in new_keys:
-                        logger.info('adding key: %s', key)
-                        await key_facade.AddKeys([key], juju_username)
-
+                    try:
+                        for key in current_keys:
+                            key = base64.b64decode(bytes(key.strip().split()[1].encode('ascii')))
+                            key = hashlib.md5(key).hexdigest()
+                            key = ':'.join(a+b for a, b in zip(key[::2], key[1::2]))
+                            logger.info('removing key: %s', key)
+                            await key_facade.DeleteKeys([key], juju_username)
+                        logger.info('Adding new ssh keys...')
+                        for key in new_keys:
+                            logger.info('adding key: %s', key)
+                            await key_facade.AddKeys([key], juju_username)
+                    except Exception:
+                        pass
                     await model_connection.disconnect()
 
         logger.info('Updating ssh keys in database...')

@@ -62,16 +62,18 @@ async def update_ssh_keys_model(ssh_keys, username, c_name, m_key):
 
             logger.info('Removing current ssh keys...')
             for key in current_keys:
-                key = base64.b64decode(bytes(key.strip().split()[1].encode('ascii')))
-                key = hashlib.md5(key).hexdigest()
-                key = ':'.join(a+b for a, b in zip(key[::2], key[1::2]))
-                logger.info('removing key: %s', key)
-                await key_facade.DeleteKeys([key], juju_username)
+                if key not in new_keys:
+                    key = base64.b64decode(bytes(key.strip().split()[1].encode('ascii')))
+                    key = hashlib.md5(key).hexdigest()
+                    key = ':'.join(a+b for a, b in zip(key[::2], key[1::2]))
+                    logger.info('removing key: %s', key)
+                    await key_facade.DeleteKeys([key], juju_username)
 
             logger.info('Adding new ssh keys...')
             for key in new_keys:
-                logger.info('adding key: %s', key)
-                await key_facade.AddKeys([key], juju_username)
+                if key not in current_keys:
+                    logger.info('adding key: %s', key)
+                    await key_facade.AddKeys([key], juju_username)
 
             await model_connection.disconnect()
 
