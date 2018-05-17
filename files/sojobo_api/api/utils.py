@@ -5,7 +5,7 @@ from random import randint
 from juju.controller import Controller
 from juju.errors import JujuAPIError
 
-from Flask import Response
+from flask import Response
 from sojobo_api.api.core import w_errors as errors
 from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api.managers import (
@@ -82,8 +82,8 @@ def get_connection_info(authorization, controller_name=None, model_name=None):
                     model_access=info_data.get('m_access', None),
                     company=company_name,
                     company_admin=company_access,
-                    ssh_keys=info_data['user']['ssh-keys'],
-                    credentials=info_data['user']['credentials'])
+                    ssh_keys=info_data['user'].get('ssh-keys', None),
+                    credentials=info_data['user'].get('credentials', None))
         if 'controller' in locals():
             if 'model' in locals():
                 return user, controller, model

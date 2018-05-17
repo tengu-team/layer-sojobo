@@ -26,11 +26,14 @@ from urllib.parse import unquote
 from werkzeug.exceptions import HTTPException
 from flask import send_file, request, Blueprint, abort
 
-from sojobo_api.api import w_juju as juju
+from sojobo_api.api import w_juju as juju, utils
 from sojobo_api.api.storage import w_datastore as datastore
-from sojobo_api.api.core import w_errors as errors
+from sojobo_api.api.core import (
+    w_errors as errors,
+    authentication,
+    w_tengu
+    )
 from sojobo_api.api.w_juju import execute_task
-from sojobo_api.api.core import w_tengu
 from sojobo_api.api.managers import model_manager
 from sojobo_api.api.core.authorization import authorize
 
@@ -58,7 +61,7 @@ def get_all_controllers():
     try:
         LOGGER.info('/TENGU/controllers [GET] => receiving call')
         auth_data = juju.get_connection_info(request.authorization)
-        execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data)
+        execute_task(authentication.authenticate, request.headers['api-key'], request.authorization, auth_data)
         LOGGER.info('/TENGU/controllers [GET] => Authenticated!')
         if auth_data['company']:
             company = auth_data['company']['name']
@@ -98,7 +101,7 @@ def create_controller():
             comp = auth_data['company']['name']
         else:
             comp = None
-        if juju.check_if_admin(request.authorization, company=comp):
+        if authentication.check_if_admin(request.authorization, company=comp):
             if juju.credential_exists(auth_data['user']['name'], data['credential']):
                 code, response = juju.create_controller(auth_data, data, request.authorization.username, request.authorization.password, comp)
                 LOGGER.info('%s [POST] => Creating Controller %s, check add_controller.log for more details! ', url, data['controller'])

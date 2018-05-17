@@ -3,7 +3,7 @@ from juju.errors import JujuAPIError
 from juju.model import Model
 
 from sojobo_api import settings
-from sojobo_api.api import utils
+from sojobo_api.api import utils, w_juju as juju
 from sojobo_api.api.managers import (
     controller_manager,
     user_manager,
@@ -28,8 +28,8 @@ async def authenticate(api_key, user, controller=None, model=None):
                 await utils.connect_to_random_controller(user)
                 return True
         try:
-            controller_manager.check_controller_state(controller, user)
-            user_manager.check_user_state(user)
+            juju.check_controller_state(controller, user)
+            # user_manager.check_user_state(user)
             if user.controller_access:
                 if controller and not model:
                     controller_connection = Controller()

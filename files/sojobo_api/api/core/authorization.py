@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from sojobo_api.api import w_datastore
+from sojobo_api.api.storage import w_datastore
 from sojobo_api import settings
 
 """
