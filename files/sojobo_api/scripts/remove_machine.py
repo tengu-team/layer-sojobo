@@ -18,21 +18,29 @@ import asyncio
 import sys
 import traceback
 import logging
-import json
 from juju.model import Model
 from juju.client import client
-sys.path.append('/opt')
+sys.path.append('/opt')  # noqa: E402
 from sojobo_api import settings
 from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api import w_juju as juju
 
 
-async def remove_machine(username, password, controller_name, model_key, machine):
+async def remove_machine(username, password, controller_key, model_key, machine):
     try:
-        auth_data = datastore.get_model_connection_info(username, controller_name, model_key)
+        auth_data = datastore.get_model_connection_info(username,
+                                                        controller_key,
+                                                        model_key)
         model_connection = Model()
-        logger.info('Setting up Model connection for %s:%s', controller_name, auth_data['model']['name'])
-        await model_connection.connect(auth_data['controller']['endpoints'][0], auth_data['model']['uuid'], auth_data['user']['juju_username'], password, auth_data['controller']['ca_cert'])
+        logger.info('Setting up Model connection for %s:%s', controller_key,
+                    auth_data['model']['name'])
+        await model_connection.connect(
+                    auth_data['controller']['endpoints'][0],
+                    auth_data['model']['uuid'],
+                    auth_data['user']['juju_username'],
+                    password,
+                    auth_data['controller']['ca_cert']
+                    )
         logger.info('Model connection was successful')
 
         for mach, entity in model_connection.state.machines.items():
@@ -65,6 +73,7 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     loop = asyncio.get_event_loop()
     loop.set_debug(True)
-    loop.run_until_complete(remove_machine(sys.argv[1], sys.argv[2], sys.argv[3],
-                                         sys.argv[4], sys.argv[5]))
+    loop.run_until_complete(remove_machine(sys.argv[1], sys.argv[2],
+                                           sys.argv[3], sys.argv[4],
+                                           sys.argv[5]))
     loop.close()

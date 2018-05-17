@@ -685,7 +685,7 @@ def set_application_config(controller, model, application):
 
 
 @TENGU.route('/controllers/<controller>/models/<model>/machines', methods=['GET'])
-def get_machines_info(controller, model):
+def get_machines(controller, model):
     try:
         controller = unquote(controller)
         model = unquote(model)
@@ -702,7 +702,7 @@ def get_machines_info(controller, model):
         if authorize(auth_data, '/controllers/controller/models/model/machines', 'get'):
             LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => '
                         'Authorized!', controller, model)
-            code, response = 200, juju.get_machines_info(connection)
+            code, response = 200, w_tengu.get_machines(connection)
             LOGGER.info('/TENGU/controllers/%s/models/%s/machines [GET] => '
                         'Succesfully retrieved machine information!',
                         controller, model)
@@ -846,29 +846,49 @@ def get_machine(controller, model, machine):
             execute_task(juju.disconnect, connection)
 
 
-
 @TENGU.route('/controllers/<controller>/models/<model>/machines/<machine>', methods=['DELETE'])
 def remove_machine(controller, model, machine):
     try:
         controller = unquote(controller)
         model = unquote(model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => receiving call', controller, model, machine)
-        auth_data = juju.get_connection_info(request.authorization, c_name=controller, m_name=model)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller, model=model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => Authenticated!', controller, model, machine)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => '
+                    'receiving call', controller, model, machine)
+        auth_data = juju.get_connection_info(request.authorization,
+                                             c_name=controller, m_name=model)
+        connection = execute_task(juju.authenticate,
+                                  request.headers['api-key'],
+                                  request.authorization, auth_data,
+                                  controller=controller, model=model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => '
+                    'Authenticated!', controller, model, machine)
         if auth_data['company']:
-            comp = auth_data['company']['name']
+            company = auth_data['company']['name']
         else:
-            comp = None
+            company = None
         if authorize(auth_data, '/controllers/controller/models/model/machines/machine', 'del'):
-            LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => Authorized!', controller, model, machine)
-            juju.remove_machine(connection, request.authorization.username, request.authorization.password, controller, auth_data['model']['_key'], machine, comp)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] '
+                        '=> Authorized!', controller, model, machine)
+            # TODO: Model object should be retrieved from connection info.
+            model_object = model_manager.ModelObject(
+                        key=auth_data['model']['_key'],
+                        name=auth_data["model"]["name"],
+                        state=auth_data["model"]["state"],
+                        uuid=auth_data["model"]["uuid"],
+                        credential_name=auth_data["model"]["credential"])
+            w_tengu.remove_machine(controller, model_object, connection,
+                                   request.authorization.username,
+                                   request.authorization.password,
+                                   machine, company)
             code, response = 202, 'Machine being removed'
-            LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [GET] => Destroying machine, check remove_machine.log for more information!', controller, model, machine)
+            LOGGER.info('/TENGU/controllers/%s/models/%s/machines/%s [DELETE]'
+                        ' => Destroying machine, check remove_machine.log '
+                        'for more information!', controller, model, machine)
             return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/TENGU/controllers/%s/models/%s/machines/%s [DELETE] => No Permission to perform this action!', controller, model, machine)
+            LOGGER.error('/TENGU/controllers/%s/models/%s/machines/%s [DELETE]'
+                         ' => No Permission to perform this action!',
+                         controller, model, machine)
             return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()

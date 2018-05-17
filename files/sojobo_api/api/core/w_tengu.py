@@ -1,4 +1,6 @@
+from flask import abort
 from sojobo_api.api import w_juju
+from sojobo_api.api.core import w_errors as errors
 from sojobo_api.api.managers import machine_manager, model_manager
 
 """This module holds logic that does not belong in api_tengu."""
@@ -24,8 +26,20 @@ def add_relation(controller, model, juju_username,
         raise ValueError(app1_name)
 
 
-def add_machine(controller, model, username, password, series, constraints,
-                spec, company, url):
+##############################################################################
+# Machines FUNCTIONS
+##############################################################################
+
+def get_machines(connection):
+    machine_manager.get_machines(connection)
+
+
+def get_machine(connection, machine):
+    machine_manager.get_machine(connection, machine)
+
+
+def add_machine(controller, model, username, password, series,
+                constraints, spec, company, url):
     if constraints:
         w_juju.check_constraints(constraints)
     if url and w_juju.cloud_supports_series(controller.type, series):
@@ -36,5 +50,9 @@ def add_machine(controller, model, username, password, series, constraints,
                                     constraints, spec, company)
 
 
-def get_machine(connection, machine):
-    machine_manager.get_machine(connection, machine)
+def remove_machine(controller, model, connection, username, password,
+                   machine, company):
+    if not machine_manager.machine_exists(connection, machine):
+        abort(404, errors.does_not_exist('machine')[1])
+    machine_manager.remove_machine(username, password, controller, model.key,
+                                   machine, company)

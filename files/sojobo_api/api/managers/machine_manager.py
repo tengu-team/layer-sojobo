@@ -19,6 +19,50 @@ def add_machine(username, password, controller_name, model_key, series,
            serie, cons, specifications])
 
 
+def get_machines(connection):
+    result = {}
+    for machine, data in connection.state.state.get('machine', {}).items():
+        try:
+            if data[0]['agent-status']['current'] == 'error' and \
+               data[0]['addresses'] is None:
+                result[machine] = {
+                    'name': machine,
+                    'Error': data[0]['agent-status']['message']
+                    }
+            if data[0] is None:
+                result[machine] = {
+                    'name': machine,
+                    'instance-id': 'Unknown',
+                    'ip': 'Unknown',
+                    'series': 'Unknown',
+                    'containers': 'Unknown',
+                    'hardware-characteristics': 'Unknown'
+                    }
+            if 'lxd' in machine:
+                result[machine.split('/')[0]].get('containers', []).append({
+                    'name': machine, 'instance-id': data[0]['instance-id'],
+                    'ip': get_machine_ip(data[0]), 'series': data[0]['series']
+                })
+            else:
+                result[machine] = {
+                    'name': machine,
+                    'instance-id': data[0]['instance-id'],
+                    'ip': get_machine_ip(data[0]),
+                    'series': data[0]['series'],
+                    'hardware-characteristics': data[0]['hardware-characteristics']
+                }
+        except KeyError:
+            result[machine] = {
+                'name': machine,
+                'instance-id': 'Unknown',
+                'ip': 'Unknown',
+                'series': 'Unknown',
+                'containers': 'Unknown',
+                'hardware-characteristics': 'Unknown'
+                }
+    return [info for info in result.values()]
+
+
 def get_machine(connection, machine):
     try:
         if not machine_exists(connection, machine):
@@ -102,3 +146,11 @@ def get_machine_ip(machine_data):
         elif machine['scope'] == 'local-cloud':
             mach_ips['internal_ip'] = machine['value']
     return mach_ips
+
+
+def remove_machine(username, password, controller_name, model_key,
+                   machine, company):
+    controller_key = w_juju.construct_controller_key(controller_name, company)
+    Popen(["python3",
+           "{}/scripts/remove_machine.py".format(settings.SOJOBO_API_DIR),
+           username, password, controller_key, model_key, machine])
