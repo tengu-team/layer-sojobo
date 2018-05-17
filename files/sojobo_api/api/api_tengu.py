@@ -29,9 +29,10 @@ from sojobo_api.api import w_juju as juju
 from sojobo_api.api.storage import w_datastore as datastore
 from sojobo_api.api.core import w_errors as errors
 from sojobo_api.api.w_juju import execute_task
-from sojobo_api.api.core import w_tengu
-from sojobo_api.api.managers import model_manager, controller_manager
+from sojobo_api.api.core import w_tengu, authentication
+from sojobo_api.api.managers import model_manager, controller_manager, connection_manager
 from sojobo_api.api.core.authorization import authorize
+import sojobo_api.api.core.new_authorization
 
 TENGU = Blueprint('tengu', __name__)
 LOGGER = logging.getLogger('api_tengu')
@@ -449,51 +450,58 @@ def get_applications_info(controller, model):
             execute_task(juju.disconnect, connection)
 
 
-@TENGU.route('/controllers/<controller>/models/<model>/applications', methods=['POST'])
+@TENGU.route('/controllers/<controller>/models/<model>/applications',
+             methods=['POST'])
 def add_application(controller, model):
     try:
         controller_name = unquote(controller)
         model_name = unquote(model)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => receiving call', controller_name, model_name)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST]'
+                    ' => receiving call', controller_name, model_name)
         json_data = request.json
-        auth_data = juju.get_connection_info(request.authorization, c_name=controller_name, m_name=model_name)
-        connection = execute_task(juju.authenticate, request.headers['api-key'], request.authorization, auth_data, controller=controller_name, model=model_name)
-        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authenticated!', controller_name, model_name)
-        if authorize(auth_data, '/controllers/controller/models/model/applications', 'post'):
-            LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => Authorized!', controller_name, model_name)
-            # TODO: Model object should be retrieved from connection info.
-            model_object = model_manager.ModelObject(key = auth_data["model"]["_key"],
-                                                     name = auth_data["model"]["name"],
-                                                     state= auth_data["model"]["state"],
-                                                     uuid = auth_data["model"]["uuid"],
-                                                     credential_name = auth_data["model"]["credential"])
-            # TODO: Controller object should be retrieved from connection info.
-            controller_object = controller_manager.ControllerObject(key = auth_data["controller"]["_key"],
-                                                                    name = auth_data["controller"]["name"],
-                                                                    state= auth_data["controller"]["state"],
-                                                                    type = auth_data["controller"]["type"],
-                                                                    region = auth_data["controller"]["region"],
-                                                                    models = auth_data["controller"]["models"],
-                                                                    endpoints = auth_data["controller"]["endpoints"],
-                                                                    uuid = auth_data["controller"]["uuid"],
-                                                                    ca_cert = auth_data["controller"]["ca_cert"],
-                                                                    default_credential_name = auth_data["controller"]["default-credential"])
-            juju_username = auth_data["user"]["juju_username"]
+        user, controller, model = connection_manager.get_connection_info(
+                                            request.authorization,
+                                            controller_name=controller_name,
+                                            model_name=model_name)
+        connection = execute_task(authentication.authenticate,
+                                  request.headers['api-key'],
+                                  user=user,
+                                  controller=controller,
+                                  model=model)
+        LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST]'
+                    ' => Authenticated!', controller_name, model_name)
+        if sojobo_api.api.core.new_authorization.authorize(user,
+                     '/controllers/controller/models/model/applications',
+                     'post'):
+            LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST]'
+                        ' => Authorized!', controller_name, model_name)
             password = request.authorization.password
             try:
-                w_tengu.deploy_application(connection, controller_object, model_object, juju_username, password,
-                                json_data.get('units', '1'), json_data.get('config', ''), json_data.get('target', None),
-                                json_data.get('application', None), json_data.get('series', None))
+                w_tengu.deploy_application(connection, controller, model,
+                                           user.juju_username,
+                                           password,
+                                           json_data.get('units', '1'),
+                                           json_data.get('config', ''),
+                                           json_data.get('target', None),
+                                           json_data.get('application', None),
+                                           json_data.get('series', None))
                 code, response = 202, 'Application is being deployed!'
-                LOGGER.info('/TENGU/controllers/%s/models/%s/applications [POST] => succesfully deployed application!', controller_name, model_name)
+                LOGGER.info('/TENGU/controllers/%s/models/%s/applications'
+                            ' [POST] => succesfully deployed application!',
+                            controller_name, model_name)
                 return juju.create_response(code, response)
             except ValueError as e:
                 code, response = e.args[0], e.args[1]
                 return juju.create_response(code, response)
         else:
             code, response = errors.no_permission()
-            LOGGER.error('/TENGU/controllers/%s/models/%s/applications [GET] => No Permission to perform this action!', controller_name, model_name)
+            LOGGER.error('/TENGU/controllers/%s/models/%s/applications [GET]'
+                         ' => No Permission to perform this action!',
+                         controller_name, model_name)
             return juju.create_response(code, response)
+    except ValueError as e:
+        code, response = e.args[0], e.args[1]
+        return juju.create_response(code, response)
     except KeyError:
         code, response = errors.invalid_data()
         error_log()
