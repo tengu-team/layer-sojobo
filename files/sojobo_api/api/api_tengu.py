@@ -180,7 +180,7 @@ def delete_controller(controller):
         if juju.check_if_admin(request.authorization, company=comp):
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Authorized!', controller)
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Deleting Controller!', controller)
-            juju.delete_controller(controller, auth_data['controller']['type'])
+            juju.delete_controller(controller, auth_data['controller']['type'], comp)
             code, response = 202, 'Controller {} is being deleted'.format(controller)
             LOGGER.info('/TENGU/controllers/%s [DELETE] => Succesfully deleted controller!', controller)
             return juju.create_response(code, response)
